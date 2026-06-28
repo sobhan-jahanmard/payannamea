@@ -1,0 +1,68 @@
+{
+  "profile_key": "research_assignment",
+  "order_type": "تحقیق دانشگاهی",
+  "workflow": "codex/workflows/research_assignment_workflow.md",
+  "required_fields": ["instructor_name", "course_name"],
+  "producer_agents": [
+    "external_tool_scout",
+    "reference_reader",
+    "visual_extractor",
+    "image_researcher",
+    "outline_builder",
+    "chapter_support_writer",
+    "academic_editor",
+    "word_format_editor",
+    "compliance_reporter"
+  ],
+  "checker_agents": [
+    "profile_stage_checker",
+    "citation_checker",
+    "format_checker",
+    "visual_loop_tester",
+    "image_quality_checker",
+    "ui_quality_checker"
+  ],
+  "skills": [
+    "verified source discovery",
+    "course-assignment structure",
+    "source-grounded drafting",
+    "citation coverage checking",
+    "RTL DOCX formatting"
+  ],
+  "required_outputs": [
+    "deliverable_source",
+    "docx",
+    "compliance_report",
+    "reference_usage_report",
+    "human_review_checklist",
+    "final_readme"
+  ],
+  "image_policy": {
+    "mode": "default_from_quantity",
+    "require_sources_when_figures_expected": true,
+    "allow_generated_images": false,
+    "preferred_sources": ["customer_files", "Wikimedia Commons", "institutional_sources", "manufacturer_or_standards_sources"]
+  },
+  "stage_check_policy": {
+    "independent_checker_required": true,
+    "loop_until_pass_or_human_review": true,
+    "write_stage_reports": true
+  },
+  "external_tool_candidates": [
+    {
+      "name": "STORM",
+      "purpose": "Cited long-form research outline and source exploration",
+      "url": "https://github.com/stanford-oval/storm"
+    },
+    {
+      "name": "PaperQA2",
+      "purpose": "Source-grounded literature question answering over supplied papers",
+      "url": "https://github.com/future-house/paper-qa"
+    },
+    {
+      "name": "Pandoc or LibreOffice",
+      "purpose": "Document conversion when native worker packaging is insufficient",
+      "url": "https://pandoc.org/"
+    }
+  ]
+}

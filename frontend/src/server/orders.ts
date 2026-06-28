@@ -28,6 +28,7 @@ import {
   orderTypeFieldConfig,
   orderTypeOptions,
   quantityTypeOptions,
+  citationStyleNotRequiredValue,
   type AcademicDetailKey,
   type QuantityType
 } from "../lib/order-options";
@@ -57,7 +58,7 @@ const academicDetailFields = {
 } as const;
 
 function orderFieldsRefinement(
-  payload: { order_type: string; quantity_type?: string | null; quantity_value?: number | null } & Partial<Record<AcademicDetailKey, string | number | null | undefined>>,
+  payload: { order_type: string; quantity_type?: string | null; quantity_value?: number | null; academic_style?: string | null } & Partial<Record<AcademicDetailKey, string | number | null | undefined>>,
   ctx: z.RefinementCtx
 ) {
   if (!orderTypeOptions.includes(payload.order_type)) {
@@ -91,16 +92,25 @@ function orderFieldsRefinement(
       message: "واحد حجم با نوع سفارش هم‌خوان نیست"
     });
   }
+
+  if (fieldConfig.requiresCitationStyle && !compact(payload.academic_style)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["academic_style"],
+      message: "شیوه ارجاع برای این نوع سفارش الزامی است"
+    });
+  }
 }
 
 export const orderCreateSchema = z.object({
   degree: z.string().min(1).max(120),
   university: z.string().min(1).max(255),
   title: z.string().min(3).max(500),
+  student_name: z.string().min(2).max(255),
   order_type: z.string().min(1).max(120),
   methodology: z.string().min(1).max(160),
   language: z.string().min(1).max(80),
-  academic_style: z.string().min(1).max(120),
+  academic_style: z.string().max(120).optional().nullable(),
   field_of_study: z.string().max(255).optional().nullable(),
   ...academicDetailFields,
   quantity_type: z.enum(quantityTypeOptions as [QuantityType, ...QuantityType[]]).optional().nullable(),
@@ -291,6 +301,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     degree: order.degree,
     university: order.university,
     title: order.title,
+    student_name: order.student_name,
     order_type: order.order_type,
     methodology: order.methodology,
     language: order.language,
@@ -397,10 +408,11 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       degree: payload.degree,
       university: payload.university,
       title: payload.title.trim(),
+      student_name: payload.student_name.trim(),
       order_type: payload.order_type,
       methodology: payload.methodology,
       language: payload.language,
-      academic_style: payload.academic_style,
+      academic_style: orderTypeFieldConfig(payload.order_type).requiresCitationStyle ? compact(payload.academic_style) ?? "APA 7" : citationStyleNotRequiredValue,
       field_of_study: compact(payload.field_of_study),
       faculty: compact(payload.faculty),
       department: compact(payload.department),
@@ -467,9 +479,10 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         degree: payload.degree,
         university: payload.university,
         title: payload.title.trim(),
+        student_name: payload.student_name.trim(),
         methodology: payload.methodology,
         language: payload.language,
-        academic_style: payload.academic_style,
+        academic_style: orderTypeFieldConfig(payload.order_type).requiresCitationStyle ? compact(payload.academic_style) ?? "APA 7" : citationStyleNotRequiredValue,
         field_of_study: compact(payload.field_of_study),
         faculty: compact(payload.faculty),
         department: compact(payload.department),

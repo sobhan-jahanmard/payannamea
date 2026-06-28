@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import io
 import json
 import math
 import os
@@ -11,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -24,6 +26,29 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 CODEX_TEMPLATE_DIR = ROOT / "codex"
+ORDER_PROFILE_DIR = CODEX_TEMPLATE_DIR / "order_profiles"
+ORDER_PROFILE_CACHE: dict[str, dict[str, Any]] | None = None
+
+DEFAULT_REQUIRED_OUTPUTS = [
+    "deliverable_source",
+    "docx",
+    "compliance_report",
+    "reference_usage_report",
+    "human_review_checklist",
+    "final_readme",
+]
+
+UPLOAD_LABELS = {
+    "deliverable_source": "deliverable source",
+    "docx": "editable Word file",
+    "pptx": "editable PowerPoint file",
+    "pdf": "PDF file",
+    "compliance_report": "compliance report",
+    "reference_usage_report": "reference usage report",
+    "human_review_checklist": "human review checklist",
+    "final_readme": "final README",
+    "image_sources": "figure source metadata",
+}
 
 QUANTITY_LABELS = {
     "pages": "صفحه",
@@ -52,6 +77,8 @@ ORDER_FIELDS = [
     ("deadline", "مهلت تحویل"),
     ("keywords", "کلیدواژه‌ها"),
 ]
+
+CITATION_STYLE_NOT_REQUIRED = "نیاز ندارد"
 
 REQUIRED_FIELDS_BY_ORDER_TYPE = {
     "پایان‌نامه کارشناسی": ["faculty", "advisor_name"],
@@ -112,6 +139,146 @@ def compact_value(value: Any) -> str:
     return str(value).strip()
 
 
+def load_order_profiles() -> dict[str, dict[str, Any]]:
+    global ORDER_PROFILE_CACHE
+    if ORDER_PROFILE_CACHE is not None:
+        return ORDER_PROFILE_CACHE
+
+    profiles: dict[str, dict[str, Any]] = {}
+    if ORDER_PROFILE_DIR.exists():
+        for path in sorted(ORDER_PROFILE_DIR.glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            profile_key = compact_value(data.get("profile_key"))
+            order_type = compact_value(data.get("order_type"))
+            if not profile_key or not order_type:
+                raise SystemExit(f"Invalid order profile manifest: {path}")
+            profiles[profile_key] = data
+
+    if not profiles:
+        raise SystemExit(f"No order profiles found under {ORDER_PROFILE_DIR}")
+
+    ORDER_PROFILE_CACHE = profiles
+    return profiles
+
+
+def default_order_profile(order: dict[str, Any]) -> dict[str, Any]:
+    order_type = compact_value(order.get("order_type"))
+    return {
+        "profile_key": "unclassified",
+        "order_type": order_type or "unknown",
+        "workflow": "codex/workflows/order_workflow.md",
+        "required_fields": REQUIRED_FIELDS_BY_ORDER_TYPE.get(order_type, []),
+        "producer_agents": [
+            "rule_extractor",
+            "reference_reader",
+            "outline_builder",
+            "chapter_support_writer",
+            "academic_editor",
+            "word_format_editor",
+            "compliance_reporter",
+        ],
+        "checker_agents": [
+            "profile_stage_checker",
+            "citation_checker",
+            "format_checker",
+            "image_quality_checker",
+            "ui_quality_checker",
+        ],
+        "skills": ["generic academic support", "source grounding", "format checking"],
+        "required_outputs": DEFAULT_REQUIRED_OUTPUTS,
+        "image_policy": {
+            "mode": "default_from_quantity",
+            "require_sources_when_figures_expected": True,
+            "allow_generated_images": False,
+        },
+        "stage_check_policy": {
+            "independent_checker_required": True,
+            "loop_until_pass_or_human_review": True,
+            "write_stage_reports": True,
+        },
+        "fallback_reason": "No exact order profile matched the order_type label.",
+    }
+
+
+def resolve_order_profile(order: dict[str, Any]) -> dict[str, Any]:
+    order_type = compact_value(order.get("order_type"))
+    quantity_type = compact_value(order.get("quantity_type"))
+    profiles = load_order_profiles()
+
+    for profile in profiles.values():
+        if compact_value(profile.get("order_type")) == order_type:
+            return profile
+
+    if quantity_type == "slides" or "پاورپوینت" in order_type or "ارائه" in order_type:
+        return profiles["presentation"]
+
+    return default_order_profile(order)
+
+
+def order_profile_summary(order: dict[str, Any]) -> dict[str, Any]:
+    profile = resolve_order_profile(order)
+    return {
+        "profile_key": profile.get("profile_key"),
+        "order_type": profile.get("order_type"),
+        "workflow": profile.get("workflow"),
+        "required_fields": profile.get("required_fields", []),
+        "producer_agents": profile.get("producer_agents", []),
+        "checker_agents": profile.get("checker_agents", []),
+        "skills": profile.get("skills", []),
+        "required_outputs": profile.get("required_outputs", DEFAULT_REQUIRED_OUTPUTS),
+        "image_policy": profile.get("image_policy", {}),
+        "stage_check_policy": profile.get("stage_check_policy", {}),
+        "external_tool_candidates": profile.get("external_tool_candidates", []),
+        **({"fallback_reason": profile["fallback_reason"]} if profile.get("fallback_reason") else {}),
+    }
+
+
+def profile_required_fields(order: dict[str, Any]) -> list[str]:
+    return list(resolve_order_profile(order).get("required_fields", []))
+
+
+def profile_required_outputs(order: dict[str, Any]) -> list[str]:
+    outputs = resolve_order_profile(order).get("required_outputs") or DEFAULT_REQUIRED_OUTPUTS
+    return [compact_value(output) for output in outputs if compact_value(output)]
+
+
+def profile_requires_output(order: dict[str, Any], output_type: str) -> bool:
+    return output_type in set(profile_required_outputs(order))
+
+
+def required_image_source_count(order: dict[str, Any]) -> int:
+    expected_figures = requested_or_default_image_count(order)
+    image_policy = resolve_order_profile(order).get("image_policy", {})
+    image_mode = compact_value(image_policy.get("mode"))
+    if image_mode == "visuals_regularly" and profile_requires_output(order, "pptx"):
+        return max(expected_figures, 1)
+    return expected_figures
+
+
+def profile_requires_image_sources(order: dict[str, Any], expected_figures: int | None = None) -> bool:
+    expected_count = required_image_source_count(order) if expected_figures is None else expected_figures
+    if expected_count <= 0:
+        return False
+    image_policy = resolve_order_profile(order).get("image_policy", {})
+    return bool(image_policy.get("require_sources_when_figures_expected", True))
+
+
+def required_uploads_for_order(order: dict[str, Any]) -> list[str]:
+    required = list(profile_required_outputs(order))
+    expected_figures = required_image_source_count(order)
+    if profile_requires_image_sources(order, expected_figures) and "image_sources" not in required:
+        required.append("image_sources")
+    return required
+
+
+def write_order_profile(workspace: Path, order: dict[str, Any]) -> None:
+    (workspace / "extracted").mkdir(parents=True, exist_ok=True)
+    (workspace / "extracted" / "order_profile.json").write_text(
+        json.dumps(order_profile_summary(order), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def markdown_escape(value: Any) -> str:
     text = compact_value(value)
     return text.replace("|", "\\|").replace("\n", "<br>")
@@ -133,8 +300,19 @@ def primary_direction(order: dict[str, Any]) -> str:
     return "rtl"
 
 
+def student_display_name(order: dict[str, Any]) -> str:
+    explicit_name = compact_value(order.get("student_name"))
+    if explicit_name:
+        return explicit_name
+
+    customer = order.get("customer")
+    if isinstance(customer, dict):
+        return compact_value(customer.get("full_name"))
+    return ""
+
+
 def missing_order_fields(order: dict[str, Any]) -> list[str]:
-    required = list(REQUIRED_FIELDS_BY_ORDER_TYPE.get(compact_value(order.get("order_type")), []))
+    required = profile_required_fields(order)
     if order.get("quantity_value") in (None, ""):
         required.append("quantity_value")
     missing = []
@@ -145,9 +323,12 @@ def missing_order_fields(order: dict[str, Any]) -> list[str]:
 
 
 def normalized_order_context(order: dict[str, Any]) -> dict[str, Any]:
+    profile = order_profile_summary(order)
     return {
         "id": order.get("id"),
         "order_type": order.get("order_type"),
+        "order_profile": profile,
+        "student_name": student_display_name(order),
         "title": order.get("title"),
         "title_english": order.get("title_english"),
         "degree": order.get("degree"),
@@ -183,6 +364,7 @@ def normalized_order_context(order: dict[str, Any]) -> dict[str, Any]:
 
 def order_context_markdown(order: dict[str, Any]) -> str:
     context = normalized_order_context(order)
+    profile = context["order_profile"]
     lines = [
         "# Order Context",
         "",
@@ -195,8 +377,14 @@ def order_context_markdown(order: dict[str, Any]) -> str:
     ]
     for key, label in ORDER_FIELDS:
         value = order.get(key)
+        if key == "academic_style" and compact_value(value) == CITATION_STYLE_NOT_REQUIRED:
+            continue
         if compact_value(value):
             lines.append(f"| {label} | {markdown_escape(value)} |")
+    if compact_value(context.get("student_name")):
+        lines.append(f"| نام دانشجو / ارائه‌دهنده | {markdown_escape(context.get('student_name'))} |")
+    lines.append(f"| پروفایل پردازشگر | `{markdown_escape(profile.get('profile_key'))}` |")
+    lines.append(f"| گردش کار انتخاب‌شده | `{markdown_escape(profile.get('workflow'))}` |")
     lines.append(f"| حجم موردنیاز | {markdown_escape(context['quantity_text'])} |")
     lines.append(f"| جهت اصلی خروجی | `{context['primary_direction']}` |")
 
@@ -286,6 +474,7 @@ def write_order_context(workspace: Path, order: dict[str, Any]) -> None:
         json.dumps(normalized_order_context(order), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    write_order_profile(workspace, order)
 
 
 def require_success(response: requests.Response) -> dict[str, Any]:
@@ -358,6 +547,7 @@ def resolve_order_context(
 
 def ensure_workspace(config: Config, order: dict[str, Any]) -> Path:
     order_id = order["id"]
+    profile = order_profile_summary(order)
     workspace = order_dir(config, order_id)
     for relative in [
         "input/files",
@@ -366,7 +556,9 @@ def ensure_workspace(config: Config, order: dict[str, Any]) -> Path:
         "planning",
         "drafts",
         "reports",
+        "reports/stage_checks",
         "final",
+        "final/figures",
     ]:
         (workspace / relative).mkdir(parents=True, exist_ok=True)
 
@@ -382,8 +574,11 @@ def ensure_workspace(config: Config, order: dict[str, Any]) -> Path:
     shutil.copytree(CODEX_TEMPLATE_DIR, target_codex_dir)
     (workspace / "AGENTS.md").write_text(
         "# Order Workspace Instructions\n\n"
-        "Read and follow `codex/AGENTS.md`, then execute "
-        "`codex/workflows/order_workflow.md` through the human review package stage.\n",
+        "Read and follow `codex/AGENTS.md`, then read `extracted/order_profile.json`.\n\n"
+        f"Selected worker profile: `{profile['profile_key']}`.\n\n"
+        f"Execute `{profile['workflow']}` through the human review package stage. "
+        "Each stage must be checked by the profile checker agent, and each failed "
+        "check must be corrected and re-checked before moving on.\n",
         encoding="utf-8",
     )
 
@@ -528,26 +723,19 @@ def refresh_workspace_order_snapshot(workspace: Path, order: dict[str, Any]) -> 
 
 
 def is_presentation_order(order: dict[str, Any]) -> bool:
+    if profile_requires_output(order, "pptx"):
+        return True
     order_type = compact_value(order.get("order_type"))
     quantity_type = compact_value(order.get("quantity_type"))
     return "پاورپوینت" in order_type or "ارائه" in order_type or quantity_type == "slides"
 
 
 def validate_review_package(workspace: Path, order: dict[str, Any], upload_paths: dict[str, str | None]) -> None:
+    expected_figures = required_image_source_count(order)
     required: list[tuple[str, str | None]] = [
-        ("deliverable source", upload_paths.get("deliverable_source")),
-        ("editable Word file", upload_paths.get("docx")),
-        ("compliance report", upload_paths.get("compliance_report")),
-        ("reference usage report", upload_paths.get("reference_usage_report")),
-        ("human review checklist", upload_paths.get("human_review_checklist")),
-        ("final README", upload_paths.get("final_readme")),
+        (UPLOAD_LABELS.get(output_type, output_type), upload_paths.get(output_type))
+        for output_type in required_uploads_for_order(order)
     ]
-    if is_presentation_order(order):
-        required.append(("editable PowerPoint file", upload_paths.get("pptx")))
-
-    expected_figures = requested_or_default_image_count(order)
-    if expected_figures > 0:
-        required.append(("figure source metadata", upload_paths.get("image_sources")))
 
     missing = [label for label, path in required if not path or not Path(path).exists() or Path(path).stat().st_size == 0]
     if missing:
@@ -558,12 +746,24 @@ def validate_review_package(workspace: Path, order: dict[str, Any], upload_paths
             f"Workspace: {workspace}"
         )
 
-    if expected_figures > 0:
+    if profile_requires_image_sources(order, expected_figures):
         validate_image_sources_file(workspace, upload_paths.get("image_sources"), expected_figures)
     validate_docx_rtl_quality(order, upload_paths.get("docx"))
+    validate_docx_page_count(order, upload_paths.get("docx"))
     validate_no_placeholder_outputs(upload_paths)
-    if is_presentation_order(order):
+    if profile_requires_output(order, "pptx"):
         validate_pptx_ui_quality(order, upload_paths.get("pptx"), workspace)
+
+
+def normalize_image_sources_metadata(raw_sources: Any) -> list[Any]:
+    if isinstance(raw_sources, list):
+        return raw_sources
+    if isinstance(raw_sources, dict):
+        for key in ("accepted", "images", "figures", "sources"):
+            value = raw_sources.get(key)
+            if isinstance(value, list):
+                return value
+    return []
 
 
 def validate_image_sources_file(workspace: Path, image_sources_path: str | None, expected_count: int) -> None:
@@ -572,12 +772,13 @@ def validate_image_sources_file(workspace: Path, image_sources_path: str | None,
 
     path = Path(image_sources_path)
     try:
-        sources = json.loads(path.read_text(encoding="utf-8"))
+        raw_sources = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise SystemExit(f"Could not read figure source metadata: {path}") from exc
 
-    actual_count = len(sources) if isinstance(sources, list) else 0
-    if not isinstance(sources, list) or actual_count < expected_count:
+    sources = normalize_image_sources_metadata(raw_sources)
+    actual_count = len(sources)
+    if actual_count < expected_count:
         raise SystemExit(
             "Figure source metadata is incomplete; refusing to submit final package.\n"
             f"Expected at least {expected_count} sourced figure records, found {actual_count}."
@@ -590,7 +791,13 @@ def validate_image_sources_file(workspace: Path, image_sources_path: str | None,
             continue
 
         local_path = compact_value(source.get("local_path"))
-        source_url = compact_value(source.get("description_url")) or compact_value(source.get("url"))
+        source_url = (
+            compact_value(source.get("description_url"))
+            or compact_value(source.get("source_url"))
+            or compact_value(source.get("url"))
+            or compact_value(source.get("direct_file_url"))
+            or compact_value(source.get("source_file_url"))
+        )
         license_label = compact_value(source.get("license"))
         generated_flag = compact_value(source.get("generated")) or compact_value(source.get("generation_tool"))
         if not local_path:
@@ -620,7 +827,6 @@ def validate_image_sources_file(workspace: Path, image_sources_path: str | None,
             f"{bullet_list}"
         )
 
-
 def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> None:
     if not docx_path or primary_direction(order) != "rtl":
         return
@@ -641,16 +847,18 @@ def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> N
     bidi_count = document_xml.count("<w:bidi") + styles_xml.count("<w:bidi")
     right_count = document_xml.count('w:jc w:val="right"') + styles_xml.count('w:jc w:val="right"')
     left_count = document_xml.count('w:jc w:val="left"')
+    visual_rtl_alignment_count = right_count + left_count
     has_fa_lang = 'w:bidi="fa-IR"' in settings_xml + styles_xml + document_xml
     has_cs_font = 'w:cs="B Nazanin"' in styles_xml + document_xml or 'w:cs="Vazirmatn"' in styles_xml + document_xml
+    rtl_paragraph_problems = docx_rtl_paragraph_problems(document_xml)
 
     problems: list[str] = []
     if paragraph_count and bidi_count < max(3, paragraph_count // 2):
         problems.append("most paragraphs are not marked as RTL/bidi")
-    if paragraph_count and right_count < max(3, paragraph_count // 2):
-        problems.append("most paragraphs are not explicitly right-aligned")
-    if left_count:
-        problems.append("left-aligned paragraph formatting was found in an RTL deliverable")
+    if paragraph_count and visual_rtl_alignment_count < max(3, paragraph_count // 2):
+        problems.append("most paragraphs do not have explicit RTL visual-start alignment")
+    if rtl_paragraph_problems:
+        problems.extend(rtl_paragraph_problems[:5])
     if not has_fa_lang:
         problems.append("Persian complex-script language metadata is missing")
     if not has_cs_font:
@@ -661,6 +869,83 @@ def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> N
         raise SystemExit(
             "DOCX RTL/right-alignment validation failed; refusing to submit final package.\n"
             f"{bullet_list}"
+        )
+
+
+def docx_rtl_paragraph_problems(document_xml: str) -> list[str]:
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    try:
+        root = ET.fromstring(document_xml)
+    except ET.ParseError:
+        return ["document.xml could not be parsed for paragraph-level RTL validation"]
+
+    problems: list[str] = []
+    for index, paragraph in enumerate(root.findall(".//w:p", namespace), start=1):
+        text = "".join(text_node.text or "" for text_node in paragraph.findall(".//w:t", namespace)).strip()
+        if not text or not contains_rtl(text):
+            continue
+
+        ppr = paragraph.find("w:pPr", namespace)
+        bidi = ppr.find("w:bidi", namespace) if ppr is not None else None
+        jc = ppr.find("w:jc", namespace) if ppr is not None else None
+        jc_value = jc.get(f"{{{namespace['w']}}}val") if jc is not None else None
+        if bidi is None:
+            problems.append(f"paragraph {index} contains Persian text but is not marked bidi/RTL")
+        if jc_value not in {"left", "right", "center"}:
+            problems.append(f"paragraph {index} contains Persian text but has no explicit visual RTL alignment")
+
+    return problems
+
+
+def rendered_docx_page_count(docx_path: str | None) -> int | None:
+    if not docx_path:
+        return None
+    soffice = shutil.which("libreoffice") or shutil.which("soffice")
+    pdfinfo = shutil.which("pdfinfo")
+    if not soffice or not pdfinfo:
+        return None
+
+    path = Path(docx_path)
+    if not path.exists():
+        return None
+
+    with tempfile.TemporaryDirectory(prefix="payanname-page-check-") as tmpdir:
+        tmp = Path(tmpdir)
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(tmp), str(path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=60,
+        )
+        pdf_path = tmp / f"{path.stem}.pdf"
+        if not pdf_path.exists():
+            return None
+        result = subprocess.run(
+            [pdfinfo, str(pdf_path)],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=20,
+        )
+    match = re.search(r"^Pages:\s+(\d+)\s*$", result.stdout, flags=re.M)
+    return int(match.group(1)) if match else None
+
+
+def validate_docx_page_count(order: dict[str, Any], docx_path: str | None) -> None:
+    requested_pages = requested_page_count(order)
+    if not requested_pages or not docx_path:
+        return
+
+    rendered_pages = rendered_docx_page_count(docx_path)
+    if rendered_pages is None:
+        return
+    minimum_pages = max(1, requested_pages - 1)
+    if rendered_pages < minimum_pages:
+        raise SystemExit(
+            "DOCX rendered page count is below the requested quantity; refusing to submit final package.\n"
+            f"Requested: {requested_pages} pages. Rendered by LibreOffice: {rendered_pages} pages. "
+            "Expand the source content or adjust normal academic spacing before submission."
         )
 
 
@@ -706,6 +991,9 @@ def text_for_output(path: Path) -> str:
 
 def validate_no_placeholder_outputs(upload_paths: dict[str, str | None]) -> None:
     problems: list[str] = []
+    workspace = infer_workspace_from_uploads(upload_paths)
+    documented_review_placeholders = workspace is not None and documented_integrity_placeholders(workspace)
+    final_output_labels = {"deliverable_source", "docx", "pdf", "pptx"}
     for label, raw_path in upload_paths.items():
         if not raw_path:
             continue
@@ -713,7 +1001,16 @@ def validate_no_placeholder_outputs(upload_paths: dict[str, str | None]) -> None
         if not path.exists():
             continue
         text = text_for_output(path)
-        for placeholder in FORBIDDEN_PLACEHOLDERS:
+        forbidden_phrases = list(FORBIDDEN_PLACEHOLDERS)
+        if label in final_output_labels:
+            forbidden_phrases.extend(FINAL_DELIVERABLE_FORBIDDEN_PHRASES)
+        for placeholder in forbidden_phrases:
+            if (
+                label not in final_output_labels
+                and placeholder in {"[NEEDS", "تکمیل شود"}
+                and documented_review_placeholders
+            ):
+                continue
             if placeholder in text:
                 problems.append(f"{label}: contains unfinished placeholder `{placeholder}`")
     if problems:
@@ -722,6 +1019,36 @@ def validate_no_placeholder_outputs(upload_paths: dict[str, str | None]) -> None
             "Output placeholder validation failed; refusing to submit final package.\n"
             f"{bullet_list}"
         )
+
+
+def infer_workspace_from_uploads(upload_paths: dict[str, str | None]) -> Path | None:
+    for raw_path in upload_paths.values():
+        if not raw_path:
+            continue
+        path = Path(raw_path).resolve()
+        for parent in [path, *path.parents]:
+            if (parent / "customer_input.json").exists() and (parent / "reports").exists():
+                return parent
+    return None
+
+
+def documented_integrity_placeholders(workspace: Path) -> bool:
+    review_paths = [
+        workspace / "reports" / "human_review_checklist.md",
+        workspace / "reports" / "compliance_report.md",
+        workspace / "reports" / "stage_checks" / "draft.md",
+    ]
+    review_text = "\n".join(
+        path.read_text(encoding="utf-8", errors="ignore")
+        for path in review_paths
+        if path.exists()
+    ).casefold()
+    return (
+        "[needs student/operator input" in review_text
+        or "missing empirical" in review_text
+        or "original qualitative" in review_text
+        or "داده‌های کیفی" in review_text
+    )
 
 
 def validate_pptx_ui_quality(order: dict[str, Any], pptx_path: str | None, workspace: Path | None = None) -> None:
@@ -761,8 +1088,11 @@ def validate_pptx_ui_quality(order: dict[str, Any], pptx_path: str | None, works
             first_slide_pictures = sum(1 for shape in slide.shapes if str(shape.shape_type) == "PICTURE (13)")
             if first_slide_pictures == 0:
                 problems.append("slide 1: title slide has no visual background or image")
+            presenter_name = student_display_name(order)
+            if presenter_name and presenter_name not in text:
+                problems.append("slide 1: missing student/presenter name")
 
-    expected_figures = requested_or_default_image_count(order)
+    expected_figures = required_image_source_count(order)
     if expected_figures and picture_count < min(expected_figures, 3):
         problems.append(f"expected at least {min(expected_figures, 3)} sourced visuals in PPTX, found {picture_count}")
 
@@ -840,7 +1170,7 @@ def submit_final(config: Config, args: argparse.Namespace) -> None:
                 "replace_existing": "true" if args.replace_existing else "false",
             },
             files=files,
-            timeout=180,
+            timeout=600,
         )
         payload = require_success(response)
         refresh_workspace_order_snapshot(workspace, payload)
@@ -1006,6 +1336,7 @@ def mock_generate(config: Config, args: argparse.Namespace) -> None:
         f"# {title}\n\n"
         "## Order Metadata\n\n"
         f"- Type: {order.get('order_type') or '-'}\n"
+        f"- Student/Presenter: {student_display_name(order) or '-'}\n"
         f"- University: {order.get('university') or '-'}\n"
         f"- Field: {order.get('field_of_study') or '-'}\n"
         f"- Quantity: {quantity_text(order)}\n\n"
@@ -1024,6 +1355,7 @@ def mock_generate(config: Config, args: argparse.Namespace) -> None:
         "| Field | Value |\n"
         "| --- | --- |\n"
         f"| Order type | {order.get('order_type') or '-'} |\n"
+        f"| Student/Presenter | {student_display_name(order) or '-'} |\n"
         f"| University | {order.get('university') or '-'} |\n"
         f"| Advisor/Instructor | {order.get('advisor_name') or order.get('instructor_name') or '-'} |\n"
         f"| Quantity | {quantity_text(order)} |\n\n"
@@ -1050,6 +1382,7 @@ def mock_generate(config: Config, args: argparse.Namespace) -> None:
         f"# Final Package\n\n"
         f"Order: {order_id}\n\n"
         f"Type: {order.get('order_type') or '-'}\n\n"
+        f"Student/Presenter: {student_display_name(order) or '-'}\n\n"
         f"Title: {title}\n\n"
         f"Quantity: {quantity_text(order)}\n\n"
         "Mock final files generated for system testing. Human review is still required before upload.\n",
@@ -1123,6 +1456,27 @@ FORBIDDEN_PLACEHOLDERS = [
     "TBD",
     "[NEEDS",
     "در دسترس نیست",
+]
+FINAL_DELIVERABLE_FORBIDDEN_PHRASES = [
+    "شناسه سفارش",
+    "حجم هدف",
+    "تعداد شکل هدف",
+    "نوع سفارش",
+    "مورد | مقدار",
+    "worker",
+    "workspace",
+    "deliverable",
+    "package",
+    "در نسخه نهایی",
+    "جایگزین شود",
+    "هدف از نگه",
+    "پژوهشگر باید",
+    "این بند باید",
+    "مرحله انسانی",
+    "ورود داده واقعی",
+    "یادداشت تحلیلی شماره",
+    "قالب ارائه یافته‌ها",
+    "چکیده پیشنهادی",
 ]
 
 
@@ -1461,7 +1815,13 @@ def markdown_blocks(markdown: str) -> list[tuple[str, Any]]:
             if not next_line:
                 index += 1
                 break
-            if next_line.startswith("|") or next_line.startswith("#") or re.match(r"^[-*]\s+", next_line) or re.match(r"^\d+\.\s+", next_line):
+            if (
+                next_line.startswith("|")
+                or next_line.startswith("#")
+                or re.match(r"^!\[(.*?)\]\((.*?)\)\s*$", next_line)
+                or re.match(r"^[-*]\s+", next_line)
+                or re.match(r"^\d+\.\s+", next_line)
+            ):
                 break
             paragraph.append(next_line)
             index += 1
@@ -1614,10 +1974,10 @@ def word_paragraph(
         style = "Heading1"
         default_jc = "right"
     else:
-        size = 22
+        size = 26
         bold = False
         before = 0
-        after = 70
+        after = 90
         style = "Normal"
         default_jc = "right"
 
@@ -1626,7 +1986,7 @@ def word_paragraph(
     return (
         "<w:p><w:pPr>"
         f'<w:pStyle w:val="{style}"/>{bidi}<w:jc w:val="{jc}"/>'
-        f'<w:spacing w:before="{before}" w:after="{after}" w:line="290" w:lineRule="auto"/>'
+        f'<w:spacing w:before="{before}" w:after="{after}" w:line="390" w:lineRule="auto"/>'
         "</w:pPr>"
         + word_run(text, bold=bold, size=size, rtl=rtl)
         + "</w:p>"
@@ -1848,17 +2208,17 @@ def word_styles_xml() -> str:
         '<w:docDefaults>'
         '<w:rPrDefault><w:rPr>'
         '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US" w:bidi="fa-IR"/>'
+        '<w:sz w:val="26"/><w:szCs w:val="26"/><w:lang w:val="en-US" w:bidi="fa-IR"/>'
         '</w:rPr></w:rPrDefault>'
         '<w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/>'
-        '<w:spacing w:after="70" w:line="290" w:lineRule="auto"/>'
+        '<w:spacing w:after="90" w:line="390" w:lineRule="auto"/>'
         '</w:pPr></w:pPrDefault>'
         '</w:docDefaults>'
         '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
         '<w:name w:val="Normal"/><w:qFormat/>'
-        '<w:pPr><w:bidi/><w:jc w:val="right"/><w:spacing w:after="70" w:line="290" w:lineRule="auto"/></w:pPr>'
+        '<w:pPr><w:bidi/><w:jc w:val="right"/><w:spacing w:after="90" w:line="390" w:lineRule="auto"/></w:pPr>'
         '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        '<w:rtl/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:bidi="fa-IR"/></w:rPr>'
+        '<w:rtl/><w:sz w:val="26"/><w:szCs w:val="26"/><w:lang w:bidi="fa-IR"/></w:rPr>'
         '</w:style>'
         '<w:style w:type="paragraph" w:styleId="Heading1">'
         '<w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>'
@@ -1880,7 +2240,10 @@ def word_settings_xml() -> str:
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:view w:val="print"/>'
+        '<w:zoom w:percent="100"/>'
         '<w:bidi/>'
+        '<w:mirrorMargins/>'
         '<w:defaultTabStop w:val="720"/>'
         '<w:themeFontLang w:val="en-US" w:eastAsia="en-US" w:bidi="fa-IR"/>'
         '<w:decimalSymbol w:val="."/><w:listSeparator w:val=","/>'
@@ -1899,6 +2262,9 @@ def write_native_formatted_docx(
     base_dir: Path | None = None,
     workspace: Path | None = None,
 ) -> None:
+    if write_python_docx(path, title, markdown, order, base_dir=base_dir, workspace=workspace):
+        return
+
     path.parent.mkdir(parents=True, exist_ok=True)
     # Real deliverables must flow naturally. Page count is controlled by source
     # length and style, not by inserting artificial page breaks that leave gaps.
@@ -1920,7 +2286,7 @@ def write_native_formatted_docx(
         "<w:body>"
         + "".join(body_parts)
         + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-        '<w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="720" w:footer="720" w:gutter="0"/>'
+        '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="720" w:footer="720" w:gutter="0"/>'
         '<w:bidi/><w:rtlGutter/><w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr>'
         + "</w:body></w:document>"
     )
@@ -1975,6 +2341,162 @@ def write_native_formatted_docx(
             docx.writestr(f"word/{asset.target}", asset.data)
 
 
+def write_python_docx(
+    path: Path,
+    title: str,
+    markdown: str,
+    order: dict[str, Any],
+    *,
+    base_dir: Path | None = None,
+    workspace: Path | None = None,
+) -> bool:
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        from docx.shared import Cm, Pt
+    except Exception:
+        return False
+
+    def ensure_child(parent: Any, tag: str) -> Any:
+        existing = parent.find(qn(tag))
+        if existing is not None:
+            return existing
+        child = OxmlElement(tag)
+        parent.append(child)
+        return child
+
+    def set_run_rtl(run: Any, *, bold: bool = False, size: int = 13) -> None:
+        run.bold = bold
+        run.font.name = "B Nazanin"
+        run.font.size = Pt(size)
+        rpr = run._r.get_or_add_rPr()
+        rfonts = ensure_child(rpr, "w:rFonts")
+        rfonts.set(qn("w:ascii"), "Times New Roman")
+        rfonts.set(qn("w:hAnsi"), "Times New Roman")
+        rfonts.set(qn("w:cs"), "B Nazanin")
+        ensure_child(rpr, "w:rtl")
+        lang = ensure_child(rpr, "w:lang")
+        lang.set(qn("w:val"), "en-US")
+        lang.set(qn("w:bidi"), "fa-IR")
+
+    def set_paragraph_rtl(paragraph: Any, *, align: Any = None) -> None:
+        # LibreOffice and Word-compatible bidi paragraphs render visual right-start
+        # alignment with the OOXML left value once w:bidi is active.
+        paragraph.alignment = align or WD_ALIGN_PARAGRAPH.LEFT
+        paragraph.paragraph_format.space_after = Pt(6)
+        paragraph.paragraph_format.line_spacing = 1.45
+        ppr = paragraph._p.get_or_add_pPr()
+        ensure_child(ppr, "w:bidi")
+
+    def add_rtl_paragraph(text: str, *, heading_level: int | None = None, align: Any = None) -> Any:
+        if heading_level:
+            paragraph = document.add_paragraph(style="Heading 1" if heading_level <= 2 else "Heading 2")
+            size = 16 if heading_level == 1 else 14
+            bold = True
+        else:
+            paragraph = document.add_paragraph(style="Normal")
+            size = 13
+            bold = False
+        set_paragraph_rtl(paragraph, align=align)
+        run = paragraph.add_run(rtl_display_text(text, True))
+        set_run_rtl(run, bold=bold, size=size)
+        return paragraph
+
+    def add_rtl_table(rows: list[list[str]]) -> None:
+        if not rows:
+            return
+        table = document.add_table(rows=len(rows), cols=max(len(row) for row in rows))
+        table.style = "Table Grid"
+        tbl_pr = table._tbl.tblPr
+        jc = ensure_child(tbl_pr, "w:jc")
+        jc.set(qn("w:val"), "right")
+        ensure_child(tbl_pr, "w:bidiVisual")
+        for row_index, row in enumerate(rows):
+            for col_index, cell_value in enumerate(row):
+                cell = table.rows[row_index].cells[col_index]
+                paragraph = cell.paragraphs[0]
+                set_paragraph_rtl(paragraph)
+                run = paragraph.add_run(rtl_display_text(str(cell_value), True))
+                set_run_rtl(run, bold=row_index == 0, size=11)
+
+    document = Document()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    section = document.sections[0]
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+    sect_pr = section._sectPr
+    ensure_child(sect_pr, "w:bidi")
+    ensure_child(sect_pr, "w:rtlGutter")
+
+    settings = document.settings.element
+    ensure_child(settings, "w:bidi")
+    ensure_child(settings, "w:mirrorMargins")
+    theme_lang = ensure_child(settings, "w:themeFontLang")
+    theme_lang.set(qn("w:val"), "en-US")
+    theme_lang.set(qn("w:bidi"), "fa-IR")
+
+    normal = document.styles["Normal"]
+    normal.font.name = "B Nazanin"
+    normal.font.size = Pt(13)
+    normal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    blocks, image_assets = prepare_docx_blocks(
+        markdown_blocks(markdown),
+        order,
+        base_dir=base_dir,
+        workspace=workspace,
+    )
+
+    if not blocks or blocks[0][0] != "heading":
+        add_rtl_paragraph(title, heading_level=1)
+
+    with tempfile.TemporaryDirectory(prefix="payanname-python-docx-") as tmpdir:
+        tmp = Path(tmpdir)
+        for block in blocks:
+            kind, value = block
+            if kind == "heading":
+                level, text = value
+                add_rtl_paragraph(text, heading_level=min(level, 3))
+            elif kind == "figure":
+                asset = value
+                image_path = tmp / f"{asset.rid}.jpg"
+                try:
+                    from PIL import Image
+                    with Image.open(io.BytesIO(asset.data)) as image:
+                        if image.mode not in {"RGB", "L"}:
+                            image = image.convert("RGB")
+                        image.save(image_path, format="JPEG", quality=88)
+                except Exception:
+                    image_path = tmp / f"{asset.rid}.{asset.extension}"
+                    image_path.write_bytes(asset.data)
+                image_paragraph = document.add_paragraph()
+                set_paragraph_rtl(image_paragraph, align=WD_ALIGN_PARAGRAPH.CENTER)
+                run = image_paragraph.add_run()
+                try:
+                    run.add_picture(str(image_path), width=Cm(13.5))
+                    add_rtl_paragraph(asset.caption, align=WD_ALIGN_PARAGRAPH.CENTER)
+                except Exception:
+                    add_rtl_paragraph(f"[تصویر قابل درج نیست: {asset.alt}]", align=WD_ALIGN_PARAGRAPH.CENTER)
+            elif kind == "table":
+                add_rtl_table(value)
+            elif kind in {"ul", "ol"}:
+                for index, item in enumerate(value, start=1):
+                    prefix = f"{str(index).translate(PERSIAN_DIGITS)}. " if kind == "ol" else "• "
+                    add_rtl_paragraph(prefix + item)
+            elif str(value).strip():
+                add_rtl_paragraph(str(value))
+            else:
+                document.add_paragraph()
+        document.save(path)
+
+    return True
+
+
 def write_rtl_html_docx(path: Path, title: str, markdown: str, order: dict[str, Any]) -> bool:
     soffice = shutil.which("libreoffice") or shutil.which("soffice")
     if not soffice:
@@ -2021,7 +2543,7 @@ def write_rtl_html_docx(path: Path, title: str, markdown: str, order: dict[str, 
       margin: 10pt 0 5pt;
       font-weight: 700;
     }}
-    p {{ margin: 0 0 7pt; text-align: justify; }}
+    p {{ margin: 0 0 7pt; text-align: right; }}
     table {{
       width: 100%;
       border-collapse: collapse;
@@ -2359,6 +2881,19 @@ def write_presentation_from_markdown(path: Path, title: str, markdown: str, orde
                 color=(232, 244, 240),
                 align=PP_ALIGN.CENTER,
             )
+            presenter_name = student_display_name(order)
+            if presenter_name:
+                add_textbox(
+                    slide,
+                    f"ارائه‌دهنده: {presenter_name}",
+                    left=Inches(6.72),
+                    top=Inches(3.56),
+                    width=Inches(5.2),
+                    height=Inches(0.42),
+                    font_size=Pt(15),
+                    color=(255, 255, 255),
+                    align=PP_ALIGN.CENTER,
+                )
             meta = " | ".join(
                 value for value in [
                     compact_value(order.get("university")),
@@ -2371,7 +2906,7 @@ def write_presentation_from_markdown(path: Path, title: str, markdown: str, orde
                 slide,
                 meta,
                 left=Inches(6.72),
-                top=Inches(3.62),
+                top=Inches(4.08 if presenter_name else 3.62),
                 width=Inches(5.2),
                 height=Inches(0.7),
                 font_size=Pt(13),
@@ -2511,7 +3046,7 @@ def package_existing(config: Config, args: argparse.Namespace) -> None:
     )
     validate_docx_rtl_quality(order, str(docx_path))
     generated = ["final/deliverable.docx"]
-    if is_presentation_order(order):
+    if profile_requires_output(order, "pptx"):
         pptx_path = workspace / "final" / "deliverable.pptx"
         write_presentation_from_markdown(pptx_path, title, markdown, order, workspace)
         generated.append("final/deliverable.pptx")
@@ -2519,24 +3054,51 @@ def package_existing(config: Config, args: argparse.Namespace) -> None:
     if stale_pdf.exists():
         stale_pdf.unlink()
 
-    print(
-        json.dumps(
-            {
-                "orderId": order_id,
-                "source": str(source_path),
-                "generated": generated,
-            },
-            ensure_ascii=False,
-            indent=2,
+    result: dict[str, Any] = {
+        "orderId": order_id,
+        "source": str(source_path),
+        "generated": generated,
+    }
+    if args.submit_final:
+        submit_args = argparse.Namespace(
+            order_id=order_id,
+            workspace=str(workspace),
+            pptx=None,
+            docx=None,
+            pdf=None,
+            deliverable_source=None,
+            compliance_report=None,
+            reference_usage_report=None,
+            human_review_checklist=None,
+            final_readme=None,
+            image_sources=None,
+            skip_package_check=args.skip_package_check,
+            notes=args.notes
+            or "Local worker packaged existing deliverable and submitted the human review package.",
+            replace_existing=args.replace_existing,
         )
-    )
+        submit_final(config, submit_args)
+        refreshed_order = workspace_order(workspace)
+        result["submittedFinal"] = True
+        result["status"] = refreshed_order.get("status")
+        result["finalOutputs"] = len(refreshed_order.get("final_outputs", []))
+    else:
+        result["submittedFinal"] = False
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def current(config: Config, args: argparse.Namespace) -> None:
     order_id, workspace = resolve_order_context(config, args.order_id, args.workspace)
+    order = workspace_order(workspace)
     print(
         json.dumps(
-            {"orderId": order_id, "workspace": str(workspace), "workerId": config.worker_id},
+            {
+                "orderId": order_id,
+                "workspace": str(workspace),
+                "workerId": config.worker_id,
+                "orderProfile": order_profile_summary(order) if order else None,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -2583,7 +3145,7 @@ def build_parser() -> argparse.ArgumentParser:
     final_parser.add_argument(
         "--skip-package-check",
         action="store_true",
-        help="Submit whatever outputs are present without enforcing the standard review-package file set",
+        help="Skip detailed local package validation. The server still enforces the required final-output matrix.",
     )
     final_parser.add_argument("--notes")
     final_parser.add_argument(
@@ -2610,6 +3172,24 @@ def build_parser() -> argparse.ArgumentParser:
     package_parser.add_argument("--order-id")
     package_parser.add_argument("--workspace")
     package_parser.add_argument("--source")
+    package_parser.add_argument("--notes")
+    package_parser.add_argument(
+        "--submit-final",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Submit the completed human review package after packaging, updating order status. Enabled by default.",
+    )
+    package_parser.add_argument(
+        "--skip-package-check",
+        action="store_true",
+        help="Skip detailed local package validation before the automatic final submission.",
+    )
+    package_parser.add_argument(
+        "--replace-existing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Replace existing final outputs of the same type during automatic final submission. Enabled by default.",
+    )
 
     fail_parser = subparsers.add_parser("fail", help="Mark order failed")
     fail_parser.add_argument("--order-id")

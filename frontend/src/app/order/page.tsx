@@ -30,6 +30,8 @@ import { formatBytes } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
 import {
   academicDetailLabels,
+  citationStyleDescriptions,
+  citationStyleNotRequiredValue,
   citationStyleOptions,
   degreeOptions,
   languageOptions,
@@ -71,10 +73,11 @@ const formSchema = z.object({
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
+  student_name: z.string().min(2, "نام و نام خانوادگی دانشجو را وارد کنید"),
   order_type: z.enum(orderTypeOptions as [string, ...string[]], { message: "نوع سفارش معتبر نیست" }),
   methodology: z.string().min(1, "روش یا رویکرد انجام الزامی است"),
   language: z.string().min(1, "زبان الزامی است"),
-  academic_style: z.string().min(1, "شیوه ارجاع الزامی است"),
+  academic_style: z.string().optional(),
   field_of_study: z.string().optional(),
   faculty: z.string().optional(),
   department: z.string().optional(),
@@ -110,6 +113,14 @@ const formSchema = z.object({
       code: "custom",
       path: ["quantity_type"],
       message: "واحد حجم با نوع سفارش هم‌خوان نیست"
+    });
+  }
+
+  if (fieldConfig.requiresCitationStyle && !compact(values.academic_style)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["academic_style"],
+      message: "شیوه ارجاع برای این نوع سفارش الزامی است"
     });
   }
 });
@@ -266,6 +277,7 @@ function OrderForm() {
     defaultValues: {
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
+      student_name: "",
       order_type: orderTypeOptions[0],
       methodology: methodologyOptions[0],
       language: languageOptions[0],
@@ -293,6 +305,7 @@ function OrderForm() {
   const requiredMark = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.required.includes(field) ? " *" : "";
   const quantityTypes = selectedFieldConfig.quantityTypes;
   const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length;
+  const showCitationStyle = selectedFieldConfig.requiresCitationStyle;
 
   useEffect(() => {
     if (!quantityTypes.includes(watched.quantity_type as QuantityType)) {
@@ -304,6 +317,16 @@ function OrderForm() {
     setValue("degree", selectedFieldConfig.defaultDegree, { shouldDirty: true });
   }, [selectedFieldConfig.defaultDegree, setValue]);
 
+  useEffect(() => {
+    if (selectedFieldConfig.requiresCitationStyle) {
+      if (!compact(watched.academic_style) || watched.academic_style === citationStyleNotRequiredValue) {
+        setValue("academic_style", citationStyleOptions[0]);
+      }
+    } else {
+      setValue("academic_style", citationStyleNotRequiredValue);
+    }
+  }, [selectedFieldConfig.requiresCitationStyle, setValue, watched.academic_style]);
+
   const stepFields = useMemo<Record<number, (keyof FormValues)[]>>(
     () => ({
       0: ["order_type"],
@@ -311,6 +334,7 @@ function OrderForm() {
         "degree",
         "university",
         "title",
+        "student_name",
         "methodology",
         "language",
         "academic_style",
@@ -365,10 +389,11 @@ function OrderForm() {
       degree: values.degree,
       university: values.university,
       title: values.title.trim(),
+      student_name: values.student_name.trim(),
       order_type: values.order_type,
       methodology: values.methodology,
       language: values.language,
-      academic_style: values.academic_style,
+      academic_style: selectedFieldConfig.requiresCitationStyle ? compact(values.academic_style) || citationStyleOptions[0] : citationStyleNotRequiredValue,
       field_of_study: compact(values.field_of_study),
       faculty: compact(values.faculty),
       department: compact(values.department),
@@ -517,6 +542,9 @@ function OrderForm() {
                 <Field label="عنوان یا موضوع پیشنهادی" error={errors.title?.message}>
                   <Input {...register("title")} />
                 </Field>
+                <Field label="نام و نام خانوادگی دانشجو *" error={errors.student_name?.message}>
+                  <Input autoComplete="name" {...register("student_name")} />
+                </Field>
                 <SearchableField id="majors" label="رشته یا گرایش تحصیلی" error={errors.field_of_study?.message} options={majorOptions} inputProps={register("field_of_study")} />
                 <Field label="مقطع تحصیلی" error={errors.degree?.message}>
                   <Select {...register("degree")}>{degreeOptions.map((option) => <option key={option}>{option}</option>)}</Select>
@@ -580,9 +608,13 @@ function OrderForm() {
                 <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
                   <Select {...register("methodology")}>{methodologyOptions.map((option) => <option key={option}>{option}</option>)}</Select>
                 </Field>
-                <Field label="شیوه ارجاع‌دهی" error={errors.academic_style?.message}>
-                  <Select {...register("academic_style")}>{citationStyleOptions.map((option) => <option key={option}>{option}</option>)}</Select>
-                </Field>
+                {showCitationStyle ? (
+                  <Field label="شیوه ارجاع‌دهی" error={errors.academic_style?.message}>
+                    <Select {...register("academic_style")}>
+                      {citationStyleOptions.map((option) => <option key={option} value={option}>{option} — {citationStyleDescriptions[option]}</option>)}
+                    </Select>
+                  </Field>
+                ) : null}
                 <Field label="زبان" error={errors.language?.message}>
                   <Select {...register("language")}>
                     {languageOptions.map((option) => <option key={option}>{option}</option>)}
@@ -743,6 +775,12 @@ function OrderForm() {
                     <dt className="text-muted-foreground">روش یا رویکرد انجام</dt>
                     <dd className="font-medium">{watched.methodology}</dd>
                   </div>
+                  {showCitationStyle ? (
+                    <div>
+                      <dt className="text-muted-foreground">شیوه ارجاع‌دهی</dt>
+                      <dd className="font-medium">{watched.academic_style || "-"}</dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt className="text-muted-foreground">حجم موردنیاز</dt>
                     <dd className="font-medium">

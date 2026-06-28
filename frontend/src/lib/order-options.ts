@@ -45,6 +45,7 @@ type OrderTypeFieldConfig = {
   quantityTypes: QuantityType[];
   defaultQuantityType: QuantityType;
   defaultDegree: string;
+  requiresCitationStyle: boolean;
 };
 
 const thesisFields: AcademicDetailKey[] = [
@@ -63,42 +64,48 @@ export const orderTypeFieldConfigs: Record<string, OrderTypeFieldConfig> = {
     required: ["faculty", "advisor_name"],
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
-    defaultDegree: "کارشناسی"
+    defaultDegree: "کارشناسی",
+    requiresCitationStyle: true
   },
   "پایان‌نامه کارشناسی ارشد": {
     visible: thesisFields,
     required: ["faculty", "advisor_name"],
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
-    defaultDegree: "کارشناسی ارشد"
+    defaultDegree: "کارشناسی ارشد",
+    requiresCitationStyle: true
   },
   "رساله دکتری": {
     visible: thesisFields,
     required: ["faculty", "advisor_name"],
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
-    defaultDegree: "دکتری تخصصی"
+    defaultDegree: "دکتری تخصصی",
+    requiresCitationStyle: true
   },
   "پروپوزال پایان‌نامه": {
     visible: thesisFields,
     required: ["faculty", "advisor_name", "abstract"],
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
-    defaultDegree: "کارشناسی ارشد"
+    defaultDegree: "کارشناسی ارشد",
+    requiresCitationStyle: true
   },
   "تحقیق دانشگاهی": {
     visible: ["faculty", "department", "instructor_name", "course_name", "keywords", "abstract"],
     required: ["instructor_name", "course_name"],
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
-    defaultDegree: "کارشناسی"
+    defaultDegree: "کارشناسی",
+    requiresCitationStyle: true
   },
   "ارائه و پاورپوینت": {
     visible: ["instructor_name", "course_name"],
     required: ["course_name"],
     quantityTypes: ["slides", "pages"],
     defaultQuantityType: "slides",
-    defaultDegree: "کارشناسی"
+    defaultDegree: "کارشناسی",
+    requiresCitationStyle: false
   }
 };
 
@@ -481,5 +488,18 @@ export const citationStyleOptions = [
   "Harvard",
   "شیوه‌نامه اختصاصی دانشگاه"
 ];
+
+export const citationStyleDescriptions: Record<string, string> = {
+  "APA 7": "رایج برای علوم انسانی، مدیریت، آموزش، روان‌شناسی و بیشتر تحقیقات کلاسی",
+  "APA 6": "نسخه قدیمی‌تر APA؛ فقط اگر استاد یا دانشگاه صراحتاً خواسته باشد",
+  Vancouver: "رایج در پزشکی، پرستاری و علوم سلامت؛ ارجاع‌ها معمولاً شماره‌ای هستند",
+  IEEE: "رایج در مهندسی برق، کامپیوتر و مقاله‌های فنی؛ ارجاع شماره‌ای داخل کروشه",
+  Chicago: "رایج در تاریخ و علوم انسانی؛ می‌تواند به شکل پانوشت یا author-date باشد",
+  MLA: "رایج در ادبیات، زبان و مطالعات فرهنگی",
+  Harvard: "سبک author-date رایج در برخی دانشگاه‌ها و رشته‌های مدیریت/علوم اجتماعی",
+  "شیوه‌نامه اختصاصی دانشگاه": "وقتی دانشگاه یا استاد فایل یا دستورالعمل ارجاع مخصوص داده است"
+};
+
+export const citationStyleNotRequiredValue = "نیاز ندارد";
 
 export const languageOptions = ["فارسی", "انگلیسی", "دو زبانه"];

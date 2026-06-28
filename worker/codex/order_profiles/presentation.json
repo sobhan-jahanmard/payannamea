@@ -1,0 +1,74 @@
+{
+  "profile_key": "presentation",
+  "order_type": "ارائه و پاورپوینت",
+  "workflow": "codex/workflows/presentation_workflow.md",
+  "required_fields": ["course_name"],
+  "producer_agents": [
+    "external_tool_scout",
+    "reference_reader",
+    "visual_extractor",
+    "image_researcher",
+    "outline_builder",
+    "slide_deck_builder",
+    "word_format_editor",
+    "compliance_reporter"
+  ],
+  "checker_agents": [
+    "profile_stage_checker",
+    "visual_loop_tester",
+    "image_quality_checker",
+    "citation_checker",
+    "ui_quality_checker",
+    "slide_deck_checker"
+  ],
+  "skills": [
+    "presentation tool evaluation",
+    "source-grounded slide planning",
+    "visual extraction",
+    "looped visual testing",
+    "PPTX generation",
+    "slide visual quality checking"
+  ],
+  "required_outputs": [
+    "deliverable_source",
+    "docx",
+    "pptx",
+    "compliance_report",
+    "reference_usage_report",
+    "human_review_checklist",
+    "final_readme"
+  ],
+  "image_policy": {
+    "mode": "visuals_regularly",
+    "require_sources_when_figures_expected": true,
+    "allow_generated_images": false,
+    "preferred_sources": ["customer_files", "Wikimedia Commons", "institutional_sources", "manufacturer_or_standards_sources"]
+  },
+  "stage_check_policy": {
+    "independent_checker_required": true,
+    "loop_until_pass_or_human_review": true,
+    "write_stage_reports": true
+  },
+  "external_tool_candidates": [
+    {
+      "name": "Presenton",
+      "purpose": "Self-hosted AI presentation generation with editable PPTX export and API/MCP support",
+      "url": "https://github.com/presenton/presenton"
+    },
+    {
+      "name": "PPTAgent",
+      "purpose": "Agentic PowerPoint generation and evaluation research baseline",
+      "url": "https://github.com/icip-cas/pptagent"
+    },
+    {
+      "name": "PptxGenJS",
+      "purpose": "Deterministic PPTX generation when AI deck tools do not meet quality gates",
+      "url": "https://github.com/gitbrent/PptxGenJS"
+    },
+    {
+      "name": "Playwright",
+      "purpose": "Rendered slide/screenshot visual regression checks",
+      "url": "https://playwright.dev/docs/test-snapshots"
+    }
+  ]
+}

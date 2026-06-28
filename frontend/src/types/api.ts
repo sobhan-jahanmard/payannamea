@@ -105,6 +105,7 @@ export interface Order {
   degree: string;
   university: string;
   title: string;
+  student_name?: string | null;
   order_type?: string | null;
   methodology: string;
   language: string;
@@ -148,6 +149,7 @@ export interface OrderCreatePayload {
   degree: string;
   university: string;
   title: string;
+  student_name: string;
   order_type: string;
   methodology: string;
   language: string;

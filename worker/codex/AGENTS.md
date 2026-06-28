@@ -22,9 +22,11 @@ input/order_context.md
 input/files/
 input/references/
 extracted/
+extracted/order_profile.json
 planning/
 drafts/
 reports/
+reports/stage_checks/
 final/
 codex/
 ```
@@ -53,10 +55,12 @@ Create final files with generic names such as `final/deliverable.docx`, `final/d
 ## Order Context And Output Style
 
 Before planning or drafting, read `codex/references/order_context_and_output_style.md`.
+Then read `extracted/order_profile.json`. The profile selects the order-type workflow, required producer agents, independent checker agents, output matrix, image policy, and external tool candidates for this order.
 
 Use every non-empty order detail in `customer_input.json` and `input/order_context.md`, including:
 
 - Order type, title, English title, degree, university, field, faculty, department.
+- Customer/student full name when present; for presentation orders, use it as the presenter name on the title slide.
 - Advisor, consultant, instructor, and course when present.
 - Abstract, keywords, methodology, language, citation style, deadline, notes.
 - `quantity_type` and `quantity_value` for pages, words, or slides.
@@ -71,10 +75,17 @@ All generated Markdown, HTML, DOCX, PDF-source, reports, and README files must b
 
 Use the prompt files in `codex/agents/` as role-specific lenses:
 
+- `external_tool_scout.md`: check whether a reputable prebuilt tool exists for this order type before building or hand-rolling a generator.
 - `rule_extractor.md`: university formatting and submission rules.
 - `reference_reader.md`: references, citation inventory, and source-grounding.
+- `visual_extractor.md`: extract figures, diagrams, screenshots, and source visuals from customer files or approved external sources.
 - `image_researcher.md`: topic-relevant image lookup, licensing, captions, and figure source notes.
+- `visual_loop_tester.md`: independently test extracted visuals and force extract/test loops until visuals pass or are removed.
 - `image_quality_checker.md`: image/diagram provenance and visual quality gate; run it after image research and again after final packaging when visuals are present.
+- `slide_deck_builder.md`: create presentation structure and editable PPTX deliverables for presentation orders.
+- `slide_deck_checker.md`: independently inspect PPTX slide count, density, hierarchy, readability, and source/caption placement.
+- `proposal_methodology_checker.md`: verify proposal objectives, questions, methods, feasibility, and required human inputs.
+- `profile_stage_checker.md`: top-level checker for every profile stage; verifies required files, stage reports, and pass/fail evidence.
 - `ui_quality_checker.md`: order-type-specific visual/layout quality gate for DOCX/PPTX/PDF-facing outputs; run it before packaging and repeat correction until the output is presentable.
 - `outline_builder.md`: structure and section/chapter plan for the selected service type.
 - `chapter_support_writer.md`: assisted drafting from supplied notes and approved claims.
@@ -84,8 +95,15 @@ Use the prompt files in `codex/agents/` as role-specific lenses:
 - `word_format_editor.md`: editable DOCX RTL, font, table, spacing, and page-flow polish.
 - `compliance_reporter.md`: final reports and reviewer checklist.
 
+Every stage must follow a producer/checker loop:
+
+1. The profile producer agent creates or updates the stage artifact.
+2. A different checker agent reviews the artifact and writes a pass/fail note under `reports/stage_checks/`.
+3. If the check fails, correct the artifact and run the checker again.
+4. Repeat until the stage passes or the remaining issue is explicitly listed in `reports/human_review_checklist.md`.
+
 You may perform these roles sequentially yourself. If sub-agents are available in the Codex environment, delegate narrow tasks to them, but the main agent remains responsible for reading instructions, checking outputs, and preserving the integrity rules.
 
 ## Default Workflow
 
-Follow `codex/workflows/order_workflow.md`.
+Follow the workflow named in `extracted/order_profile.json`. Use `codex/workflows/order_workflow.md` only as the generic fallback when the profile does not select a more specific workflow.

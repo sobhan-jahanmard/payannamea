@@ -48,6 +48,27 @@ Start the Next.js app from `frontend/`, then:
 ```bash
 cd /home/sobhan/projects/payanname/worker
 source .venv/bin/activate
+python scripts/run_order_codex.py
+```
+
+This single command:
+
+1. Claims the oldest admin-approved order.
+2. Marks it `in_progress`.
+3. Creates `worker/workspace/order_<id>/`.
+4. Downloads customer files and writes the generated order context.
+5. Runs `codex exec` inside that exact workspace with the order workflow prompt.
+6. If Codex exits successfully, runs `local_worker.py submit-final` so the admin panel sees the new `final_outputs`.
+
+Use this when you want the full worker automation path. To stop after Codex writes the review package without uploading to the backend:
+
+```bash
+python scripts/run_order_codex.py --no-submit-final
+```
+
+The older manual flow is still available for debugging:
+
+```bash
 python scripts/local_worker.py run
 ```
 
@@ -58,8 +79,9 @@ This will:
 3. Create `worker/workspace/order_<id>/`.
 4. Save `customer_input.json`.
 5. Generate `input/order_context.md` and seed `extracted/order_context.json` from every order detail.
-6. Download order files into `input/files/`.
-7. Copy Codex instructions into the order workspace.
+6. Generate `extracted/order_profile.json` from the selected order type.
+7. Download order files into `input/files/`.
+8. Copy Codex instructions, order profiles, workflows, and agent prompts into the order workspace.
 
 Every `run` calls the Next.js worker queue again. It does not use a remembered active order.
 
@@ -73,8 +95,10 @@ codex
 Tell Codex:
 
 ```txt
-Read AGENTS.md and execute codex/workflows/order_workflow.md through the review-package stage.
+Read AGENTS.md, then execute the workflow selected in extracted/order_profile.json through the review-package stage.
 ```
+
+Each current order type has a worker profile under `codex/order_profiles/`. The profile selects the producer agents, checker agents, required outputs, visual policy, prebuilt tool candidates, and workflow. Every workflow stage should write a pass/fail note under `reports/stage_checks/`; failed checks loop back to the producer stage until they pass or are explicitly listed for human review.
 
 For system testing without a real customer order, generate a tiny mock package instead:
 
@@ -102,8 +126,10 @@ cd /home/sobhan/projects/payanname/worker/workspace/order_<id>
 This sets the order status to `worker_done_pending_approval`. Admins should inspect the uploaded
 package in the admin panel and set the order to `completed` only after approval.
 By default, `submit-final` now validates the standard human-review package before
-submitting it; pass `--skip-package-check` only for intentional partial/manual
-uploads.
+submitting it. `--skip-package-check` skips detailed local file inspection only;
+the backend still requires the complete final-output matrix. Partial replacement
+uploads are accepted only when the existing saved package plus the replacement
+files still covers every required output type.
 
 When run inside an order workspace, `submit-final` infers the order ID from
 `customer_input.json` and looks for:
@@ -172,13 +198,16 @@ workspace/order_<id>/
   AGENTS.md
   codex/
     AGENTS.md
+    order_profiles/*.json
     references/order_context_and_output_style.md
-    workflows/order_workflow.md
+    references/external_tool_registry.md
+    workflows/*.md
     agents/*.md
   input/
     files/
     references/
   extracted/
+    order_profile.json
     order_context.json
     university_rules.json
     references.json
@@ -190,17 +219,21 @@ workspace/order_<id>/
     compliance_report.md
     reference_usage_report.md
     human_review_checklist.md
+    stage_checks/
   final/
+    figures/
 ```
 
 ## Order Context And Formatting
 
-The worker writes a readable order summary to `input/order_context.md`. Codex must use it together with
-`customer_input.json` for every plan, draft, report, and final README.
+The worker writes a readable order summary to `input/order_context.md` and a selected processing profile to
+`extracted/order_profile.json`. Codex must use them together with `customer_input.json` for every plan, draft,
+report, and final README.
 
 The context includes:
 
 - Order type, title, English title, degree, university, field, faculty, department.
+- Selected worker profile and workflow.
 - Advisor/consultant or instructor/course.
 - Abstract, keywords, methodology, language, citation style, deadline, expected image count, and customer notes.
 - Requested quantity using `quantity_type` and `quantity_value`: pages, words, or slides.

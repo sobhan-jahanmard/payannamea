@@ -10,6 +10,7 @@ Core fields:
 
 - `id`
 - `order_type`
+- `student_name`
 - `title`
 - `title_english`
 - `degree`
@@ -81,6 +82,7 @@ For research assignment orders:
 For presentation orders:
 
 - Treat `quantity_type=slides` as the expected slide count.
+- Put the student/customer full name on the title slide as the presenter name when it is present.
 - Plan slide titles, presenter notes if requested, and any source/citation slide.
 - Keep slide text concise and make missing visual/data inputs explicit.
 
@@ -144,6 +146,7 @@ Do not use decorative layouts that make academic review harder. Keep the design 
 At minimum, `final/README.md` must include:
 
 - Order ID and order type.
+- Student/presenter name when present.
 - Title and English title if present.
 - University, degree, field, faculty, and department.
 - Advisor/consultant or instructor/course when present.

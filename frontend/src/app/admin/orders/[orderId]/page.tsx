@@ -222,6 +222,10 @@ function AdminOrderDetail() {
                 <dd className="font-medium">{order.customer.full_name}</dd>
               </div>
               <div>
+                <dt className="text-muted-foreground">نام دانشجو</dt>
+                <dd className="font-medium">{order.student_name ?? "-"}</dd>
+              </div>
+              <div>
                 <dt className="text-muted-foreground">ایمیل</dt>
                 <dd className="ltr text-left font-medium">
                   {order.customer.email}

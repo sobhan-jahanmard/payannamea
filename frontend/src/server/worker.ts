@@ -22,6 +22,26 @@ export const workerActionSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
+const baseFinalOutputTypes = [
+  "deliverable_source",
+  "docx",
+  "compliance_report",
+  "reference_usage_report",
+  "human_review_checklist",
+  "final_readme"
+] as const;
+
+const outputTypeLabels: Record<string, string> = {
+  deliverable_source: "deliverable source",
+  docx: "editable Word file",
+  pptx: "editable PowerPoint file",
+  compliance_report: "compliance report",
+  reference_usage_report: "reference usage report",
+  human_review_checklist: "human review checklist",
+  final_readme: "final README",
+  image_sources: "figure source metadata"
+};
+
 export function utcNow(): Date {
   return new Date();
 }
@@ -179,6 +199,93 @@ export async function submitDraft(
   return getOrderOr404(orderId);
 }
 
+function isPresentationOrder(order: Pick<OrderEntity, "order_type" | "quantity_type">): boolean {
+  const orderType = compact(order.order_type) ?? "";
+  return order.quantity_type === "slides" || orderType.includes("پاورپوینت") || orderType.includes("ارائه");
+}
+
+function requestedOrDefaultImageCount(
+  order: Pick<OrderEntity, "image_count" | "quantity_type" | "quantity_value" | "order_type">
+): number {
+  if (typeof order.image_count === "number") {
+    return Math.max(Math.trunc(order.image_count), 0);
+  }
+
+  const quantityValue = typeof order.quantity_value === "number" ? Math.trunc(order.quantity_value) : 0;
+  const orderType = compact(order.order_type) ?? "";
+  if (order.quantity_type === "slides" && quantityValue > 0) {
+    return Math.min(Math.max(Math.ceil(quantityValue / 4), 1), 6);
+  }
+  if (order.quantity_type === "pages" && quantityValue > 0) {
+    return Math.min(Math.max(Math.ceil(quantityValue / 3), 1), 4);
+  }
+  if (order.quantity_type === "words" && quantityValue > 0) {
+    return Math.min(Math.max(Math.ceil(quantityValue / 1200), 1), 4);
+  }
+  if (orderType.includes("پایان") || orderType.includes("رساله") || orderType.includes("پروپوزال")) {
+    return 3;
+  }
+  return 1;
+}
+
+function requiredImageSourceCount(order: OrderEntity): number {
+  const expectedCount = requestedOrDefaultImageCount(order);
+  if (isPresentationOrder(order)) {
+    return Math.max(expectedCount, 1);
+  }
+  return expectedCount;
+}
+
+function requiredFinalOutputTypes(order: OrderEntity): string[] {
+  const required = new Set<string>(baseFinalOutputTypes);
+  if (isPresentationOrder(order)) {
+    required.add("pptx");
+  }
+  if (requiredImageSourceCount(order) > 0) {
+    required.add("image_sources");
+  }
+  return [...required];
+}
+
+function validateFinalUploadMatrix(
+  order: OrderEntity,
+  outputTypes: Iterable<string>
+): void {
+  const present = new Set(outputTypes);
+  const missing = requiredFinalOutputTypes(order).filter((outputType) => !present.has(outputType));
+  if (missing.length) {
+    throw new ApiError(
+      422,
+      `Final review package is incomplete. Missing: ${missing.map((outputType) => outputTypeLabels[outputType] ?? outputType).join(", ")}`
+    );
+  }
+}
+
+async function finalOutputTypesAfterUpload(
+  manager: EntityManager,
+  orderId: string,
+  uploads: Array<{ output_type: string; size_bytes: number }>,
+  options: { replaceExisting?: boolean }
+): Promise<string[]> {
+  const replacedTypes = new Set(uploads.map((upload) => upload.output_type));
+  const uploadTypes = new Set(uploads.filter((upload) => upload.size_bytes > 0).map((upload) => upload.output_type));
+  if (!options.replaceExisting) {
+    return [...uploadTypes];
+  }
+
+  const existingOutputs = await manager
+    .getRepository(FinalOutputSchema)
+    .createQueryBuilder("output")
+    .select("output.output_type", "output_type")
+    .where("output.order_id = :orderId", { orderId })
+    .getRawMany<{ output_type: string }>();
+
+  const retainedExistingTypes = existingOutputs
+    .map((output) => output.output_type)
+    .filter((outputType) => !replacedTypes.has(outputType));
+  return [...new Set([...retainedExistingTypes, ...uploadTypes])];
+}
+
 export async function submitFinal(
   orderId: string,
   workerId: string,
@@ -213,6 +320,8 @@ export async function submitFinal(
       }
     }
 
+    validateFinalUploadMatrix(order, await finalOutputTypesAfterUpload(manager, order.id, uploads, options));
+
     const submission = await manager.getRepository(WorkerSubmissionSchema).save({
       id: randomUUID(),
       order_id: order.id,
@@ -231,9 +340,28 @@ export async function submitFinal(
         .getMany();
 
       if (existingOutputs.length) {
-        await manager.getRepository(FinalOutputSchema).remove(existingOutputs);
-        for (const output of existingOutputs) {
-          await deleteStoredUpload(output.storage_path);
+        const existingStoragePaths = existingOutputs.map((output) => ({
+          id: output.id,
+          storage_path: output.storage_path
+        }));
+        await manager
+          .getRepository(FinalOutputSchema)
+          .createQueryBuilder()
+          .delete()
+          .where("order_id = :orderId", { orderId: order.id })
+          .andWhere("output_type in (:...outputTypes)", { outputTypes })
+          .execute();
+        for (const output of existingStoragePaths) {
+          try {
+            await deleteStoredUpload(output.storage_path);
+          } catch (error) {
+            console.warn("Could not delete replaced final output from storage", {
+              orderId: order.id,
+              outputId: output.id,
+              storagePath: output.storage_path,
+              error
+            });
+          }
         }
       }
     }
