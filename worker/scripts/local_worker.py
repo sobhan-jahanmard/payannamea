@@ -495,6 +495,10 @@ def order_dir(config: Config, order_id: str) -> Path:
     return config.workspace / f"order_{order_id}"
 
 
+def in_progress_dir(config: Config) -> Path:
+    return config.workspace / "in_progress"
+
+
 def normalize_workspace(workspace: str | None) -> Path | None:
     if not workspace:
         return None
@@ -524,6 +528,13 @@ def infer_order_id_from_workspace(workspace: Path) -> str | None:
     return None
 
 
+def active_workspace_for_order(config: Config, order_id: str) -> Path | None:
+    workspace = in_progress_dir(config)
+    if workspace.exists() and infer_order_id_from_workspace(workspace) == order_id:
+        return workspace
+    return None
+
+
 def resolve_order_context(
     config: Config,
     provided_order_id: str | None = None,
@@ -532,7 +543,7 @@ def resolve_order_context(
     workspace = normalize_workspace(provided_workspace) or workspace_from_cwd()
 
     if provided_order_id:
-        return provided_order_id, workspace or order_dir(config, provided_order_id)
+        return provided_order_id, workspace or active_workspace_for_order(config, provided_order_id) or order_dir(config, provided_order_id)
 
     if workspace:
         inferred_order_id = infer_order_id_from_workspace(workspace)
@@ -540,15 +551,73 @@ def resolve_order_context(
             return inferred_order_id, workspace
 
     raise SystemExit(
-        "Could not infer the order. Run this command inside `worker/workspace/order_<id>`, "
+        "Could not infer the order. Run this command inside `worker/workspace/in_progress` "
+        "or `worker/workspace/order_<id>`, "
         "or pass --workspace/--order-id explicitly."
     )
+
+
+def prepare_active_workspace(config: Config, order_id: str) -> Path:
+    workspace = in_progress_dir(config)
+    if workspace.exists():
+        existing_order_id = infer_order_id_from_workspace(workspace)
+        if existing_order_id and existing_order_id != order_id:
+            raise SystemExit(
+                "Active workspace is already assigned to another order.\n"
+                f"Active workspace: {workspace}\n"
+                f"Existing order: {existing_order_id}\n"
+                f"Claimed order: {order_id}\n"
+                "Submit, archive, reset, or manually move the active workspace before claiming another order."
+            )
+        shutil.rmtree(workspace)
+    workspace.mkdir(parents=True, exist_ok=True)
+    return workspace
+
+
+def assert_active_workspace_available(config: Config, order_id: str | None = None) -> None:
+    workspace = in_progress_dir(config)
+    if not workspace.exists():
+        return
+    existing_order_id = infer_order_id_from_workspace(workspace)
+    if order_id and existing_order_id == order_id:
+        return
+    if existing_order_id:
+        raise SystemExit(
+            "Active workspace already exists; refusing to claim another order.\n"
+            f"Active workspace: {workspace}\n"
+            f"Existing order: {existing_order_id}\n"
+            "Finish or clear the active workspace first."
+        )
+    if any(workspace.iterdir()):
+        raise SystemExit(
+            "Active workspace already exists and is not empty; refusing to claim another order.\n"
+            f"Active workspace: {workspace}"
+        )
+
+
+def archive_workspace(config: Config, workspace: Path, order_id: str) -> Path:
+    archive = order_dir(config, order_id)
+    if workspace.resolve() == archive.resolve():
+        return archive
+    if archive.exists():
+        archived_order_id = infer_order_id_from_workspace(archive)
+        if archived_order_id and archived_order_id != order_id:
+            raise SystemExit(
+                "Archive path belongs to a different order; refusing to overwrite it.\n"
+                f"Archive: {archive}\n"
+                f"Archive order: {archived_order_id}\n"
+                f"Current order: {order_id}"
+            )
+        shutil.rmtree(archive)
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(workspace, archive)
+    return archive
 
 
 def ensure_workspace(config: Config, order: dict[str, Any]) -> Path:
     order_id = order["id"]
     profile = order_profile_summary(order)
-    workspace = order_dir(config, order_id)
+    workspace = prepare_active_workspace(config, order_id)
     for relative in [
         "input/files",
         "input/references",
@@ -602,13 +671,23 @@ def download_file(config: Config, workspace: Path, file_info: dict[str, Any]) ->
     return target
 
 
-def claim(config: Config) -> None:
-    response = requests.post(
-        api_url(config, "/api/worker/orders/claim-oldest"),
-        headers=config.headers,
-        json={"workerId": config.worker_id},
-        timeout=30,
-    )
+def claim(config: Config, args: argparse.Namespace) -> None:
+    order_id = getattr(args, "order_id", None)
+    assert_active_workspace_available(config, order_id)
+    if order_id:
+        response = requests.post(
+            api_url(config, f"/api/worker/orders/{order_id}/claim"),
+            headers={**config.headers, "Content-Type": "application/json"},
+            json={"workerId": config.worker_id, "redo": bool(getattr(args, "redo", False))},
+            timeout=30,
+        )
+    else:
+        response = requests.post(
+            api_url(config, "/api/worker/orders/claim-oldest"),
+            headers=config.headers,
+            json={"workerId": config.worker_id},
+            timeout=30,
+        )
     payload = require_success(response)
     order = payload["customerInput"]
     workspace = ensure_workspace(config, order)
@@ -629,8 +708,9 @@ def claim(config: Config) -> None:
         {
             "orderId": order["id"],
             "workspace": str(workspace),
+            "archiveWorkspace": str(order_dir(config, order["id"])),
             "downloadedFiles": [str(path) for path in downloaded],
-            "nextStep": "cd into the workspace and run Codex with AGENTS.md",
+            "nextStep": "Run Codex in worker/workspace/in_progress with AGENTS.md",
         },
         ensure_ascii=False,
         indent=2,
@@ -753,6 +833,28 @@ def validate_review_package(workspace: Path, order: dict[str, Any], upload_paths
     validate_no_placeholder_outputs(upload_paths)
     if profile_requires_output(order, "pptx"):
         validate_pptx_ui_quality(order, upload_paths.get("pptx"), workspace)
+
+
+def final_upload_paths(workspace: Path, args: argparse.Namespace) -> dict[str, str | None]:
+    return {
+        "deliverable_source": args.deliverable_source or default_source_path(workspace),
+        "pptx": resolved_upload(args.pptx, workspace / "final" / "deliverable.pptx"),
+        "docx": args.docx or default_docx_path(workspace),
+        "pdf": args.pdf or default_pdf_path(workspace),
+        "compliance_report": resolved_upload(
+            args.compliance_report, workspace / "reports" / "compliance_report.md"
+        ),
+        "reference_usage_report": resolved_upload(
+            args.reference_usage_report, workspace / "reports" / "reference_usage_report.md"
+        ),
+        "human_review_checklist": resolved_upload(
+            args.human_review_checklist, workspace / "reports" / "human_review_checklist.md"
+        ),
+        "final_readme": resolved_upload(args.final_readme, workspace / "final" / "README.md"),
+        "image_sources": resolved_upload(
+            args.image_sources, workspace / "final" / "figures" / "image_sources.json"
+        ),
+    }
 
 
 def normalize_image_sources_metadata(raw_sources: Any) -> list[Any]:
@@ -1112,48 +1214,20 @@ def validate_pptx_ui_quality(order: dict[str, Any], pptx_path: str | None, works
 def submit_final(config: Config, args: argparse.Namespace) -> None:
     order_id, workspace = resolve_order_context(config, args.order_id, args.workspace)
     order = workspace_order(workspace)
-    deliverable_source = args.deliverable_source or default_source_path(workspace)
-    pptx = resolved_upload(args.pptx, workspace / "final" / "deliverable.pptx")
-    docx = args.docx or default_docx_path(workspace)
-    pdf = args.pdf or default_pdf_path(workspace)
-    compliance_report = resolved_upload(
-        args.compliance_report, workspace / "reports" / "compliance_report.md"
-    )
-    reference_usage_report = resolved_upload(
-        args.reference_usage_report, workspace / "reports" / "reference_usage_report.md"
-    )
-    human_review_checklist = resolved_upload(
-        args.human_review_checklist, workspace / "reports" / "human_review_checklist.md"
-    )
-    final_readme = resolved_upload(args.final_readme, workspace / "final" / "README.md")
-    image_sources = resolved_upload(
-        args.image_sources, workspace / "final" / "figures" / "image_sources.json"
-    )
-
-    upload_paths = {
-        "deliverable_source": deliverable_source,
-        "pptx": pptx,
-        "docx": docx,
-        "pdf": pdf,
-        "compliance_report": compliance_report,
-        "reference_usage_report": reference_usage_report,
-        "human_review_checklist": human_review_checklist,
-        "final_readme": final_readme,
-        "image_sources": image_sources,
-    }
+    upload_paths = final_upload_paths(workspace, args)
     if not args.skip_package_check:
         validate_review_package(workspace, order, upload_paths)
 
     files: dict[str, Any] = {}
-    optional_upload(files, "deliverable_source", deliverable_source)
-    optional_upload(files, "pptx_file", pptx)
-    optional_upload(files, "docx_file", docx)
-    optional_upload(files, "pdf_file", pdf)
-    optional_upload(files, "compliance_report", compliance_report)
-    optional_upload(files, "reference_usage_report", reference_usage_report)
-    optional_upload(files, "human_review_checklist", human_review_checklist)
-    optional_upload(files, "final_readme", final_readme)
-    optional_upload(files, "image_sources", image_sources)
+    optional_upload(files, "deliverable_source", upload_paths["deliverable_source"])
+    optional_upload(files, "pptx_file", upload_paths["pptx"])
+    optional_upload(files, "docx_file", upload_paths["docx"])
+    optional_upload(files, "pdf_file", upload_paths["pdf"])
+    optional_upload(files, "compliance_report", upload_paths["compliance_report"])
+    optional_upload(files, "reference_usage_report", upload_paths["reference_usage_report"])
+    optional_upload(files, "human_review_checklist", upload_paths["human_review_checklist"])
+    optional_upload(files, "final_readme", upload_paths["final_readme"])
+    optional_upload(files, "image_sources", upload_paths["image_sources"])
     if not files:
         raise SystemExit(
             "At least one output file is required. Expected defaults under "
@@ -1174,17 +1248,44 @@ def submit_final(config: Config, args: argparse.Namespace) -> None:
         )
         payload = require_success(response)
         refresh_workspace_order_snapshot(workspace, payload)
+        archive = archive_workspace(config, workspace, order_id)
         print(json.dumps(
             {
                 "orderId": order_id,
                 "status": payload["status"],
                 "finalOutputs": len(payload.get("final_outputs", [])),
+                "workspace": str(workspace),
+                "archiveWorkspace": str(archive),
             },
             indent=2,
         ))
     finally:
         for handle in files.values():
             handle.close()
+
+
+def validate_final(config: Config, args: argparse.Namespace) -> None:
+    order_id, workspace = resolve_order_context(config, args.order_id, args.workspace)
+    order = workspace_order(workspace)
+    upload_paths = final_upload_paths(workspace, args)
+    validate_review_package(workspace, order, upload_paths)
+    present = {
+        output_type: path
+        for output_type, path in upload_paths.items()
+        if path and Path(path).exists() and Path(path).stat().st_size > 0
+    }
+    print(
+        json.dumps(
+            {
+                "orderId": order_id,
+                "workspace": str(workspace),
+                "status": "valid",
+                "outputs": present,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def fail(config: Config, args: argparse.Namespace) -> None:
@@ -1209,6 +1310,86 @@ def reset(config: Config, args: argparse.Namespace) -> None:
     )
     payload = require_success(response)
     print(json.dumps({"orderId": order_id, "status": payload["status"]}, indent=2))
+
+
+def review_notes_markdown(order: dict[str, Any]) -> str:
+    notes = order.get("review_notes", [])
+    lines = [
+        "# Admin Review Notes",
+        "",
+        "These internal manager notes were fetched from the backend for this order. Treat them as operator instructions for the correction pass.",
+        "",
+        f"- Order ID: `{markdown_escape(order.get('id'))}`",
+        f"- Current status: `{markdown_escape(order.get('status'))}`",
+        f"- Fetched at: `{datetime.now(UTC).isoformat()}`",
+        "",
+        "## Notes",
+        "",
+    ]
+    if not notes:
+        lines.append("- No admin review notes are currently recorded.")
+    else:
+        for index, note in enumerate(notes, start=1):
+            author = markdown_escape(note.get("author"))
+            created_at = markdown_escape(note.get("created_at"))
+            body = compact_value(note.get("note"))
+            lines.extend(
+                [
+                    f"### Note {index}",
+                    "",
+                    f"- Author: {author or '-'}",
+                    f"- Created at: {created_at or '-'}",
+                    "",
+                    body or "-",
+                    "",
+                ]
+            )
+    lines.extend(
+        [
+            "## Required Correction Pass",
+            "",
+            "- Read every note above before editing outputs.",
+            "- Update final deliverables and reports to address the notes.",
+            "- Record what changed in `reports/admin_review_response.md`.",
+            "- Re-run the normal final package checks before submission.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def fetch_review_notes(config: Config, args: argparse.Namespace) -> None:
+    order_id, workspace = resolve_order_context(config, args.order_id, args.workspace)
+    response = requests.get(
+        api_url(config, f"/api/worker/orders/{order_id}/review"),
+        headers=config.headers,
+        timeout=30,
+    )
+    order = require_success(response)
+    refresh_workspace_order_snapshot(workspace, order)
+    input_dir = workspace / "input"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    notes_path = input_dir / "admin_review_notes.md"
+    notes_json_path = input_dir / "admin_review_notes.json"
+    notes_path.write_text(review_notes_markdown(order), encoding="utf-8")
+    notes_json_path.write_text(
+        json.dumps(order.get("review_notes", []), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(
+        json.dumps(
+            {
+                "orderId": order_id,
+                "status": order.get("status"),
+                "workspace": str(workspace),
+                "reviewNotes": len(order.get("review_notes", [])),
+                "notesPath": str(notes_path),
+                "notesJsonPath": str(notes_json_path),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def contains_rtl(text: str) -> bool:
@@ -3109,11 +3290,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local Payanname worker helper")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser(
+    run_parser = subparsers.add_parser(
         "run", help="Claim oldest approved order, start it, and create local workspace"
     )
-    subparsers.add_parser(
+    run_parser.add_argument("--order-id", help="Claim this specific order instead of the oldest queued order")
+    run_parser.add_argument(
+        "--redo",
+        action="store_true",
+        help="Allow a specific order to be reclaimed from in_progress, worker_done_pending_approval, admin_review, or failed status",
+    )
+
+    claim_parser = subparsers.add_parser(
         "claim", help="Alias for run: claim oldest approved order and create local workspace"
+    )
+    claim_parser.add_argument("--order-id", help="Claim this specific order instead of the oldest queued order")
+    claim_parser.add_argument(
+        "--redo",
+        action="store_true",
+        help="Allow a specific order to be reclaimed from in_progress, worker_done_pending_approval, admin_review, or failed status",
     )
 
     current_parser = subparsers.add_parser("current", help="Show order context for a workspace")
@@ -3155,10 +3349,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Replace existing final_outputs of the same type for this order. Enabled by default.",
     )
 
+    validate_parser = subparsers.add_parser(
+        "validate-final",
+        help="Validate the final review package without uploading it",
+    )
+    validate_parser.add_argument("--order-id")
+    validate_parser.add_argument("--workspace")
+    validate_parser.add_argument("--pptx")
+    validate_parser.add_argument("--docx")
+    validate_parser.add_argument("--pdf")
+    validate_parser.add_argument("--deliverable-source")
+    validate_parser.add_argument("--compliance-report")
+    validate_parser.add_argument("--reference-usage-report")
+    validate_parser.add_argument("--human-review-checklist")
+    validate_parser.add_argument("--final-readme")
+    validate_parser.add_argument("--image-sources")
+
     reset_parser = subparsers.add_parser("reset", help="Reset an interrupted order back to the approved pickup list")
     reset_parser.add_argument("--order-id")
     reset_parser.add_argument("--workspace")
     reset_parser.add_argument("--notes")
+
+    review_notes_parser = subparsers.add_parser(
+        "fetch-review-notes",
+        help="Fetch internal admin review notes for a completed/pending-approval order",
+    )
+    review_notes_parser.add_argument("--order-id")
+    review_notes_parser.add_argument("--workspace")
 
     mock_parser = subparsers.add_parser(
         "mock-generate", help="Generate a tiny mock academic package for system tests"
@@ -3208,7 +3425,7 @@ def main() -> None:
 
     try:
         if args.command in {"run", "claim"}:
-            claim(config)
+            claim(config, args)
         elif args.command == "current":
             current(config, args)
         elif args.command == "heartbeat":
@@ -3217,8 +3434,12 @@ def main() -> None:
             submit_draft(config, args)
         elif args.command == "submit-final":
             submit_final(config, args)
+        elif args.command == "validate-final":
+            validate_final(config, args)
         elif args.command == "reset":
             reset(config, args)
+        elif args.command == "fetch-review-notes":
+            fetch_review_notes(config, args)
         elif args.command == "mock-generate":
             mock_generate(config, args)
         elif args.command == "package-existing":

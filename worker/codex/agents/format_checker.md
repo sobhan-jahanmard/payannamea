@@ -25,6 +25,7 @@ Check:
 - Fonts, hierarchy, tables, spacing, and metadata blocks are organized enough for human review.
 - Required output files are present or marked missing.
 - Any university AI-use/authorship disclosure requirements are surfaced.
+- Final deliverables contain no raw placeholders, TODO/TBD text, worker/workspace metadata, or internal order-processing labels.
 
 Rules:
 

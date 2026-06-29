@@ -57,7 +57,7 @@ Outputs:
 - `planning/chapter_plan.md`
 - `reports/stage_checks/outline.md`
 
-Keep scope suitable for bachelor level and mark missing original analysis as human review.
+Keep scope suitable for bachelor level and mark missing original analysis in the human review checklist, not as raw placeholders inside final deliverables.
 
 ## 5. Assisted Draft
 
@@ -71,6 +71,7 @@ Outputs:
 - `reports/stage_checks/draft.md`
 
 Draft only from supplied inputs, verified references, and allowed public sources.
+Draft-stage placeholders are allowed only in `drafts/assisted_draft.md` and stage reports. Before writing `final/deliverable_source.md` or DOCX, replace raw placeholders with polished limitation/scope language and move the action item to `reports/human_review_checklist.md`.
 
 ## 6. Package And Final Checks
 
@@ -86,3 +87,4 @@ Outputs:
 - `reports/stage_checks/final_package.md`
 
 Run `python ../../scripts/local_worker.py package-existing` from the order workspace when ready, then run the final checker loop before submission.
+Also run `python ../../scripts/local_worker.py validate-final --workspace .` from the order workspace. If it reports placeholder, layout, source, image, or package problems, fix them and regenerate the editable outputs before handing control back to the wrapper.

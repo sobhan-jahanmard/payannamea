@@ -55,16 +55,30 @@ This single command:
 
 1. Claims the oldest admin-approved order.
 2. Marks it `in_progress`.
-3. Creates `worker/workspace/order_<id>/`.
+3. Creates `worker/workspace/in_progress/`.
 4. Downloads customer files and writes the generated order context.
-5. Runs `codex exec` inside that exact workspace with the order workflow prompt.
-6. If Codex exits successfully, runs `local_worker.py submit-final` so the admin panel sees the new `final_outputs`.
+5. Runs `codex exec` inside `workspace/in_progress` with the order workflow prompt.
+6. Validates the generated package with the same local checks used by `submit-final`. If validation fails, the runner sends Codex through one focused correction pass by default, regenerates editable outputs, and validates again.
+7. If Codex exits successfully, runs `local_worker.py submit-final` so the admin panel sees the new `final_outputs`.
+8. Copies the active workspace to `worker/workspace/order_<id>/` as the durable snapshot.
+
+The terminal prints each stage as `1/8`, `2/8`, and so on. If a stage fails, the runner prints the failed stage and reason, then attempts to mark the active order failed with that note.
+
+Final deliverables must be clean upload candidates: no raw TODO/TBD text, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", internal worker labels, or order-processing metadata tables. Put missing-data and human-review action items in `reports/human_review_checklist.md` and `final/README.md` instead.
 
 Use this when you want the full worker automation path. To stop after Codex writes the review package without uploading to the backend:
 
 ```bash
 python scripts/run_order_codex.py --no-submit-final
 ```
+
+To rerun one specific failed or in-review order instead of claiming the oldest queue item:
+
+```bash
+python scripts/run_order_codex.py 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85
+```
+
+The positional order ID is shorthand for `--order-id <id> --redo`. It allows a specific order to be reclaimed from `failed`, `in_progress`, `worker_done_pending_approval`, or `admin_review`. It still refuses `submitted` and `completed` orders.
 
 The older manual flow is still available for debugging:
 
@@ -76,7 +90,7 @@ This will:
 
 1. Claim the oldest admin-approved or failed order.
 2. Mark it `in_progress`.
-3. Create `worker/workspace/order_<id>/`.
+3. Create `worker/workspace/in_progress/`.
 4. Save `customer_input.json`.
 5. Generate `input/order_context.md` and seed `extracted/order_context.json` from every order detail.
 6. Generate `extracted/order_profile.json` from the selected order type.
@@ -85,10 +99,29 @@ This will:
 
 Every `run` calls the Next.js worker queue again. It does not use a remembered active order.
 
-Then open the generated workspace and run Codex there:
+## HTTP Control API
+
+All worker operations can also be controlled over HTTP:
 
 ```bash
-cd workspace/order_<id>
+python scripts/worker_api.py --host 127.0.0.1 --port 8765
+```
+
+Example full run:
+
+```bash
+curl -X POST http://127.0.0.1:8765/v1/commands/run-order \
+  -H "Authorization: Bearer $WORKER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+See `docs/worker_api.md` for all endpoints, payloads, and job polling.
+
+For manual debugging only, open the active workspace and run Codex there:
+
+```bash
+cd workspace/in_progress
 codex
 ```
 
@@ -103,7 +136,7 @@ Each current order type has a worker profile under `codex/order_profiles/`. The 
 For system testing without a real customer order, generate a tiny mock package instead:
 
 ```bash
-cd /home/sobhan/projects/payanname/worker/workspace/order_<id>
+cd /home/sobhan/projects/payanname/worker/workspace/in_progress
 ../../.venv/bin/python ../../scripts/local_worker.py mock-generate
 ```
 
@@ -111,14 +144,14 @@ If Codex already created `final/deliverable_source.md` or `drafts/assisted_draft
 existing source into test DOCX/PDF files:
 
 ```bash
-cd /home/sobhan/projects/payanname/worker/workspace/order_<id>
+cd /home/sobhan/projects/payanname/worker/workspace/in_progress
 ../../.venv/bin/python ../../scripts/local_worker.py package-existing
 ```
 
 After Codex creates the human review package, upload it for admin review:
 
 ```bash
-cd /home/sobhan/projects/payanname/worker/workspace/order_<id>
+cd /home/sobhan/projects/payanname/worker/workspace/in_progress
 ../../.venv/bin/python ../../scripts/local_worker.py submit-final \
   --notes "Ready for admin review"
 ```
@@ -135,23 +168,23 @@ When run inside an order workspace, `submit-final` infers the order ID from
 `customer_input.json` and looks for:
 
 ```txt
-workspace/order_<id>/final/deliverable_source.md
-workspace/order_<id>/final/deliverable.pptx
-workspace/order_<id>/final/thesis.docx
-workspace/order_<id>/final/thesis.pdf
-workspace/order_<id>/final/deliverable.docx
-workspace/order_<id>/final/deliverable.pdf
-workspace/order_<id>/final/README.md
-workspace/order_<id>/reports/compliance_report.md
-workspace/order_<id>/reports/reference_usage_report.md
-workspace/order_<id>/reports/human_review_checklist.md
+workspace/in_progress/final/deliverable_source.md
+workspace/in_progress/final/deliverable.pptx
+workspace/in_progress/final/thesis.docx
+workspace/in_progress/final/thesis.pdf
+workspace/in_progress/final/deliverable.docx
+workspace/in_progress/final/deliverable.pdf
+workspace/in_progress/final/README.md
+workspace/in_progress/reports/compliance_report.md
+workspace/in_progress/reports/reference_usage_report.md
+workspace/in_progress/reports/human_review_checklist.md
 ```
 
 From the `worker/` directory you can also pass a workspace path:
 
 ```bash
 python scripts/local_worker.py submit-final \
-  --workspace workspace/order_<id> \
+  --workspace workspace/in_progress \
   --notes "Ready for admin review"
 ```
 
@@ -165,7 +198,13 @@ WORKER_ID=local-pc-1 python scripts/local_worker.py run
 WORKER_ID=local-pc-2 python scripts/local_worker.py run
 ```
 
-Each worker writes to:
+Each worker writes active work to:
+
+```txt
+workspace/in_progress/
+```
+
+After a successful run, the active workspace is copied to:
 
 ```txt
 workspace/order_<claimed-id>/
@@ -177,7 +216,7 @@ If a worker is stopped in the middle of an order, reset that order back to the a
 its workspace:
 
 ```bash
-cd /home/sobhan/projects/payanname/worker/workspace/order_<id>
+cd /home/sobhan/projects/payanname/worker/workspace/in_progress
 ../../.venv/bin/python ../../scripts/local_worker.py reset --notes "Worker interrupted"
 ```
 
@@ -185,14 +224,14 @@ Or from the `worker/` directory:
 
 ```bash
 python scripts/local_worker.py reset \
-  --workspace workspace/order_<id> \
+  --workspace workspace/in_progress \
   --notes "Worker interrupted"
 ```
 
 ## Workspace Layout
 
 ```txt
-workspace/order_<id>/
+workspace/in_progress/
   customer_input.json
   input/order_context.md
   AGENTS.md
@@ -255,17 +294,23 @@ Claim oldest order:
 python scripts/local_worker.py run
 ```
 
+Claim a specific order for redo:
+
+```bash
+python scripts/local_worker.py run --order-id <order-id> --redo
+```
+
 Refresh lock:
 
 ```bash
-python scripts/local_worker.py heartbeat --workspace workspace/order_<id>
+python scripts/local_worker.py heartbeat --workspace workspace/in_progress
 ```
 
 Submit draft package:
 
 ```bash
 python scripts/local_worker.py submit-draft \
-  --workspace workspace/order_<id> \
+  --workspace workspace/in_progress \
   --notes "Ready for operator review"
 ```
 
@@ -273,41 +318,57 @@ Submit the worker package for admin review:
 
 ```bash
 python scripts/local_worker.py submit-final \
-  --workspace workspace/order_<id> \
+  --workspace workspace/in_progress \
   --notes "Ready for admin review"
 ```
+
+Validate the package without uploading:
+
+```bash
+python scripts/local_worker.py validate-final --workspace workspace/in_progress
+```
+
+Review an order after internal admin notes were added while it is `worker_done_pending_approval`
+or `admin_review`:
+
+```bash
+python scripts/run_order_codex.py --review-workspace workspace/order_<id>
+```
+
+This fetches admin review notes into `input/admin_review_notes.md`, runs Codex against the existing
+workspace, then uploads the corrected final package with replacement enabled.
 
 Reset an interrupted order:
 
 ```bash
 python scripts/local_worker.py reset \
-  --workspace workspace/order_<id> \
+  --workspace workspace/in_progress \
   --notes "Worker interrupted"
 ```
 
 Generate mock academic files for testing:
 
 ```bash
-python scripts/local_worker.py mock-generate --workspace workspace/order_<id>
+python scripts/local_worker.py mock-generate --workspace workspace/in_progress
 ```
 
 Package an existing generated Markdown source as DOCX/PDF:
 
 ```bash
-python scripts/local_worker.py package-existing --workspace workspace/order_<id>
+python scripts/local_worker.py package-existing --workspace workspace/in_progress
 ```
 
 Mark failed:
 
 ```bash
-python scripts/local_worker.py fail --workspace workspace/order_<id> --notes "Reason"
+python scripts/local_worker.py fail --workspace workspace/in_progress --notes "Reason"
 ```
 
 Show workspace order context:
 
 ```bash
-python scripts/local_worker.py current --workspace workspace/order_<id>
+python scripts/local_worker.py current --workspace workspace/in_progress
 ```
 
 You can still pass `--order-id` manually for recovery/debugging, but the normal flow should use
-the order workspace instead of copying IDs.
+the active workspace instead of copying IDs. After completion, use `workspace/order_<id>` for review-mode corrections and durable history.

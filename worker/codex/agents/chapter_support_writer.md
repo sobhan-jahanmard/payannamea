@@ -22,8 +22,9 @@ Rules:
 - Only draft text that is grounded in supplied notes, verified references, or explicit operator instructions. For class research assignments with no supplied references, verified public sources may be used.
 - Use all relevant order details in the metadata block, structure, headings, and final notes.
 - Respect the requested quantity as a planning constraint; do not pad content with unsupported material.
-- Use placeholders only for missing original research, required private data, or instructor-specific information that cannot be reasonably completed from verified sources:
+- Use placeholders only in `drafts/assisted_draft.md` for missing original research, required private data, or instructor-specific information that cannot be reasonably completed from verified sources:
   `[NEEDS STUDENT/OPERATOR INPUT: ...]`
+- Do not copy draft placeholders into `final/deliverable_source.md`, DOCX, PDF, or PPTX. Final deliverables should use polished limitation/scope language, while the action item belongs in `reports/human_review_checklist.md`.
 - Do not fabricate data, findings, tables, interviews, experiments, citations, or quotes.
 - Use real APA-style in-text citations when citation details are verified. Keep citations as placeholders only when metadata is not verified:
   `(Author, Year)` or `[VERIFY CITATION: source]`.

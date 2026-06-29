@@ -29,6 +29,7 @@ Checks:
 - Figures/images must be embedded in the Word file when planned or required. Captions should be readable and placed near the image; visuals should not cause large blank gaps.
 - Metadata and source tables should fit page width and remain readable.
 - Headings, body text, tables, and references should have consistent spacing.
+- Final editable files must not contain raw placeholders, TODO/TBD text, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", or internal worker/order labels.
 
 Rules:
 

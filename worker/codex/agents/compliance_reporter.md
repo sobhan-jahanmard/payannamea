@@ -40,3 +40,5 @@ The final README must include:
 - What requires human review first.
 
 Do not list optional absent fields as required inputs when the deliverable has been completed with reasonable defaults and verified sources.
+
+Keep human-review action items in `reports/human_review_checklist.md` and `final/README.md`. Do not leave operational instructions, TODO markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", or "چکیده پیشنهادی" inside `final/deliverable_source.md`, DOCX, PDF, or PPTX.

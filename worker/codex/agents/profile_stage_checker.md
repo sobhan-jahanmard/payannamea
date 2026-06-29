@@ -22,6 +22,7 @@ Checks:
 - Required files exist, are non-empty, and match the selected order type.
 - The artifact uses every non-empty relevant order detail.
 - The stage does not introduce invented sources, unsupported academic claims, generated visual fallbacks, or hidden placeholders.
+- Final deliverables contain no raw TODO/TBD markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", "چکیده پیشنهادی", or internal worker/order labels.
 - The stage has a concrete pass/fail result and, on failure, exact correction items.
 
 Correction loop:

@@ -75,13 +75,15 @@ Output:
 
 - `drafts/assisted_draft.md`
 
-Write from supplied inputs, extracted rules, verified references, and operator-approved notes. For class research assignments, external verified references may be used when no customer references are supplied. Label unsupported sections clearly:
+Write from supplied inputs, extracted rules, verified references, and operator-approved notes. For class research assignments, external verified references may be used when no customer references are supplied. In drafts, label unsupported sections clearly:
 
 ```txt
 [NEEDS STUDENT/OPERATOR INPUT: describe the missing analysis or evidence]
 ```
 
 Start the draft or `final/deliverable_source.md` with a compact metadata table that uses the order context. Keep Persian text RTL and technical/English values LTR.
+
+Before copying draft material into `final/deliverable_source.md`, remove draft-only placeholders and internal worker metadata. Missing original research, interviews, statistics, advisor decisions, or private data must be documented in `reports/human_review_checklist.md`; the final deliverable itself should use polished academic limitation language instead of TODO markers.
 
 Include planned visuals in the draft/final source where they improve readability. Use customer images first; otherwise use licensed/source-recorded public images. Use library-created diagrams/charts only when the source data and validation notes are recorded. When no exact image count is supplied, missing count should not result in a plain text-only file by default.
 
@@ -94,7 +96,7 @@ Outputs:
 - Updated `drafts/assisted_draft.md`
 - Style notes in `reports/human_review_checklist.md`
 
-Do not remove integrity placeholders unless the missing information has actually been provided.
+Do not pretend missing information has been provided. Move any integrity placeholders out of final deliverables and into `reports/human_review_checklist.md`, then revise the final text so it remains honest, readable, and free of raw TODO markers.
 
 ## Stage 7: Citation And Format Checks
 
@@ -113,6 +115,8 @@ Outputs:
 - Updated `final/deliverable.docx` when an editable Word output is required
 
 Flag every uncited claim, missing source, suspicious citation, invented-looking citation, and format mismatch. Also flag directionality, font, spacing, or layout problems that would make the output hard to review or unsuitable for upload.
+
+Reject final deliverables that contain TODO/TBD markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", "چکیده پیشنهادی", or internal worker/order labels. Fix the final text and regenerate editable outputs before final submission.
 
 For Persian Word deliverables, the Word format editor must verify that the file opens with RTL document behavior, Persian complex-script fonts, natural page flow, real Word tables, and no artificial blank-page gaps.
 

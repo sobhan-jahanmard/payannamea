@@ -16,7 +16,8 @@ Write:
 
 Rules:
 
-- Do not remove `[NEEDS STUDENT/OPERATOR INPUT]` placeholders unless the missing information is present.
+- Do not pretend `[NEEDS STUDENT/OPERATOR INPUT]` items have been satisfied unless the missing information is present.
+- Before final packaging, move raw placeholders out of final deliverables and into `reports/human_review_checklist.md`; revise final prose into honest limitation/scope language.
 - Do not change factual claims unless they are unsupported; instead flag them.
 - For Persian academic prose, prefer formal, clear sentence structure and avoid inflated wording.
 - Keep headings consistent with the required structure for the selected service type.

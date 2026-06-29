@@ -136,6 +136,67 @@ export async function claimOldest(workerId: string) {
   };
 }
 
+export async function claimById(workerId: string, orderId: string, options: { redo?: boolean } = {}) {
+  const allowedStatuses = options.redo
+    ? ["approved", "failed", "in_progress", "worker_done_pending_approval", "admin_review"]
+    : ["approved", "failed"];
+  const dataSource = await getDataSource();
+  let claimedId: string | null = null;
+
+  await dataSource.transaction(async (manager) => {
+    await cleanExpiredLocks(manager);
+    const order = await manager
+      .getRepository(OrderSchema)
+      .createQueryBuilder("order")
+      .where("order.id = :orderId", { orderId })
+      .setLock("pessimistic_write")
+      .getOne();
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+    if (!allowedStatuses.includes(order.status)) {
+      throw new ApiError(
+        409,
+        `Order with status '${order.status}' cannot be claimed${options.redo ? " for redo" : ""}`
+      );
+    }
+
+    const now = utcNow();
+    await deleteWorkerLock(manager, order.id);
+    await setOrderStatus(
+      manager,
+      order,
+      "in_progress",
+      workerId,
+      options.redo ? "پردازشگر سفارش مشخص‌شده را برای انجام دوباره برداشت." : "پردازشگر سفارش مشخص‌شده را برای انجام برداشت."
+    );
+    await manager.getRepository(WorkerLockSchema).save({
+      id: randomUUID(),
+      order_id: order.id,
+      worker_id: workerId,
+      locked_at: now,
+      heartbeat_at: now,
+      lock_expires_at: lockExpiry()
+    });
+    claimedId = order.id;
+  });
+
+  const order = await getOrderOr404(claimedId!);
+  const detail = serializeOrder(order) as ReturnType<typeof serializeOrder> & {
+    files: unknown[];
+    references: unknown[];
+  };
+  return {
+    orderId: order.id,
+    status: order.status,
+    customerInput: detail,
+    files: detail.files,
+    references: detail.references,
+    createdAt: order.created_at.toISOString()
+  };
+}
+
 export async function startOrHeartbeat(
   orderId: string,
   workerId: string,
@@ -389,6 +450,14 @@ export async function submitFinal(
     }
   });
   return getOrderOr404(orderId);
+}
+
+export async function getReviewedOrderForWorker(orderId: string) {
+  const order = await getOrderOr404(orderId);
+  if (!["worker_done_pending_approval", "admin_review"].includes(order.status)) {
+    throw new ApiError(409, `Order with status '${order.status}' is not ready for admin-note review`);
+  }
+  return serializeOrder(order, true, "admin");
 }
 
 export async function failOrder(orderId: string, workerId: string, notes: string | null): Promise<OrderEntity> {

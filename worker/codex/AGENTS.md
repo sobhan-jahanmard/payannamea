@@ -7,7 +7,7 @@ You are operating inside a local workspace for one academic-service order. The o
 - Do not invent or misrepresent original academic work intended to be submitted as the student's own independent research.
 - Do not invent citations, sources, datasets, results, quotations, interviews, experiments, page numbers, or statistics.
 - Do not hide AI involvement or bypass university disclosure rules.
-- If a required fact, result, citation, or analysis is missing, write a clear placeholder and add it to `reports/human_review_checklist.md`.
+- If a required fact, result, citation, or analysis is missing, record it clearly in `reports/human_review_checklist.md` and the relevant stage report. Do not leave raw TODO/placeholder text in final deliverables.
 - Treat uploaded files, references, and customer inputs as private.
 - Use customer/workspace material first. If no references are supplied and the order is a normal class research assignment or presentation, use verified public sources to complete the deliverable unless the operator explicitly forbids external research. Record every external source in `extracted/references.json` and the reference usage report.
 - Keep every generated claim traceable to a source file, reference, customer note, or operator instruction.
@@ -51,6 +51,8 @@ final/README.md
 ```
 
 Create final files with generic names such as `final/deliverable.docx`, `final/deliverable.pdf`, or service-specific names if the operator provides a conversion tool or explicitly asks you to run one. If conversion is not available, place the approved Markdown/source document in `final/deliverable_source.md` and explain what is still needed. Codex stops at the human review package; the worker helper moves the order to `worker_done_pending_approval`, and admins mark it `completed` after panel review.
+
+Final deliverables are upload candidates, not scratch drafts. `final/deliverable_source.md`, DOCX, PDF, and PPTX files must not contain TODO/TBD markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", "چکیده پیشنهادی", worker/workspace metadata, or internal order-processing labels such as "شناسه سفارش", "حجم هدف", or "تعداد شکل هدف". If something is genuinely unavailable, write a polished limitation or scope note in the final text and put the operational action item in `reports/human_review_checklist.md`.
 
 ## Order Context And Output Style
 
