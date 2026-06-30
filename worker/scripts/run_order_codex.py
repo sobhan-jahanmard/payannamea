@@ -361,6 +361,11 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="Optional shorthand order ID. Equivalent to --order-id <id> --redo.",
     )
+    parser.add_argument(
+        "prompt_arg",
+        nargs="?",
+        help="Optional shorthand Codex prompt to use with the positional order ID.",
+    )
     parser.add_argument("--codex-bin", default=os.getenv("CODEX_BIN", "codex"))
     parser.add_argument(
         "--codex-sandbox",
@@ -411,6 +416,12 @@ def main() -> None:
             raise SystemExit("Positional order ID cannot be combined with --review-workspace.")
         args.order_id = args.order_id_arg
         args.redo = True
+    if args.prompt_arg:
+        if args.prompt:
+            raise SystemExit("Pass the Codex prompt either positionally or with --prompt, not both.")
+        if not args.order_id_arg:
+            raise SystemExit("Positional prompt requires a positional order ID first.")
+        args.prompt = args.prompt_arg
     steps = StepRunner(total=8)
     order_id: str | None = None
     workspace: Path | None = None

@@ -23,6 +23,7 @@ Checks:
 - The artifact uses every non-empty relevant order detail.
 - The stage does not introduce invented sources, unsupported academic claims, generated visual fallbacks, or hidden placeholders.
 - Final deliverables contain no raw TODO/TBD markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", "چکیده پیشنهادی", or internal worker/order labels.
+- Final deliverables do not reveal order intake, uploaded-file absence, worker/backend workflow, external customer/operator framing, or package-generation traces.
 - The stage has a concrete pass/fail result and, on failure, exact correction items.
 
 Correction loop:

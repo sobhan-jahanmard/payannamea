@@ -107,6 +107,7 @@ Use:
 - `codex/agents/image_quality_checker.md` when visuals are present
 - `codex/agents/ui_quality_checker.md`
 - `codex/agents/word_format_editor.md`
+- `codex/agents/confidentiality_checker.md`
 
 Outputs:
 
@@ -117,6 +118,8 @@ Outputs:
 Flag every uncited claim, missing source, suspicious citation, invented-looking citation, and format mismatch. Also flag directionality, font, spacing, or layout problems that would make the output hard to review or unsuitable for upload.
 
 Reject final deliverables that contain TODO/TBD markers, `[NEEDS ...]`, "تکمیل شود", "در نسخه نهایی", "پژوهشگر باید", "چکیده پیشنهادی", or internal worker/order labels. Fix the final text and regenerate editable outputs before final submission.
+
+Reject final deliverables that reveal the order/intake process, for example phrases like "در ورودی سفارش وجود نداشت", "فایل ارسالی موجود نبود", "مشتری/اپراتور باید", or English worker/workspace/package/order traces. Rewrite them as neutral academic limitation or scope notes and keep the operational explanation in reports only.
 
 For Persian Word deliverables, the Word format editor must verify that the file opens with RTL document behavior, Persian complex-script fonts, natural page flow, real Word tables, and no artificial blank-page gaps.
 

@@ -50,6 +50,21 @@ UPLOAD_LABELS = {
     "image_sources": "figure source metadata",
 }
 
+WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+WORD_NAMESPACE = {"w": WORD_NS}
+CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+RTL_PARAGRAPH_ALIGNMENTS = {"right", "center"}
+RTL_COMPLEX_SCRIPT_FONTS = {"B Nazanin", "B Mitra", "Vazirmatn", "IRANSans", "Tahoma", "Arial"}
+
+
+def w_qn(tag: str) -> str:
+    local_name = tag.split(":", 1)[1] if ":" in tag else tag
+    return f"{{{WORD_NS}}}{local_name}"
+
+
 QUANTITY_LABELS = {
     "pages": "صفحه",
     "words": "کلمه",
@@ -831,6 +846,7 @@ def validate_review_package(workspace: Path, order: dict[str, Any], upload_paths
     validate_docx_rtl_quality(order, upload_paths.get("docx"))
     validate_docx_page_count(order, upload_paths.get("docx"))
     validate_no_placeholder_outputs(upload_paths)
+    validate_no_order_trace_outputs(upload_paths)
     if profile_requires_output(order, "pptx"):
         validate_pptx_ui_quality(order, upload_paths.get("pptx"), workspace)
 
@@ -929,6 +945,98 @@ def validate_image_sources_file(workspace: Path, image_sources_path: str | None,
             f"{bullet_list}"
         )
 
+def word_child(parent: ET.Element | None, tag: str) -> ET.Element | None:
+    return parent.find(tag, WORD_NAMESPACE) if parent is not None else None
+
+
+def ensure_word_child(parent: ET.Element, tag: str) -> ET.Element:
+    child = word_child(parent, tag)
+    if child is not None:
+        return child
+    child = ET.Element(w_qn(tag))
+    parent.append(child)
+    return child
+
+
+def remove_word_child(parent: ET.Element, tag: str) -> None:
+    child = word_child(parent, tag)
+    if child is not None:
+        parent.remove(child)
+
+
+def ensure_word_ppr(paragraph: ET.Element) -> ET.Element:
+    ppr = word_child(paragraph, "w:pPr")
+    if ppr is not None:
+        return ppr
+    ppr = ET.Element(w_qn("w:pPr"))
+    paragraph.insert(0, ppr)
+    return ppr
+
+
+def ensure_word_rpr(run: ET.Element) -> ET.Element:
+    rpr = word_child(run, "w:rPr")
+    if rpr is not None:
+        return rpr
+    rpr = ET.Element(w_qn("w:rPr"))
+    run.insert(0, rpr)
+    return rpr
+
+
+def word_element_text(element: ET.Element) -> str:
+    return "".join(text_node.text or "" for text_node in element.findall(".//w:t", WORD_NAMESPACE))
+
+
+def contains_ltr_token(text: str) -> bool:
+    return bool(re.search(r"[A-Za-z@:/\\]", text))
+
+
+def parse_word_xml(xml: str, part_name: str) -> tuple[ET.Element | None, str | None]:
+    if not xml:
+        return None, f"{part_name} is missing"
+    try:
+        return ET.fromstring(xml), None
+    except ET.ParseError:
+        return None, f"{part_name} could not be parsed"
+
+
+def word_has_bidi_language(*roots: ET.Element | None) -> bool:
+    for root in roots:
+        if root is None:
+            continue
+        for element in root.iter():
+            if element.get(w_qn("w:bidi")) == "fa-IR":
+                return True
+    return False
+
+
+def word_has_complex_script_font(*roots: ET.Element | None) -> bool:
+    for root in roots:
+        if root is None:
+            continue
+        for rfonts in root.findall(".//w:rFonts", WORD_NAMESPACE):
+            font = compact_value(rfonts.get(w_qn("w:cs")))
+            if font in RTL_COMPLEX_SCRIPT_FONTS:
+                return True
+    return False
+
+
+def word_styles_have_rtl_defaults(styles_root: ET.Element | None) -> bool:
+    if styles_root is None:
+        return False
+
+    default_ppr = styles_root.find(".//w:docDefaults/w:pPrDefault/w:pPr", WORD_NAMESPACE)
+    normal_style = styles_root.find(".//w:style[@w:styleId='Normal']", WORD_NAMESPACE)
+    normal_ppr = word_child(normal_style, "w:pPr")
+
+    for ppr in [default_ppr, normal_ppr]:
+        if ppr is None:
+            continue
+        jc = word_child(ppr, "w:jc")
+        if word_child(ppr, "w:bidi") is not None and jc is not None and jc.get(w_qn("w:val")) == "right":
+            return True
+    return False
+
+
 def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> None:
     if not docx_path or primary_direction(order) != "rtl":
         return
@@ -939,31 +1047,43 @@ def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> N
 
     try:
         with zipfile.ZipFile(path) as docx:
+            names = set(docx.namelist())
             document_xml = docx.read("word/document.xml").decode("utf-8")
-            settings_xml = docx.read("word/settings.xml").decode("utf-8") if "word/settings.xml" in docx.namelist() else ""
-            styles_xml = docx.read("word/styles.xml").decode("utf-8") if "word/styles.xml" in docx.namelist() else ""
+            settings_xml = docx.read("word/settings.xml").decode("utf-8") if "word/settings.xml" in names else ""
+            styles_xml = docx.read("word/styles.xml").decode("utf-8") if "word/styles.xml" in names else ""
     except (OSError, KeyError, zipfile.BadZipFile, UnicodeDecodeError) as exc:
         raise SystemExit(f"Could not inspect DOCX RTL formatting: {path}") from exc
 
-    paragraph_count = max(document_xml.count("<w:p>"), document_xml.count("<w:p "))
-    bidi_count = document_xml.count("<w:bidi") + styles_xml.count("<w:bidi")
-    right_count = document_xml.count('w:jc w:val="right"') + styles_xml.count('w:jc w:val="right"')
-    left_count = document_xml.count('w:jc w:val="left"')
-    visual_rtl_alignment_count = right_count + left_count
-    has_fa_lang = 'w:bidi="fa-IR"' in settings_xml + styles_xml + document_xml
-    has_cs_font = 'w:cs="B Nazanin"' in styles_xml + document_xml or 'w:cs="Vazirmatn"' in styles_xml + document_xml
-    rtl_paragraph_problems = docx_rtl_paragraph_problems(document_xml)
+    document_root, document_error = parse_word_xml(document_xml, "word/document.xml")
+    settings_root, settings_error = parse_word_xml(settings_xml, "word/settings.xml")
+    styles_root, styles_error = parse_word_xml(styles_xml, "word/styles.xml")
 
     problems: list[str] = []
-    if paragraph_count and bidi_count < max(3, paragraph_count // 2):
-        problems.append("most paragraphs are not marked as RTL/bidi")
-    if paragraph_count and visual_rtl_alignment_count < max(3, paragraph_count // 2):
-        problems.append("most paragraphs do not have explicit RTL visual-start alignment")
-    if rtl_paragraph_problems:
-        problems.extend(rtl_paragraph_problems[:5])
-    if not has_fa_lang:
+    if document_error:
+        problems.append(document_error)
+    if settings_error:
+        problems.append(settings_error)
+    if styles_error:
+        problems.append(styles_error)
+
+    if document_root is not None:
+        problems.extend(docx_rtl_paragraph_problems(document_xml, require_all_text_paragraphs=True)[:8])
+        section_props = document_root.findall(".//w:sectPr", WORD_NAMESPACE)
+        if not any(word_child(sect_pr, "w:bidi") is not None for sect_pr in section_props):
+            problems.append("document section does not enable RTL page flow")
+
+    if settings_root is not None:
+        if word_child(settings_root, "w:bidi") is None:
+            problems.append("document settings do not enable RTL/bidi")
+        if word_child(settings_root, "w:mirrorMargins") is None:
+            problems.append("document settings do not mirror margins for RTL layout")
+
+    if styles_root is not None and not word_styles_have_rtl_defaults(styles_root):
+        problems.append("Word styles do not define RTL/right-aligned paragraph defaults")
+
+    if not word_has_bidi_language(document_root, settings_root, styles_root):
         problems.append("Persian complex-script language metadata is missing")
-    if not has_cs_font:
+    if not word_has_complex_script_font(document_root, styles_root):
         problems.append("Persian complex-script font metadata is missing")
 
     if problems:
@@ -974,29 +1094,188 @@ def validate_docx_rtl_quality(order: dict[str, Any], docx_path: str | None) -> N
         )
 
 
-def docx_rtl_paragraph_problems(document_xml: str) -> list[str]:
-    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+def docx_rtl_paragraph_problems(document_xml: str, *, require_all_text_paragraphs: bool = True) -> list[str]:
     try:
         root = ET.fromstring(document_xml)
     except ET.ParseError:
         return ["document.xml could not be parsed for paragraph-level RTL validation"]
 
     problems: list[str] = []
-    for index, paragraph in enumerate(root.findall(".//w:p", namespace), start=1):
-        text = "".join(text_node.text or "" for text_node in paragraph.findall(".//w:t", namespace)).strip()
-        if not text or not contains_rtl(text):
+    for index, paragraph in enumerate(root.findall(".//w:p", WORD_NAMESPACE), start=1):
+        text = word_element_text(paragraph).strip()
+        if not text:
+            continue
+        if not require_all_text_paragraphs and not contains_rtl(text):
             continue
 
-        ppr = paragraph.find("w:pPr", namespace)
-        bidi = ppr.find("w:bidi", namespace) if ppr is not None else None
-        jc = ppr.find("w:jc", namespace) if ppr is not None else None
-        jc_value = jc.get(f"{{{namespace['w']}}}val") if jc is not None else None
+        ppr = word_child(paragraph, "w:pPr")
+        bidi = word_child(ppr, "w:bidi")
+        jc = word_child(ppr, "w:jc")
+        jc_value = jc.get(w_qn("w:val")) if jc is not None else None
         if bidi is None:
-            problems.append(f"paragraph {index} contains Persian text but is not marked bidi/RTL")
-        if jc_value not in {"left", "right", "center"}:
-            problems.append(f"paragraph {index} contains Persian text but has no explicit visual RTL alignment")
+            problems.append(f"paragraph {index} contains text but is not marked bidi/RTL")
+        if jc_value not in RTL_PARAGRAPH_ALIGNMENTS:
+            problems.append(f"paragraph {index} contains text but is not explicitly right/center aligned")
+
+        for run_index, run in enumerate(paragraph.findall(".//w:r", WORD_NAMESPACE), start=1):
+            run_text = word_element_text(run).strip()
+            if not run_text:
+                continue
+            rpr = word_child(run, "w:rPr")
+            run_rtl = word_child(rpr, "w:rtl")
+            lang = word_child(rpr, "w:lang")
+            if contains_rtl(run_text):
+                if run_rtl is None:
+                    problems.append(f"paragraph {index} run {run_index} contains Persian text but is not marked RTL")
+                if lang is None or lang.get(w_qn("w:bidi")) != "fa-IR":
+                    problems.append(f"paragraph {index} run {run_index} lacks Persian bidi language metadata")
+            elif contains_ltr_token(run_text) and run_rtl is not None:
+                problems.append(f"paragraph {index} run {run_index} contains only LTR text but is marked RTL")
 
     return problems
+
+
+def ensure_content_type_override(entries: dict[str, bytes], part_name: str, content_type: str) -> None:
+    path = "[Content_Types].xml"
+    try:
+        root = ET.fromstring(entries.get(path, b""))
+    except ET.ParseError:
+        root = ET.Element(f"{{{CONTENT_TYPES_NS}}}Types")
+
+    override_tag = f"{{{CONTENT_TYPES_NS}}}Override"
+    for override in root.findall(override_tag):
+        if override.get("PartName") == part_name:
+            override.set("ContentType", content_type)
+            entries[path] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+            return
+
+    ET.SubElement(root, override_tag, {"PartName": part_name, "ContentType": content_type})
+    entries[path] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def ensure_document_relationship(entries: dict[str, bytes], rel_id: str, rel_type: str, target: str) -> None:
+    rels_path = "word/_rels/document.xml.rels"
+    try:
+        root = ET.fromstring(entries.get(rels_path, b""))
+    except ET.ParseError:
+        root = ET.Element(f"{{{PACKAGE_REL_NS}}}Relationships")
+
+    relationship_tag = f"{{{PACKAGE_REL_NS}}}Relationship"
+    used_ids = {compact_value(relationship.get("Id")) for relationship in root.findall(relationship_tag)}
+    for relationship in root.findall(relationship_tag):
+        if relationship.get("Type") == rel_type and relationship.get("Target") == target:
+            entries[rels_path] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+            return
+
+    next_id = rel_id
+    suffix = 2
+    while next_id in used_ids:
+        next_id = f"{rel_id}{suffix}"
+        suffix += 1
+    ET.SubElement(root, relationship_tag, {"Id": next_id, "Type": rel_type, "Target": target})
+    entries[rels_path] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def normalize_docx_rtl_layout(path: Path) -> None:
+    ET.register_namespace("w", WORD_NS)
+
+    try:
+        with zipfile.ZipFile(path, "r") as original:
+            entries = {name: original.read(name) for name in original.namelist()}
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise SystemExit(f"Could not normalize DOCX RTL formatting: {path}") from exc
+
+    entries.setdefault("word/styles.xml", word_styles_xml().encode("utf-8"))
+    entries.setdefault("word/settings.xml", word_settings_xml().encode("utf-8"))
+    ensure_content_type_override(
+        entries,
+        "/word/styles.xml",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+    )
+    ensure_content_type_override(
+        entries,
+        "/word/settings.xml",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+    )
+    ensure_document_relationship(entries, "rIdStyles", f"{OFFICE_REL_NS}/styles", "styles.xml")
+    ensure_document_relationship(entries, "rIdSettings", f"{OFFICE_REL_NS}/settings", "settings.xml")
+
+    try:
+        document_root = ET.fromstring(entries["word/document.xml"])
+    except (KeyError, ET.ParseError) as exc:
+        raise SystemExit(f"Could not normalize DOCX document XML: {path}") from exc
+
+    for paragraph in document_root.findall(".//w:p", WORD_NAMESPACE):
+        if not word_element_text(paragraph).strip():
+            continue
+        ppr = ensure_word_ppr(paragraph)
+        ensure_word_child(ppr, "w:bidi")
+        jc = ensure_word_child(ppr, "w:jc")
+        if jc.get(w_qn("w:val")) != "center":
+            jc.set(w_qn("w:val"), "right")
+
+        for run in paragraph.findall(".//w:r", WORD_NAMESPACE):
+            run_text = word_element_text(run)
+            if not run_text.strip():
+                continue
+            rpr = ensure_word_rpr(run)
+            rfonts = ensure_word_child(rpr, "w:rFonts")
+            rfonts.set(w_qn("w:ascii"), "Times New Roman")
+            rfonts.set(w_qn("w:hAnsi"), "Times New Roman")
+            rfonts.set(w_qn("w:cs"), "B Nazanin")
+            lang = ensure_word_child(rpr, "w:lang")
+            lang.set(w_qn("w:val"), "en-US")
+            lang.set(w_qn("w:bidi"), "fa-IR")
+            if contains_rtl(run_text):
+                ensure_word_child(rpr, "w:rtl")
+            else:
+                remove_word_child(rpr, "w:rtl")
+
+    for sect_pr in document_root.findall(".//w:sectPr", WORD_NAMESPACE):
+        ensure_word_child(sect_pr, "w:bidi")
+        ensure_word_child(sect_pr, "w:rtlGutter")
+
+    entries["word/document.xml"] = ET.tostring(document_root, encoding="utf-8", xml_declaration=True)
+
+    try:
+        styles_root = ET.fromstring(entries["word/styles.xml"])
+        for ppr in styles_root.findall(".//w:pPr", WORD_NAMESPACE):
+            ensure_word_child(ppr, "w:bidi")
+            jc = ensure_word_child(ppr, "w:jc")
+            if jc.get(w_qn("w:val")) != "center":
+                jc.set(w_qn("w:val"), "right")
+        for rpr in styles_root.findall(".//w:rPr", WORD_NAMESPACE):
+            rfonts = ensure_word_child(rpr, "w:rFonts")
+            rfonts.set(w_qn("w:cs"), "B Nazanin")
+            remove_word_child(rpr, "w:rtl")
+            lang = ensure_word_child(rpr, "w:lang")
+            lang.set(w_qn("w:val"), "en-US")
+            lang.set(w_qn("w:bidi"), "fa-IR")
+        entries["word/styles.xml"] = ET.tostring(styles_root, encoding="utf-8", xml_declaration=True)
+    except ET.ParseError:
+        pass
+
+    try:
+        settings_root = ET.fromstring(entries["word/settings.xml"])
+        ensure_word_child(settings_root, "w:bidi")
+        ensure_word_child(settings_root, "w:mirrorMargins")
+        theme_lang = ensure_word_child(settings_root, "w:themeFontLang")
+        theme_lang.set(w_qn("w:val"), "en-US")
+        theme_lang.set(w_qn("w:bidi"), "fa-IR")
+        entries["word/settings.xml"] = ET.tostring(settings_root, encoding="utf-8", xml_declaration=True)
+    except ET.ParseError:
+        pass
+
+    with tempfile.NamedTemporaryFile(prefix="payanname-rtl-docx-", suffix=".docx", delete=False) as tmp_file:
+        tmp_path = Path(tmp_file.name)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as normalized:
+            for name, data in entries.items():
+                normalized.writestr(name, data)
+        shutil.move(str(tmp_path), path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
 
 def rendered_docx_page_count(docx_path: str | None) -> int | None:
@@ -1119,6 +1398,27 @@ def validate_no_placeholder_outputs(upload_paths: dict[str, str | None]) -> None
         bullet_list = "\n".join(f"- {problem}" for problem in problems)
         raise SystemExit(
             "Output placeholder validation failed; refusing to submit final package.\n"
+            f"{bullet_list}"
+        )
+
+
+def validate_no_order_trace_outputs(upload_paths: dict[str, str | None]) -> None:
+    problems: list[str] = []
+    final_output_labels = {"deliverable_source", "docx", "pdf", "pptx"}
+    for label, raw_path in upload_paths.items():
+        if label not in final_output_labels or not raw_path:
+            continue
+        path = Path(raw_path)
+        if not path.exists():
+            continue
+        text = text_for_output(path)
+        for phrase in ORDER_TRACE_FORBIDDEN_PHRASES:
+            if phrase in text:
+                problems.append(f"{label}: exposes order/workflow trace `{phrase}`")
+    if problems:
+        bullet_list = "\n".join(f"- {problem}" for problem in problems)
+        raise SystemExit(
+            "Output confidentiality validation failed; refusing to submit final package.\n"
             f"{bullet_list}"
         )
 
@@ -1397,21 +1697,21 @@ def contains_rtl(text: str) -> bool:
 
 
 def docx_paragraph(line: str, heading: bool = False) -> str:
-    rtl = contains_rtl(line)
-    alignment = "right" if rtl else "left"
-    bidi = "<w:bidi/>" if rtl else ""
+    run_rtl = contains_rtl(line)
     size = "32" if heading else "24"
     bold = "<w:b/>" if heading else ""
-    paragraph_props = f'<w:pPr>{bidi}<w:jc w:val="{alignment}"/></w:pPr>'
+    rtl_xml = "<w:rtl/>" if run_rtl else ""
+    paragraph_props = '<w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr>'
     run_props = (
         '<w:rPr>'
         '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        f"{bold}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>"
+        f'{bold}{rtl_xml}<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>'
+        '<w:lang w:val="en-US" w:bidi="fa-IR"/>'
         '</w:rPr>'
     )
     return (
         f"<w:p>{paragraph_props}<w:r>{run_props}<w:t xml:space=\"preserve\">"
-        + html.escape(line)
+        + html.escape(rtl_display_text(line, True))
         + "</w:t></w:r></w:p>"
     )
 
@@ -1449,6 +1749,7 @@ def write_minimal_docx(path: Path, title: str, body_lines: list[str]) -> None:
         docx.writestr("[Content_Types].xml", content_types)
         docx.writestr("_rels/.rels", rels)
         docx.writestr("word/document.xml", document_xml)
+    normalize_docx_rtl_layout(path)
 
 
 def write_minimal_pdf(path: Path, title: str) -> None:
@@ -1658,6 +1959,26 @@ FINAL_DELIVERABLE_FORBIDDEN_PHRASES = [
     "یادداشت تحلیلی شماره",
     "قالب ارائه یافته‌ها",
     "چکیده پیشنهادی",
+]
+
+ORDER_TRACE_FORBIDDEN_PHRASES = [
+    "در ورودی سفارش",
+    "ورودی سفارش",
+    "سفارش وجود نداشت",
+    "در فایل‌های ارسالی وجود نداشت",
+    "فایل ارسالی وجود نداشت",
+    "فایل‌های ارسالی",
+    "مشتری باید",
+    "اپراتور باید",
+    "دانشجو/اپراتور",
+    "پردازشگر",
+    "فرایند سفارش",
+    "پکیج",
+    "بسته کاری",
+    "worker",
+    "workspace",
+    "backend",
+    "order workflow",
 ]
 
 
@@ -2113,7 +2434,7 @@ def rtl_display_text(text: str, rtl: bool) -> str:
 
 def word_run(text: str, *, bold: bool = False, size: int = 24, rtl: bool | None = None) -> str:
     if rtl is None:
-        rtl = True
+        rtl = contains_rtl(text)
     escaped = html.escape(rtl_display_text(text, rtl))
     bold_xml = "<w:b/><w:bCs/>" if bold else ""
     rtl_xml = "<w:rtl/>" if rtl else ""
@@ -2121,6 +2442,7 @@ def word_run(text: str, *, bold: bool = False, size: int = 24, rtl: bool | None 
         "<w:r><w:rPr>"
         '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
         f"{bold_xml}{rtl_xml}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>"
+        '<w:lang w:val="en-US" w:bidi="fa-IR"/>'
         "</w:rPr>"
         f"<w:t xml:space=\"preserve\">{escaped}</w:t></w:r>"
     )
@@ -2132,7 +2454,6 @@ def word_paragraph(
     heading_level: int | None = None,
     align: str | None = None,
 ) -> str:
-    rtl = True
     if heading_level == 1:
         size = 32
         bold = True
@@ -2169,7 +2490,7 @@ def word_paragraph(
         f'<w:pStyle w:val="{style}"/>{bidi}<w:jc w:val="{jc}"/>'
         f'<w:spacing w:before="{before}" w:after="{after}" w:line="390" w:lineRule="auto"/>'
         "</w:pPr>"
-        + word_run(text, bold=bold, size=size, rtl=rtl)
+        + word_run(text, bold=bold, size=size, rtl=contains_rtl(text))
         + "</w:p>"
     )
 
@@ -2399,19 +2720,19 @@ def word_styles_xml() -> str:
         '<w:name w:val="Normal"/><w:qFormat/>'
         '<w:pPr><w:bidi/><w:jc w:val="right"/><w:spacing w:after="90" w:line="390" w:lineRule="auto"/></w:pPr>'
         '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        '<w:rtl/><w:sz w:val="26"/><w:szCs w:val="26"/><w:lang w:bidi="fa-IR"/></w:rPr>'
+        '<w:sz w:val="26"/><w:szCs w:val="26"/><w:lang w:val="en-US" w:bidi="fa-IR"/></w:rPr>'
         '</w:style>'
         '<w:style w:type="paragraph" w:styleId="Heading1">'
         '<w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>'
         '<w:pPr><w:bidi/><w:jc w:val="right"/><w:keepNext/><w:spacing w:before="120" w:after="60" w:line="290" w:lineRule="auto"/></w:pPr>'
         '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        '<w:b/><w:bCs/><w:rtl/><w:sz w:val="28"/><w:szCs w:val="28"/><w:lang w:bidi="fa-IR"/></w:rPr>'
+        '<w:b/><w:bCs/><w:sz w:val="28"/><w:szCs w:val="28"/><w:lang w:val="en-US" w:bidi="fa-IR"/></w:rPr>'
         '</w:style>'
         '<w:style w:type="paragraph" w:styleId="Title">'
         '<w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>'
         '<w:pPr><w:bidi/><w:jc w:val="right"/><w:keepNext/><w:spacing w:before="120" w:after="160" w:line="290" w:lineRule="auto"/></w:pPr>'
         '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="B Nazanin"/>'
-        '<w:b/><w:bCs/><w:rtl/><w:sz w:val="32"/><w:szCs w:val="32"/><w:lang w:bidi="fa-IR"/></w:rPr>'
+        '<w:b/><w:bCs/><w:sz w:val="32"/><w:szCs w:val="32"/><w:lang w:val="en-US" w:bidi="fa-IR"/></w:rPr>'
         '</w:style>'
         '</w:styles>'
     )
@@ -2520,6 +2841,7 @@ def write_native_formatted_docx(
         docx.writestr("word/settings.xml", word_settings_xml())
         for asset in image_assets:
             docx.writestr(f"word/{asset.target}", asset.data)
+    normalize_docx_rtl_layout(path)
 
 
 def write_python_docx(
@@ -2548,7 +2870,13 @@ def write_python_docx(
         parent.append(child)
         return child
 
-    def set_run_rtl(run: Any, *, bold: bool = False, size: int = 13) -> None:
+    def remove_child(parent: Any, tag: str) -> None:
+        existing = parent.find(qn(tag))
+        if existing is not None:
+            parent.remove(existing)
+
+    def set_run_rtl(run: Any, *, bold: bool = False, size: int = 13, rtl: bool | None = None) -> None:
+        run_rtl = contains_rtl(run.text or "") if rtl is None else rtl
         run.bold = bold
         run.font.name = "B Nazanin"
         run.font.size = Pt(size)
@@ -2557,19 +2885,43 @@ def write_python_docx(
         rfonts.set(qn("w:ascii"), "Times New Roman")
         rfonts.set(qn("w:hAnsi"), "Times New Roman")
         rfonts.set(qn("w:cs"), "B Nazanin")
-        ensure_child(rpr, "w:rtl")
+        if run_rtl:
+            ensure_child(rpr, "w:rtl")
+        else:
+            remove_child(rpr, "w:rtl")
         lang = ensure_child(rpr, "w:lang")
         lang.set(qn("w:val"), "en-US")
         lang.set(qn("w:bidi"), "fa-IR")
 
     def set_paragraph_rtl(paragraph: Any, *, align: Any = None) -> None:
-        # LibreOffice and Word-compatible bidi paragraphs render visual right-start
-        # alignment with the OOXML left value once w:bidi is active.
-        paragraph.alignment = align or WD_ALIGN_PARAGRAPH.LEFT
+        paragraph.alignment = align or WD_ALIGN_PARAGRAPH.RIGHT
         paragraph.paragraph_format.space_after = Pt(6)
         paragraph.paragraph_format.line_spacing = 1.45
         ppr = paragraph._p.get_or_add_pPr()
         ensure_child(ppr, "w:bidi")
+        jc = ensure_child(ppr, "w:jc")
+        jc.set(qn("w:val"), "center" if align == WD_ALIGN_PARAGRAPH.CENTER else "right")
+
+    def set_style_rtl(style: Any, *, size: int = 13, bold: bool = False) -> None:
+        style.font.name = "B Nazanin"
+        style.font.size = Pt(size)
+        style.font.bold = bold
+        style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        style.paragraph_format.space_after = Pt(6)
+        style.paragraph_format.line_spacing = 1.45
+        ppr = style.element.get_or_add_pPr()
+        ensure_child(ppr, "w:bidi")
+        jc = ensure_child(ppr, "w:jc")
+        jc.set(qn("w:val"), "right")
+        rpr = style.element.get_or_add_rPr()
+        rfonts = ensure_child(rpr, "w:rFonts")
+        rfonts.set(qn("w:ascii"), "Times New Roman")
+        rfonts.set(qn("w:hAnsi"), "Times New Roman")
+        rfonts.set(qn("w:cs"), "B Nazanin")
+        remove_child(rpr, "w:rtl")
+        lang = ensure_child(rpr, "w:lang")
+        lang.set(qn("w:val"), "en-US")
+        lang.set(qn("w:bidi"), "fa-IR")
 
     def add_rtl_paragraph(text: str, *, heading_level: int | None = None, align: Any = None) -> Any:
         if heading_level:
@@ -2621,10 +2973,10 @@ def write_python_docx(
     theme_lang.set(qn("w:val"), "en-US")
     theme_lang.set(qn("w:bidi"), "fa-IR")
 
-    normal = document.styles["Normal"]
-    normal.font.name = "B Nazanin"
-    normal.font.size = Pt(13)
-    normal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    set_style_rtl(document.styles["Normal"], size=13)
+    for style_name, size in [("Heading 1", 16), ("Heading 2", 14), ("Title", 16)]:
+        if style_name in document.styles:
+            set_style_rtl(document.styles[style_name], size=size, bold=True)
 
     blocks, image_assets = prepare_docx_blocks(
         markdown_blocks(markdown),
@@ -2675,6 +3027,7 @@ def write_python_docx(
                 document.add_paragraph()
         document.save(path)
 
+    normalize_docx_rtl_layout(path)
     return True
 
 
@@ -2769,6 +3122,7 @@ def write_rtl_html_docx(path: Path, title: str, markdown: str, order: dict[str, 
         if not converted.exists():
             return False
         shutil.copyfile(converted, path)
+    normalize_docx_rtl_layout(path)
     return True
 
 

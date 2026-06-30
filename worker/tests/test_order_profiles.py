@@ -6,6 +6,7 @@ import re
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 import zipfile
 from unittest import mock
 from pathlib import Path
@@ -67,6 +68,25 @@ def minimal_order(order_type: str, *, order_id: str = "test-order", **overrides:
     }
     order.update(overrides)
     return order
+
+
+def word_text(element: ET.Element) -> str:
+    return "".join(text.text or "" for text in element.findall(".//w:t", local_worker.WORD_NAMESPACE)).strip()
+
+
+def assert_text_paragraphs_are_rtl(test_case: unittest.TestCase, document_xml: str) -> None:
+    document_root = ET.fromstring(document_xml)
+    for paragraph in document_root.findall(".//w:p", local_worker.WORD_NAMESPACE):
+        if not word_text(paragraph):
+            continue
+        ppr = paragraph.find("w:pPr", local_worker.WORD_NAMESPACE)
+        test_case.assertIsNotNone(ppr)
+        assert ppr is not None
+        test_case.assertIsNotNone(ppr.find("w:bidi", local_worker.WORD_NAMESPACE), word_text(paragraph))
+        jc = ppr.find("w:jc", local_worker.WORD_NAMESPACE)
+        test_case.assertIsNotNone(jc, word_text(paragraph))
+        assert jc is not None
+        test_case.assertIn(jc.get(local_worker.w_qn("w:val")), {"right", "center"})
 
 
 class OrderProfileTests(unittest.TestCase):
@@ -248,7 +268,13 @@ class OrderProfileTests(unittest.TestCase):
 
     def test_native_docx_writer_marks_persian_paragraphs_rtl_and_right_aligned(self) -> None:
         order = minimal_order("تحقیق دانشگاهی")
-        markdown = "# عنوان آزمایشی\n\nاین یک بند فارسی برای بررسی راست‌چین بودن خروجی است.\n\n## منابع\n\n- https://example.test"
+        markdown = (
+            "# عنوان آزمایشی\n\n"
+            "این یک بند فارسی برای بررسی راست‌چین بودن خروجی است.\n\n"
+            "## منابع\n\n"
+            "- https://example.test\n\n"
+            "English only reference line"
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             docx_path = Path(tmpdir) / "deliverable.docx"
@@ -267,10 +293,44 @@ class OrderProfileTests(unittest.TestCase):
                 styles_xml = docx.read("word/styles.xml").decode("utf-8")
             local_worker.validate_docx_rtl_quality(order, str(docx_path))
 
-        self.assertIn("<w:bidi/>", settings_xml)
-        self.assertIn("<w:mirrorMargins/>", settings_xml)
-        self.assertIn('<w:jc w:val="right"/>', styles_xml)
-        self.assertIn('w:jc w:val="left"', document_xml)
+        settings_root = ET.fromstring(settings_xml)
+        styles_root = ET.fromstring(styles_xml)
+        document_root = ET.fromstring(document_xml)
+        self.assertIsNotNone(settings_root.find("w:bidi", local_worker.WORD_NAMESPACE))
+        self.assertIsNotNone(settings_root.find("w:mirrorMargins", local_worker.WORD_NAMESPACE))
+        self.assertTrue(local_worker.word_styles_have_rtl_defaults(styles_root))
+        assert_text_paragraphs_are_rtl(self, document_xml)
+        self.assertNotIn('w:val="left"', document_xml)
+        url_runs = [
+            run
+            for run in document_root.findall(".//w:r", local_worker.WORD_NAMESPACE)
+            if "https://example.test" in word_text(run)
+        ]
+        self.assertTrue(url_runs)
+        self.assertTrue(
+            all(run.find("w:rPr/w:rtl", local_worker.WORD_NAMESPACE) is None for run in url_runs)
+        )
+        self.assertEqual(local_worker.docx_rtl_paragraph_problems(document_xml), [])
+
+    def test_minimal_docx_writer_creates_rtl_settings_styles_and_right_aligned_paragraphs(self) -> None:
+        order = minimal_order("تحقیق دانشگاهی")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            docx_path = Path(tmpdir) / "minimal.docx"
+            local_worker.write_minimal_docx(
+                docx_path,
+                "عنوان آزمایشی",
+                ["https://example.test", "English only line"],
+            )
+            with zipfile.ZipFile(docx_path) as docx:
+                names = set(docx.namelist())
+                document_xml = docx.read("word/document.xml").decode("utf-8")
+            local_worker.validate_docx_rtl_quality(order, str(docx_path))
+
+        self.assertIn("word/settings.xml", names)
+        self.assertIn("word/styles.xml", names)
+        self.assertIn("word/_rels/document.xml.rels", names)
+        assert_text_paragraphs_are_rtl(self, document_xml)
         self.assertEqual(local_worker.docx_rtl_paragraph_problems(document_xml), [])
 
 

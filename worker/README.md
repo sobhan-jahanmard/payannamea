@@ -80,6 +80,14 @@ python scripts/run_order_codex.py 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85
 
 The positional order ID is shorthand for `--order-id <id> --redo`. It allows a specific order to be reclaimed from `failed`, `in_progress`, `worker_done_pending_approval`, or `admin_review`. It still refuses `submitted` and `completed` orders.
 
+You can also pass a one-off Codex instruction after the ID:
+
+```bash
+python scripts/run_order_codex.py \
+  872225ec-d68b-4f6e-aeaf-04b6c1c2ed85 \
+  "این متن هنوز چپ‌چین است؛ منطقش را درست کن و دوباره خروجی‌ها را edit کن"
+```
+
 The older manual flow is still available for debugging:
 
 ```bash

@@ -95,6 +95,7 @@ Use the prompt files in `codex/agents/` as role-specific lenses:
 - `citation_checker.md`: citation coverage and missing-source detection.
 - `format_checker.md`: formatting compliance checks.
 - `word_format_editor.md`: editable DOCX RTL, font, table, spacing, and page-flow polish.
+- `confidentiality_checker.md`: removes order/workflow/intake traces from customer-facing final deliverables.
 - `compliance_reporter.md`: final reports and reviewer checklist.
 
 Every stage must follow a producer/checker loop:

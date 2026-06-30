@@ -76,7 +76,7 @@ Draft-stage placeholders are allowed only in `drafts/assisted_draft.md` and stag
 ## 6. Package And Final Checks
 
 Producer: `word_format_editor.md`.
-Checker: `format_checker.md`, `image_quality_checker.md`, `ui_quality_checker.md`, `profile_stage_checker.md`.
+Checker: `format_checker.md`, `image_quality_checker.md`, `ui_quality_checker.md`, `confidentiality_checker.md`, `profile_stage_checker.md`.
 
 Outputs:
 
