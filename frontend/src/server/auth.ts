@@ -9,6 +9,7 @@ const PASSWORD_ALGORITHM = "pbkdf2_sha256";
 const PASSWORD_ITERATIONS = 390_000;
 const TOKEN_TTL_SECONDS = 60 * 60 * 24;
 const RESET_TTL_SECONDS = 60 * 30;
+const AUTH_COOKIE_NAME = "payanname_auth_token";
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
@@ -94,11 +95,21 @@ export function decodeAccessToken(token: string): { sub: string; role: string } 
 export async function getCurrentUser(request: Request): Promise<UserEntity> {
   const authorization = request.headers.get("authorization");
   const prefix = "Bearer ";
-  if (!authorization?.startsWith(prefix)) {
+  let token = authorization?.startsWith(prefix) ? authorization.slice(prefix.length).trim() : null;
+  if (!token) {
+    const cookie = request.headers.get("cookie") ?? "";
+    token = cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`))
+      ?.slice(AUTH_COOKIE_NAME.length + 1) ?? null;
+    token = token ? decodeURIComponent(token) : null;
+  }
+  if (!token) {
     throw new ApiError(401, "Missing bearer token");
   }
 
-  const payload = decodeAccessToken(authorization.slice(prefix.length).trim());
+  const payload = decodeAccessToken(token);
   const dataSource = await getDataSource();
   const user = await dataSource.getRepository(UserSchema).findOneBy({ id: payload.sub });
   if (!user) {

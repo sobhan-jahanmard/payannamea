@@ -81,27 +81,29 @@ export default function LandingPage() {
           sizes="100vw"
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-l from-black/56 via-black/24 to-white/18" />
+        <div className="absolute inset-0 bg-slate-950/26" />
+        <div className="absolute inset-0 bg-gradient-to-l from-teal-950/88 via-slate-950/58 to-slate-900/18" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.28),transparent_30%)]" />
         <div className="relative mx-auto flex min-h-[calc(100svh-64px)] w-full max-w-7xl items-center px-4 pb-24 pt-16 lg:px-8">
-          <div className="max-w-2xl text-white hero-text-shadow">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-white/35 bg-white/14 px-3 py-2 text-sm backdrop-blur">
+          <div className="max-w-2xl rounded-lg border border-white/16 bg-slate-950/62 p-5 text-white shadow-2xl shadow-slate-950/35 backdrop-blur-sm hero-text-shadow sm:p-7">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-amber-200/70 bg-amber-300 px-3 py-2 text-sm font-medium text-slate-950 shadow-sm">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />
               پایان‌نامه کارشناسی، ارشد، رساله، پروپوزال، تحقیق و ارائه
             </div>
             <h1 className="text-4xl font-semibold leading-tight tracking-normal sm:text-5xl lg:text-6xl">
               خدمات دانشگاهی از ایده تا تحویل
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-white/92 sm:text-lg">
-              دقیقاً مشخص کنید چه کاری می‌خواهید، فایل‌ها و توضیحات را ثبت کنید و بعد از تأیید مدیر، سفارش را تا تحویل نهایی پیگیری کنید.
+            <p className="mt-5 max-w-xl text-base leading-8 text-white sm:text-lg">
+              سفارش پژوهشی خود را با جزئیات ثبت کنید، مسیر انجام را شفاف ببینید و خروجی نهایی را در زمان توافق‌شده دریافت کنید.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild>
+              <Button asChild className="border-amber-300 bg-amber-300 text-slate-950 hover:bg-amber-200">
                 <Link href="/order">
                   ثبت سفارش
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white/60 bg-white/12 text-white hover:bg-white/20">
+              <Button asChild variant="outline" className="border-white/70 bg-white/95 text-slate-950 hover:bg-white">
                 <Link href="/orders">سفارش‌های من</Link>
               </Button>
             </div>

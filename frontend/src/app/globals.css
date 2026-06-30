@@ -60,6 +60,7 @@ textarea {
 }
 
 .hero-text-shadow {
-  text-shadow: 0 2px 18px rgba(8, 19, 30, 0.28);
+  text-shadow:
+    0 2px 8px rgba(4, 11, 20, 0.5),
+    0 14px 34px rgba(4, 11, 20, 0.36);
 }
-

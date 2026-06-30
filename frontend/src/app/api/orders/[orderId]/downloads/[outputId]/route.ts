@@ -3,9 +3,10 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { getCurrentUser } from "../../../../../../server/auth";
 import { absoluteStoragePath } from "../../../../../../server/files";
 import { ApiError, errorResponse } from "../../../../../../server/http";
-import { customerOutputFileName, findFinalOutput } from "../../../../../../server/orders";
+import { customerOutputFileName, findFinalOutput, getOrderForUserOr404, getOrderOr404 } from "../../../../../../server/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,9 +15,18 @@ interface Context {
   params: Promise<{ orderId: string; outputId: string }>;
 }
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   try {
     const { orderId, outputId } = await context.params;
+    const user = await getCurrentUser(request);
+    if (user.role === "admin") {
+      await getOrderOr404(orderId);
+    } else {
+      const order = await getOrderForUserOr404(orderId, user);
+      if (order.status !== "completed") {
+        throw new ApiError(403, "Final output downloads are available only after the order is completed");
+      }
+    }
     const output = await findFinalOutput(orderId, outputId);
     const filePath = absoluteStoragePath(output.storage_path);
     const buffer = await fs.readFile(filePath).catch(() => null);

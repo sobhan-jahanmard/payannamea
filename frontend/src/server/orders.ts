@@ -337,7 +337,9 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     status_logs: audience === "admin" ? byDate(order.status_logs).map(serializeStatusLog) : [],
     final_outputs:
       audience === "customer"
-        ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
+        ? order.status === "completed"
+          ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
+          : []
         : byDate(order.final_outputs).map(serializeFinalOutput),
     review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : []
   };
