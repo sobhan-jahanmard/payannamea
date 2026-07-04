@@ -93,6 +93,7 @@ const formSchema = z.object({
   image_count: optionalImageCount,
   deadline: z.string().optional(),
   notes: z.string().optional(),
+  moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional(),
   references: z.array(referenceSchema)
 }).superRefine((values, ctx) => {
   const fieldConfig = orderTypeFieldConfig(values.order_type);
@@ -127,13 +128,14 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const steps = ["نوع سفارش", "مشخصات سفارش", "فایل‌ها", "منابع", "بازبینی"];
+const steps = ["نوع سفارش", "مشخصات سفارش", "فایل‌ها", "منابع", "کد معرف", "بازبینی"];
 
 const stepDescriptions = [
   "نوع خدمت را مشخص کنید تا فیلدهای بعدی دقیق‌تر شوند.",
   "اطلاعات دانشگاهی، حجم کار و الزامات خروجی را وارد کنید.",
   "شیوه‌نامه، منابع و فایل‌های پشتیبان را بارگذاری کنید.",
   "منابع اجباری یا لینک‌های مهم را جداگانه ثبت کنید.",
+  "اگر سفارش با معرفی شخصی ثبت شده، کد او را وارد کنید.",
   "قبل از ارسال، خلاصه سفارش را بررسی کنید."
 ];
 
@@ -294,6 +296,7 @@ function OrderForm() {
       abstract: "",
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
+      moarref_code: "",
       references: []
     }
   });
@@ -351,7 +354,8 @@ function OrderForm() {
         "quantity_value",
         "image_count"
       ],
-      3: ["references"]
+      3: ["references"],
+      4: ["moarref_code"]
     }),
     []
   );
@@ -409,6 +413,7 @@ function OrderForm() {
       image_count: values.image_count,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
+      moarref_code: compact(values.moarref_code),
       references: values.references.map((reference) => ({
         reference_type: reference.reference_type,
         title: reference.title.trim(),
@@ -476,7 +481,7 @@ function OrderForm() {
               style={{ width: `${((step + 1) / steps.length) * 100}%` }}
             />
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-5">
+          <div className="mt-4 grid gap-2 sm:grid-cols-6">
             {steps.map((label, index) => (
               <button
                 key={label}
@@ -751,6 +756,20 @@ function OrderForm() {
           ) : null}
 
           {step === 4 ? (
+            <div className="grid gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">کد معرف</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  اگر این سفارش از طرف شخص یا همکار خاصی معرفی شده، کد معرف را اینجا وارد کنید.
+                </p>
+              </div>
+              <Field label="کد معرف" error={errors.moarref_code?.message}>
+                <Input className="ltr text-left" {...register("moarref_code")} placeholder="مثلاً REF-123" />
+              </Field>
+            </div>
+          ) : null}
+
+          {step === 5 ? (
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-md border border-border bg-white p-4">
                 <h2 className="mb-4 text-lg font-semibold">خلاصه سفارش</h2>
@@ -798,6 +817,10 @@ function OrderForm() {
                   <div>
                     <dt className="text-muted-foreground">فایل‌ها</dt>
                     <dd className="font-medium">{totalFiles.toLocaleString("fa-IR")}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">کد معرف</dt>
+                    <dd className="font-medium">{watched.moarref_code || "-"}</dd>
                   </div>
                 </dl>
               </div>

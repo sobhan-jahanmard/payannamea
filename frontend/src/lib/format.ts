@@ -1,4 +1,4 @@
-import type { OrderStatus } from "../types/api";
+import type { OrderStatus, PaymentStatus } from "../types/api";
 
 export const orderStatuses: OrderStatus[] = [
   "submitted",
@@ -51,6 +51,18 @@ export function statusLabel(status: OrderStatus): string {
     admin_review: "در انتظار بررسی مدیر",
     completed: "انجام شده و تمام",
     failed: "ناموفق"
+  };
+  return labels[status];
+}
+
+export const paymentStatuses: PaymentStatus[] = ["fully_paid", "partially_paid", "not_paid", "refunded"];
+
+export function paymentStatusLabel(status: PaymentStatus): string {
+  const labels: Record<PaymentStatus, string> = {
+    fully_paid: "پرداخت کامل",
+    partially_paid: "پرداخت بخشی",
+    not_paid: "پرداخت نشده",
+    refunded: "برگشت داده شده"
   };
   return labels[status];
 }

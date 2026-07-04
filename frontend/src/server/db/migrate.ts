@@ -19,6 +19,8 @@ const statements = [
     id varchar(36) primary key,
     user_id varchar(36) not null references users(id) on delete cascade,
     status varchar(32) not null default 'submitted',
+    payment_status varchar(32) not null default 'not_paid',
+    moarref_payment_status varchar(32) not null default 'not_paid',
     degree varchar(120) not null,
     university varchar(255) not null,
     title varchar(500) not null,
@@ -49,6 +51,7 @@ const statements = [
     deadline timestamptz,
     word_count integer,
     notes text,
+    moarref_code varchar(120),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
   )`,
@@ -77,6 +80,9 @@ const statements = [
   `alter table orders add column if not exists proposal_status varchar(160)`,
   `alter table orders add column if not exists required_chapters varchar(255)`,
   `alter table orders add column if not exists analysis_software varchar(255)`,
+  `alter table orders add column if not exists payment_status varchar(32) not null default 'not_paid'`,
+  `alter table orders add column if not exists moarref_payment_status varchar(32) not null default 'not_paid'`,
+  `alter table orders add column if not exists moarref_code varchar(120)`,
   `create table if not exists order_files (
     id varchar(36) primary key,
     order_id varchar(36) not null references orders(id) on delete cascade,
@@ -152,7 +158,21 @@ const statements = [
     note text not null,
     created_at timestamptz not null default now()
   )`,
-  `create index if not exists ix_review_notes_order_id on review_notes(order_id)`
+  `create index if not exists ix_review_notes_order_id on review_notes(order_id)`,
+  `create table if not exists payment_notes (
+    id varchar(36) primary key,
+    order_id varchar(36) not null references orders(id) on delete cascade,
+    note_type varchar(32) not null,
+    payment_status varchar(32) not null,
+    note text,
+    original_name varchar(500),
+    stored_name varchar(500),
+    storage_path varchar(1000),
+    content_type varchar(255),
+    size_bytes integer,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists ix_payment_notes_order_id on payment_notes(order_id)`
 ];
 
 async function main() {

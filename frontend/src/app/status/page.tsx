@@ -25,7 +25,7 @@ import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { absoluteUrl, getOrder, updateOrder, uploadOrderFile } from "../../lib/api";
-import { formatBytes, formatDate, formatDateTime, statusLabel } from "../../lib/format";
+import { formatBytes, formatDate, formatDateTime, paymentStatusLabel, statusLabel } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
 import {
   academicDetailLabels,
@@ -92,6 +92,7 @@ const formSchema = z.object({
   image_count: optionalImageCount,
   deadline: z.string().optional(),
   notes: z.string().optional(),
+  moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional(),
   references: z.array(referenceSchema)
 }).superRefine((values, ctx) => {
   const fieldConfig = orderTypeFieldConfig(values.order_type);
@@ -170,6 +171,7 @@ function valuesFromOrder(order: Order): FormValues {
     image_count: order.image_count ?? undefined,
     deadline: order.deadline ?? "",
     notes: order.notes ?? "",
+    moarref_code: order.moarref_code ?? "",
     references: (order.references ?? []).map((reference) => ({
       reference_type: reference.reference_type,
       title: reference.title,
@@ -342,6 +344,7 @@ function StatusContent() {
       abstract: "",
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
+      moarref_code: "",
       references: []
     }
   });
@@ -437,6 +440,7 @@ function StatusContent() {
       image_count: values.image_count,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
+      moarref_code: compact(values.moarref_code),
       references: values.references.map((reference) => ({
         reference_type: reference.reference_type,
         title: reference.title.trim(),
@@ -560,6 +564,9 @@ function StatusContent() {
                     <Select {...register("degree")}>{degreeOptions.map((option) => <option key={option}>{option}</option>)}</Select>
                   </Field>
                   <SearchableField id="edit-universities" label="دانشگاه یا مؤسسه آموزشی" error={errors.university?.message} options={universityOptions} inputProps={register("university")} />
+                  <Field label="کد معرف" error={errors.moarref_code?.message}>
+                    <Input className="ltr text-left" {...register("moarref_code")} />
+                  </Field>
                 </div>
 
                 <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
@@ -755,7 +762,10 @@ function StatusContent() {
             <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <DetailItem label="شناسه سفارش" value={<span className="ltr inline-block">{order.id}</span>} />
               <DetailItem label="وضعیت فعلی" value={statusLabel(order.status)} />
+              <DetailItem label="وضعیت پرداخت" value={paymentStatusLabel(order.payment_status)} />
+              <DetailItem label="وضعیت پرداخت معرف" value={paymentStatusLabel(order.moarref_payment_status)} />
               <DetailItem label="نوع سفارش" value={display(order.order_type)} />
+              <DetailItem label="کد معرف" value={display(order.moarref_code)} />
               <DetailItem label="نام دانشجو" value={display(order.student_name)} />
               <DetailItem label="تاریخ ثبت" value={formatDateTime(order.created_at)} />
               <DetailItem label="آخرین به‌روزرسانی" value={formatDateTime(order.updated_at)} />

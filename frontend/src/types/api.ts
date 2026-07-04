@@ -7,6 +7,9 @@ export type OrderStatus =
   | "completed"
   | "failed";
 
+export type PaymentStatus = "fully_paid" | "partially_paid" | "not_paid" | "refunded";
+export type PaymentNoteType = "payment" | "moarref_payment";
+
 export interface User {
   id: string;
   full_name: string;
@@ -99,9 +102,26 @@ export interface ReviewNote {
   created_at: string;
 }
 
+export interface PaymentNote {
+  id: string;
+  order_id: string;
+  note_type: PaymentNoteType;
+  payment_status: PaymentStatus;
+  note?: string | null;
+  original_name?: string | null;
+  stored_name?: string | null;
+  storage_path?: string | null;
+  content_type?: string | null;
+  size_bytes?: number | null;
+  created_at: string;
+  url?: string | null;
+}
+
 export interface Order {
   id: string;
   status: OrderStatus;
+  payment_status: PaymentStatus;
+  moarref_payment_status: PaymentStatus;
   degree: string;
   university: string;
   title: string;
@@ -125,6 +145,7 @@ export interface Order {
   image_count?: number | null;
   deadline?: string | null;
   notes?: string | null;
+  moarref_code?: string | null;
   created_at: string;
   updated_at: string;
   customer: User;
@@ -133,6 +154,7 @@ export interface Order {
   status_logs?: StatusLog[];
   final_outputs?: FinalOutput[];
   review_notes?: ReviewNote[];
+  payment_notes?: PaymentNote[];
 }
 
 export interface ReferenceInput {
@@ -169,6 +191,7 @@ export interface OrderCreatePayload {
   image_count?: number;
   deadline?: string;
   notes?: string;
+  moarref_code?: string;
   references: ReferenceInput[];
 }
 

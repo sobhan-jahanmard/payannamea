@@ -11,6 +11,10 @@ export const ORDER_STATUSES = [
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export const PAYMENT_STATUSES = ["fully_paid", "partially_paid", "not_paid", "refunded"] as const;
+export const PAYMENT_NOTE_TYPES = ["payment", "moarref_payment"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+export type PaymentNoteType = (typeof PAYMENT_NOTE_TYPES)[number];
 export type UserRole = "customer" | "admin";
 
 export interface UserEntity {
@@ -30,6 +34,8 @@ export interface OrderEntity {
   id: string;
   user_id: string;
   status: OrderStatus;
+  payment_status: PaymentStatus;
+  moarref_payment_status: PaymentStatus;
   degree: string;
   university: string;
   title: string;
@@ -60,6 +66,7 @@ export interface OrderEntity {
   deadline: Date | null;
   word_count: number | null;
   notes: string | null;
+  moarref_code: string | null;
   created_at: Date;
   updated_at: Date;
   customer?: UserEntity;
@@ -70,6 +77,7 @@ export interface OrderEntity {
   worker_submissions?: WorkerSubmissionEntity[];
   final_outputs?: FinalOutputEntity[];
   review_notes?: ReviewNoteEntity[];
+  payment_notes?: PaymentNoteEntity[];
 }
 
 export interface OrderFileEntity {
@@ -157,6 +165,21 @@ export interface ReviewNoteEntity {
   order?: OrderEntity;
 }
 
+export interface PaymentNoteEntity {
+  id: string;
+  order_id: string;
+  note_type: PaymentNoteType;
+  payment_status: PaymentStatus;
+  note: string | null;
+  original_name: string | null;
+  stored_name: string | null;
+  storage_path: string | null;
+  content_type: string | null;
+  size_bytes: number | null;
+  created_at: Date;
+  order?: OrderEntity;
+}
+
 const idColumn = {
   type: String,
   primary: true,
@@ -199,6 +222,8 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     id: idColumn,
     user_id: { type: String, length: 36 },
     status: { type: String, length: 32, default: "submitted" },
+    payment_status: { type: String, length: 32, default: "not_paid" },
+    moarref_payment_status: { type: String, length: 32, default: "not_paid" },
     degree: { type: String, length: 120 },
     university: { type: String, length: 255 },
     title: { type: String, length: 500 },
@@ -229,6 +254,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     deadline: { type: "timestamptz", nullable: true },
     word_count: { type: Number, nullable: true },
     notes: { type: "text", nullable: true },
+    moarref_code: { type: String, length: 120, nullable: true },
     created_at: createdAtColumn,
     updated_at: { type: "timestamptz", updateDate: true }
   },
@@ -250,7 +276,8 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     worker_lock: { type: "one-to-one", target: "WorkerLock", inverseSide: "order" },
     worker_submissions: { type: "one-to-many", target: "WorkerSubmission", inverseSide: "order" },
     final_outputs: { type: "one-to-many", target: "FinalOutput", inverseSide: "order" },
-    review_notes: { type: "one-to-many", target: "ReviewNote", inverseSide: "order" }
+    review_notes: { type: "one-to-many", target: "ReviewNote", inverseSide: "order" },
+    payment_notes: { type: "one-to-many", target: "PaymentNote", inverseSide: "order" }
   }
 });
 
@@ -441,6 +468,34 @@ export const ReviewNoteSchema = new EntitySchema<ReviewNoteEntity>({
   }
 });
 
+export const PaymentNoteSchema = new EntitySchema<PaymentNoteEntity>({
+  name: "PaymentNote",
+  tableName: "payment_notes",
+  columns: {
+    id: idColumn,
+    order_id: { type: String, length: 36 },
+    note_type: { type: String, length: 32 },
+    payment_status: { type: String, length: 32 },
+    note: { type: "text", nullable: true },
+    original_name: { type: String, length: 500, nullable: true },
+    stored_name: { type: String, length: 500, nullable: true },
+    storage_path: { type: String, length: 1000, nullable: true },
+    content_type: { type: String, length: 255, nullable: true },
+    size_bytes: { type: Number, nullable: true },
+    created_at: createdAtColumn
+  },
+  indices: [{ name: "ix_payment_notes_order_id", columns: ["order_id"] }],
+  relations: {
+    order: {
+      type: "many-to-one",
+      target: "Order",
+      inverseSide: "payment_notes",
+      joinColumn: { name: "order_id" },
+      onDelete: "CASCADE"
+    }
+  }
+});
+
 export const entities = [
   UserSchema,
   OrderSchema,
@@ -450,5 +505,6 @@ export const entities = [
   WorkerLockSchema,
   WorkerSubmissionSchema,
   FinalOutputSchema,
-  ReviewNoteSchema
+  ReviewNoteSchema,
+  PaymentNoteSchema
 ];

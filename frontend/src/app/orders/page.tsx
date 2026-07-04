@@ -8,7 +8,7 @@ import { AuthGate, useAuth } from "../../components/auth/AuthProvider";
 import { StatusBadge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { listMyOrders } from "../../lib/api";
-import { formatDate, formatDateTime, statusLabel } from "../../lib/format";
+import { formatDate, formatDateTime, paymentStatusLabel, statusLabel } from "../../lib/format";
 import type { Order } from "../../types/api";
 
 function OrdersList() {
@@ -71,6 +71,9 @@ function OrdersList() {
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <StatusBadge status={order.status} />
                     <span className="text-xs text-muted-foreground">{statusLabel(order.status)}</span>
+                    <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                      {paymentStatusLabel(order.payment_status)}
+                    </span>
                   </div>
                   <h2 className="line-clamp-2 text-base font-semibold">{order.title}</h2>
                   <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">

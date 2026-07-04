@@ -3,6 +3,7 @@
 import {
   ArrowRight,
   Download,
+  FileUp,
   MessageSquarePlus,
   RefreshCcw,
   Save,
@@ -17,8 +18,10 @@ import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
 import { Select } from "../../../../components/ui/select";
+import { Textarea } from "../../../../components/ui/textarea";
 import {
   absoluteUrl,
+  addPaymentNote,
   addReviewNote,
   getAdminOrder,
   updateAdminStatus,
@@ -26,11 +29,13 @@ import {
 import {
   formatBytes,
   formatDateTime,
+  paymentStatuses,
+  paymentStatusLabel,
   orderStatuses,
   statusLabel,
 } from "../../../../lib/format";
 import { quantityLabel } from "../../../../lib/order-options";
-import type { Order, OrderStatus } from "../../../../types/api";
+import type { Order, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus } from "../../../../types/api";
 
 type ToastState = {
   type: "success" | "error";
@@ -45,10 +50,17 @@ function AdminOrderDetail() {
   const [statusNotes, setStatusNotes] = useState("");
   const [reviewAuthor, setReviewAuthor] = useState("مدیر");
   const [reviewNote, setReviewNote] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_paid");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [paymentReceipt, setPaymentReceipt] = useState<File | null>(null);
+  const [moarrefPaymentStatus, setMoarrefPaymentStatus] = useState<PaymentStatus>("not_paid");
+  const [moarrefPaymentNote, setMoarrefPaymentNote] = useState("");
+  const [moarrefPaymentReceipt, setMoarrefPaymentReceipt] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [approvingOrder, setApprovingOrder] = useState(false);
   const [savingReviewNote, setSavingReviewNote] = useState(false);
+  const [savingPaymentNote, setSavingPaymentNote] = useState<PaymentNoteType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -63,6 +75,8 @@ function AdminOrderDetail() {
       const result = await getAdminOrder(orderId);
       setOrder(result);
       setNextStatus(result.status);
+      setPaymentStatus(result.payment_status);
+      setMoarrefPaymentStatus(result.moarref_payment_status);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -126,6 +140,40 @@ function AdminOrderDetail() {
       showToast("error", message);
     } finally {
       setSavingReviewNote(false);
+    }
+  }
+
+  async function savePayment(noteType: PaymentNoteType) {
+    if (!order) {
+      return;
+    }
+
+    const isMoarref = noteType === "moarref_payment";
+    const selectedStatus = isMoarref ? moarrefPaymentStatus : paymentStatus;
+    const note = isMoarref ? moarrefPaymentNote : paymentNote;
+    const receipt = isMoarref ? moarrefPaymentReceipt : paymentReceipt;
+
+    setError(null);
+    setSavingPaymentNote(noteType);
+    try {
+      const result = await addPaymentNote(order.id, noteType, selectedStatus, note.trim(), receipt);
+      setOrder(result);
+      setPaymentStatus(result.payment_status);
+      setMoarrefPaymentStatus(result.moarref_payment_status);
+      if (isMoarref) {
+        setMoarrefPaymentNote("");
+        setMoarrefPaymentReceipt(null);
+      } else {
+        setPaymentNote("");
+        setPaymentReceipt(null);
+      }
+      showToast("success", isMoarref ? "وضعیت پرداخت معرف ذخیره شد." : "وضعیت پرداخت سفارش ذخیره شد.");
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : "ثبت وضعیت پرداخت ناموفق بود";
+      setError(message);
+      showToast("error", message);
+    } finally {
+      setSavingPaymentNote(null);
     }
   }
 
@@ -240,6 +288,18 @@ function AdminOrderDetail() {
               <div>
                 <dt className="text-muted-foreground">نوع سفارش</dt>
                 <dd className="font-medium">{order.order_type ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">کد معرف</dt>
+                <dd className="ltr text-left font-medium">{order.moarref_code ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">وضعیت پرداخت</dt>
+                <dd className="font-medium">{paymentStatusLabel(order.payment_status)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">وضعیت پرداخت معرف</dt>
+                <dd className="font-medium">{paymentStatusLabel(order.moarref_payment_status)}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">مقطع تحصیلی</dt>
@@ -366,6 +426,33 @@ function AdminOrderDetail() {
               ) : null}
             </div>
 
+            <div className="grid gap-4 lg:grid-cols-2">
+              <PaymentPanel
+                title="پرداخت سفارش"
+                status={paymentStatus}
+                onStatusChange={setPaymentStatus}
+                note={paymentNote}
+                onNoteChange={setPaymentNote}
+                onReceiptChange={setPaymentReceipt}
+                receipt={paymentReceipt}
+                notes={order.payment_notes?.filter((note) => note.note_type === "payment") ?? []}
+                saving={savingPaymentNote === "payment"}
+                onSave={() => void savePayment("payment")}
+              />
+              <PaymentPanel
+                title="پرداخت معرف"
+                status={moarrefPaymentStatus}
+                onStatusChange={setMoarrefPaymentStatus}
+                note={moarrefPaymentNote}
+                onNoteChange={setMoarrefPaymentNote}
+                onReceiptChange={setMoarrefPaymentReceipt}
+                receipt={moarrefPaymentReceipt}
+                notes={order.payment_notes?.filter((note) => note.note_type === "moarref_payment") ?? []}
+                saving={savingPaymentNote === "moarref_payment"}
+                onSave={() => void savePayment("moarref_payment")}
+              />
+            </div>
+
             <div className="grid gap-3 rounded-md border border-border bg-white p-4">
               <h3 className="font-semibold">خروجی‌ها</h3>
               {order.final_outputs?.length ? (
@@ -463,6 +550,89 @@ function AdminOrderDetail() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function PaymentPanel({
+  title,
+  status,
+  onStatusChange,
+  note,
+  onNoteChange,
+  receipt,
+  onReceiptChange,
+  notes,
+  saving,
+  onSave
+}: {
+  title: string;
+  status: PaymentStatus;
+  onStatusChange: (status: PaymentStatus) => void;
+  note: string;
+  onNoteChange: (note: string) => void;
+  receipt: File | null;
+  onReceiptChange: (file: File | null) => void;
+  notes: PaymentNote[];
+  saving: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <div className="grid gap-3 rounded-md border border-border bg-white p-4">
+      <h3 className="font-semibold">{title}</h3>
+      <div className="grid gap-3">
+        <div className="space-y-2">
+          <Label>وضعیت پرداخت</Label>
+          <Select value={status} onChange={(event) => onStatusChange(event.target.value as PaymentStatus)}>
+            {paymentStatuses.map((option) => (
+              <option key={option} value={option}>
+                {paymentStatusLabel(option)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>یادداشت پرداخت</Label>
+          <Textarea
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="مثلاً: نصف مبلغ پرداخت شد و رسید ضمیمه است."
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>رسید پرداخت</Label>
+          <Input type="file" onChange={(event) => onReceiptChange(event.target.files?.[0] ?? null)} />
+          {receipt ? <p className="text-xs text-muted-foreground">{receipt.name}</p> : null}
+        </div>
+        <Button type="button" className="w-fit" onClick={onSave} loading={saving}>
+          <FileUp className="h-4 w-4" aria-hidden="true" />
+          ذخیره پرداخت
+        </Button>
+      </div>
+
+      {notes.length ? (
+        <div className="grid gap-2">
+          {notes.map((item) => (
+            <div key={item.id} className="rounded-md bg-muted p-3 text-sm">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{paymentStatusLabel(item.payment_status)}</span>
+                <span className="text-xs text-muted-foreground">{formatDateTime(item.created_at)}</span>
+              </div>
+              {item.note ? <p className="whitespace-pre-wrap text-muted-foreground">{item.note}</p> : null}
+              {item.url ? (
+                <a href={absoluteUrl(item.url)} className="mt-2 inline-flex items-center gap-2 text-primary">
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  {item.original_name ?? "رسید پرداخت"}
+                </a>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+          هنوز یادداشت پرداخت ثبت نشده است.
+        </div>
+      )}
+    </div>
   );
 }
 

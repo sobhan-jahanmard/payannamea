@@ -4,6 +4,8 @@ import type {
   LoginPayload,
   Order,
   OrderCreatePayload,
+  PaymentNoteType,
+  PaymentStatus,
   OrderStatus,
   OrderUpdatePayload,
   ReferenceInput,
@@ -206,6 +208,35 @@ export async function addReviewNote(orderId: string, author: string, note: strin
     method: "POST",
     body: JSON.stringify({ author, note })
   });
+}
+
+export async function addPaymentNote(
+  orderId: string,
+  noteType: PaymentNoteType,
+  paymentStatus: PaymentStatus,
+  note: string,
+  receipt?: File | null
+): Promise<Order> {
+  const form = new FormData();
+  form.append("note_type", noteType);
+  form.append("payment_status", paymentStatus);
+  form.append("note", note);
+  if (receipt) {
+    form.append("receipt", receipt);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}/payment-notes`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? response.statusText);
+  }
+
+  return response.json() as Promise<Order>;
 }
 
 export function absoluteUrl(path: string): string {

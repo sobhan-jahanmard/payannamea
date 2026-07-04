@@ -8,6 +8,8 @@ import {
   FinalOutputEntity,
   FinalOutputSchema,
   ORDER_STATUSES,
+  PAYMENT_NOTE_TYPES,
+  PAYMENT_STATUSES,
   OrderEntity,
   OrderFileEntity,
   OrderFileSchema,
@@ -17,6 +19,10 @@ import {
   OrderStatus,
   OrderStatusLogEntity,
   OrderStatusLogSchema,
+  PaymentNoteEntity,
+  PaymentNoteSchema,
+  PaymentNoteType,
+  PaymentStatus,
   ReviewNoteEntity,
   ReviewNoteSchema,
   UserEntity,
@@ -118,6 +124,7 @@ export const orderCreateSchema = z.object({
   image_count: optionalImageCount,
   deadline: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  moarref_code: z.string().max(120).optional().nullable(),
   references: z.array(referenceSchema).default([])
 }).superRefine(orderFieldsRefinement);
 
@@ -133,6 +140,12 @@ export const reviewNoteSchema = z.object({
   note: z.string().min(1)
 });
 
+export const paymentNoteSchema = z.object({
+  note_type: z.enum(PAYMENT_NOTE_TYPES),
+  payment_status: z.enum(PAYMENT_STATUSES),
+  note: z.string().optional().nullable()
+});
+
 const detailRelations = {
   customer: true,
   files: true,
@@ -140,7 +153,8 @@ const detailRelations = {
   status_logs: true,
   final_outputs: true,
   review_notes: true,
-  worker_lock: true
+  worker_lock: true,
+  payment_notes: true
 } as const;
 
 function iso(value: Date | string | null | undefined): string | null {
@@ -290,6 +304,23 @@ function serializeReviewNote(note: ReviewNoteEntity) {
   };
 }
 
+function serializePaymentNote(note: PaymentNoteEntity) {
+  return {
+    id: note.id,
+    order_id: note.order_id,
+    note_type: note.note_type,
+    payment_status: note.payment_status,
+    note: note.note,
+    original_name: note.original_name,
+    stored_name: note.stored_name,
+    storage_path: note.storage_path,
+    content_type: note.content_type,
+    size_bytes: note.size_bytes === null ? null : Number(note.size_bytes),
+    created_at: iso(note.created_at),
+    url: note.storage_path ? `/uploads/${note.storage_path}` : null
+  };
+}
+
 export function serializeOrder(order: OrderEntity, detail = true, audience: "admin" | "customer" = "admin") {
   if (!order.customer) {
     throw new ApiError(500, "Order customer relation was not loaded");
@@ -298,6 +329,8 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
   const base = {
     id: order.id,
     status: order.status,
+    payment_status: order.payment_status,
+    moarref_payment_status: order.moarref_payment_status,
     degree: order.degree,
     university: order.university,
     title: order.title,
@@ -321,6 +354,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     image_count: order.image_count,
     deadline: iso(order.deadline),
     notes: order.notes,
+    moarref_code: order.moarref_code,
     created_at: iso(order.created_at),
     updated_at: iso(order.updated_at),
     customer: serializeUser(order.customer)
@@ -341,7 +375,8 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
           ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
           : []
         : byDate(order.final_outputs).map(serializeFinalOutput),
-    review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : []
+    review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : [],
+    payment_notes: audience === "admin" ? byDate(order.payment_notes).map(serializePaymentNote) : []
   };
 }
 
@@ -407,6 +442,8 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       id: orderId,
       user_id: user.id,
       status: "submitted",
+      payment_status: "not_paid",
+      moarref_payment_status: "not_paid",
       degree: payload.degree,
       university: payload.university,
       title: payload.title.trim(),
@@ -429,7 +466,8 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       quantity_value: payload.quantity_value ?? null,
       image_count: payload.image_count ?? null,
       deadline: parseDeadline(payload.deadline),
-      notes: compact(payload.notes)
+      notes: compact(payload.notes),
+      moarref_code: compact(payload.moarref_code)
     });
     await manager.getRepository(OrderSchema).save(order);
 
@@ -500,6 +538,7 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         image_count: payload.image_count ?? null,
         deadline: parseDeadline(payload.deadline),
         notes: compact(payload.notes),
+        moarref_code: compact(payload.moarref_code),
         updated_at: new Date()
       }
     );
@@ -586,6 +625,45 @@ export async function addReviewNote(orderId: string, rawPayload: unknown): Promi
     author: payload.author,
     note: payload.note
   });
+}
+
+export async function addPaymentNote(
+  orderId: string,
+  rawPayload: unknown,
+  receipt?: {
+    original_name: string;
+    stored_name: string;
+    storage_path: string;
+    content_type: string | null;
+    size_bytes: number;
+  }
+): Promise<OrderEntity> {
+  const payload = paymentNoteSchema.parse(rawPayload);
+  const statusColumn = payload.note_type === "payment" ? "payment_status" : "moarref_payment_status";
+  const dataSource = await getDataSource();
+  await dataSource.transaction(async (manager) => {
+    await getOrderOr404(orderId, manager);
+    await manager.getRepository(OrderSchema).update(
+      { id: orderId },
+      {
+        [statusColumn]: payload.payment_status,
+        updated_at: new Date()
+      }
+    );
+    await manager.getRepository(PaymentNoteSchema).save({
+      id: randomUUID(),
+      order_id: orderId,
+      note_type: payload.note_type,
+      payment_status: payload.payment_status,
+      note: compact(payload.note),
+      original_name: receipt?.original_name ?? null,
+      stored_name: receipt?.stored_name ?? null,
+      storage_path: receipt?.storage_path ?? null,
+      content_type: receipt?.content_type ?? null,
+      size_bytes: receipt?.size_bytes ?? null
+    });
+  });
+  return getOrderOr404(orderId);
 }
 
 export async function findFinalOutput(orderId: string, outputId: string): Promise<FinalOutputEntity> {
