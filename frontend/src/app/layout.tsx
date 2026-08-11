@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { TopNav } from "../components/layout/TopNav";
@@ -14,6 +15,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cloudflareAnalyticsToken =
+    process.env.NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN?.trim() ||
+    "660524cdc1b44a0ba9860110a034ea4e";
+
   return (
     <html lang="fa" dir="rtl">
       <body>
@@ -21,6 +26,13 @@ export default function RootLayout({
           <TopNav />
           {children}
         </AuthProvider>
+        {process.env.NODE_ENV === "production" && cloudflareAnalyticsToken ? (
+          <Script
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            strategy="afterInteractive"
+            data-cf-beacon={JSON.stringify({ token: cloudflareAnalyticsToken, spa: true })}
+          />
+        ) : null}
       </body>
     </html>
   );
