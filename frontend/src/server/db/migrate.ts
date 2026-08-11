@@ -15,12 +15,16 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_users_role on users(role)`,
+  `alter table users alter column full_name drop not null`,
+  `alter table users alter column email drop not null`,
+  `create unique index if not exists uq_users_phone on users(phone) where phone is not null`,
   `create table if not exists orders (
     id varchar(36) primary key,
     user_id varchar(36) not null references users(id) on delete cascade,
     status varchar(32) not null default 'submitted',
     payment_status varchar(32) not null default 'not_paid',
     moarref_payment_status varchar(32) not null default 'not_paid',
+    correspondence_email varchar(255) not null,
     degree varchar(120) not null,
     university varchar(255) not null,
     title varchar(500) not null,
@@ -82,6 +86,12 @@ const statements = [
   `alter table orders add column if not exists analysis_software varchar(255)`,
   `alter table orders add column if not exists payment_status varchar(32) not null default 'not_paid'`,
   `alter table orders add column if not exists moarref_payment_status varchar(32) not null default 'not_paid'`,
+  `alter table orders add column if not exists correspondence_email varchar(255)`,
+  `update orders set correspondence_email = users.email
+    from users
+    where orders.user_id = users.id and orders.correspondence_email is null and users.email is not null`,
+  `update orders set correspondence_email = 'unknown@example.invalid' where correspondence_email is null`,
+  `alter table orders alter column correspondence_email set not null`,
   `alter table orders add column if not exists moarref_code varchar(120)`,
   `create table if not exists order_files (
     id varchar(36) primary key,
@@ -172,7 +182,18 @@ const statements = [
     size_bytes integer,
     created_at timestamptz not null default now()
   )`,
-  `create index if not exists ix_payment_notes_order_id on payment_notes(order_id)`
+  `create index if not exists ix_payment_notes_order_id on payment_notes(order_id)`,
+  `create table if not exists otp_challenges (
+    id varchar(36) primary key,
+    phone varchar(40) not null,
+    code_hash varchar(128) not null,
+    expires_at timestamptz not null,
+    attempts integer not null default 0,
+    consumed_at timestamptz,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists ix_otp_challenges_phone_created_at on otp_challenges(phone, created_at)`,
+  `create index if not exists ix_otp_challenges_expires_at on otp_challenges(expires_at)`
 ];
 
 async function main() {

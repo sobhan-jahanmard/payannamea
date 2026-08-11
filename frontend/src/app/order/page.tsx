@@ -70,6 +70,7 @@ const optionalImageCount = z.preprocess((value) => {
 }, z.number().int().min(0, "حداقل مقدار ۰ است").max(1000, "حداکثر ۱۰۰۰ عکس").optional());
 
 const formSchema = z.object({
+  correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
@@ -277,6 +278,7 @@ function OrderForm() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      correspondence_email: "",
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
       student_name: "",
@@ -338,6 +340,7 @@ function OrderForm() {
         "university",
         "title",
         "student_name",
+        "correspondence_email",
         "methodology",
         "language",
         "academic_style",
@@ -390,6 +393,7 @@ function OrderForm() {
     setCreatedOrder(null);
 
     const payload: OrderCreatePayload = {
+      correspondence_email: values.correspondence_email.trim(),
       degree: values.degree,
       university: values.university,
       title: values.title.trim(),
@@ -454,7 +458,7 @@ function OrderForm() {
             <p className="mt-1 text-sm text-muted-foreground">ابتدا نوع سفارش را انتخاب کنید، سپس مشخصات دانشگاهی، فایل‌ها و منابع لازم را وارد کنید تا سفارش برای بررسی مدیر ارسال شود.</p>
             {user ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                سفارش به نام {user.full_name} ثبت می‌شود. <span className="ltr inline-block">{user.email}</span>
+                سفارش با حساب <span className="ltr inline-block">{user.phone}</span> ثبت می‌شود.
               </p>
             ) : null}
           </div>
@@ -549,6 +553,9 @@ function OrderForm() {
                 </Field>
                 <Field label="نام و نام خانوادگی دانشجو *" error={errors.student_name?.message}>
                   <Input autoComplete="name" {...register("student_name")} />
+                </Field>
+                <Field label="ایمیل مکاتبات سفارش *" error={errors.correspondence_email?.message}>
+                  <Input className="ltr text-left" type="email" autoComplete="email" placeholder="name@example.com" {...register("correspondence_email")} />
                 </Field>
                 <SearchableField id="majors" label="رشته یا گرایش تحصیلی" error={errors.field_of_study?.message} options={majorOptions} inputProps={register("field_of_study")} />
                 <Field label="مقطع تحصیلی" error={errors.degree?.message}>
@@ -774,6 +781,10 @@ function OrderForm() {
               <div className="rounded-md border border-border bg-white p-4">
                 <h2 className="mb-4 text-lg font-semibold">خلاصه سفارش</h2>
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted-foreground">ایمیل مکاتبات سفارش</dt>
+                    <dd className="ltr text-left font-medium">{watched.correspondence_email || "-"}</dd>
+                  </div>
                   <div>
                     <dt className="text-muted-foreground">مقطع تحصیلی</dt>
                     <dd className="font-medium">{watched.degree}</dd>

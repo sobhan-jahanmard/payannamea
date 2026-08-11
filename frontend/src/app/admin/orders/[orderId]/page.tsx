@@ -267,7 +267,7 @@ function AdminOrderDetail() {
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">مشتری</dt>
-                <dd className="font-medium">{order.customer.full_name}</dd>
+                <dd className="ltr text-left font-medium">{order.customer.phone ?? "-"}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">نام دانشجو</dt>
@@ -276,7 +276,7 @@ function AdminOrderDetail() {
               <div>
                 <dt className="text-muted-foreground">ایمیل</dt>
                 <dd className="ltr text-left font-medium">
-                  {order.customer.email}
+                  {order.correspondence_email}
                 </dd>
               </div>
               <div>

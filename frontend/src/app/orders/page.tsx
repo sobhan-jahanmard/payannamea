@@ -39,7 +39,7 @@ function OrdersList() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal">سفارش‌های من</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {user?.full_name}، همه سفارش‌های ثبت‌شده شما در همین صفحه دیده می‌شود.
+            همه سفارش‌های ثبت‌شده با شماره <span className="ltr inline-block">{user?.phone}</span> در این صفحه دیده می‌شود.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">

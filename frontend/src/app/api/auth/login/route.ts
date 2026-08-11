@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const user = await dataSource.getRepository(UserSchema).findOneBy({
       email: payload.email.trim().toLowerCase()
     });
-    if (!user || !verifyPassword(payload.password, user.password_hash)) {
+    if (!user || user.role !== "admin" || !verifyPassword(payload.password, user.password_hash)) {
       throw new ApiError(401, "Invalid email or password");
     }
 

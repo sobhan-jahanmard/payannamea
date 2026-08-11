@@ -12,18 +12,26 @@ export type PaymentNoteType = "payment" | "moarref_payment";
 
 export interface User {
   id: string;
-  full_name: string;
-  email: string;
-  phone?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone: string | null;
   role: "customer" | "admin";
   created_at: string;
 }
 
-export interface RegisterPayload {
-  full_name: string;
-  email: string;
+export interface OtpRequestPayload {
   phone: string;
-  password: string;
+}
+
+export interface OtpRequestResponse {
+  challenge_id: string;
+  expires_in: number;
+  dev_code?: string;
+}
+
+export interface OtpVerifyPayload extends OtpRequestPayload {
+  challenge_id: string;
+  code: string;
 }
 
 export interface LoginPayload {
@@ -122,6 +130,7 @@ export interface Order {
   status: OrderStatus;
   payment_status: PaymentStatus;
   moarref_payment_status: PaymentStatus;
+  correspondence_email: string;
   degree: string;
   university: string;
   title: string;
@@ -168,6 +177,7 @@ export interface ReferenceInput {
 }
 
 export interface OrderCreatePayload {
+  correspondence_email: string;
   degree: string;
   university: string;
   title: string;

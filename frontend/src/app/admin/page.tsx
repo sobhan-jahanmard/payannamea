@@ -103,7 +103,7 @@ function AdminPanel() {
               <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
                 <span>{order.order_type ?? "نوع سفارش ثبت نشده"}</span>
                 <span>{paymentStatusLabel(order.payment_status)}</span>
-                <span className="ltr text-left">{order.customer.email}</span>
+                <span className="ltr text-left">{order.correspondence_email}</span>
                 <span className="inline-flex items-center gap-1 text-primary">
                   باز کردن جزئیات
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />

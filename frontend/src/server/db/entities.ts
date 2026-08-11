@@ -19,8 +19,8 @@ export type UserRole = "customer" | "admin";
 
 export interface UserEntity {
   id: string;
-  full_name: string;
-  email: string;
+  full_name: string | null;
+  email: string | null;
   phone: string | null;
   password_hash: string | null;
   role: UserRole;
@@ -36,6 +36,7 @@ export interface OrderEntity {
   status: OrderStatus;
   payment_status: PaymentStatus;
   moarref_payment_status: PaymentStatus;
+  correspondence_email: string;
   degree: string;
   university: string;
   title: string;
@@ -78,6 +79,16 @@ export interface OrderEntity {
   final_outputs?: FinalOutputEntity[];
   review_notes?: ReviewNoteEntity[];
   payment_notes?: PaymentNoteEntity[];
+}
+
+export interface OtpChallengeEntity {
+  id: string;
+  phone: string;
+  code_hash: string;
+  expires_at: Date;
+  attempts: number;
+  consumed_at: Date | null;
+  created_at: Date;
 }
 
 export interface OrderFileEntity {
@@ -196,9 +207,9 @@ export const UserSchema = new EntitySchema<UserEntity>({
   tableName: "users",
   columns: {
     id: idColumn,
-    full_name: { type: String, length: 255 },
-    email: { type: String, length: 255, unique: true },
-    phone: { type: String, length: 40, nullable: true },
+    full_name: { type: String, length: 255, nullable: true },
+    email: { type: String, length: 255, unique: true, nullable: true },
+    phone: { type: String, length: 40, nullable: true, unique: true },
     password_hash: { type: String, length: 255, nullable: true },
     role: { type: String, length: 32, default: "customer" },
     reset_token_hash: { type: String, length: 128, nullable: true },
@@ -224,6 +235,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     status: { type: String, length: 32, default: "submitted" },
     payment_status: { type: String, length: 32, default: "not_paid" },
     moarref_payment_status: { type: String, length: 32, default: "not_paid" },
+    correspondence_email: { type: String, length: 255 },
     degree: { type: String, length: 120 },
     university: { type: String, length: 255 },
     title: { type: String, length: 500 },
@@ -279,6 +291,24 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     review_notes: { type: "one-to-many", target: "ReviewNote", inverseSide: "order" },
     payment_notes: { type: "one-to-many", target: "PaymentNote", inverseSide: "order" }
   }
+});
+
+export const OtpChallengeSchema = new EntitySchema<OtpChallengeEntity>({
+  name: "OtpChallenge",
+  tableName: "otp_challenges",
+  columns: {
+    id: idColumn,
+    phone: { type: String, length: 40 },
+    code_hash: { type: String, length: 128 },
+    expires_at: { type: "timestamptz" },
+    attempts: { type: Number, default: 0 },
+    consumed_at: { type: "timestamptz", nullable: true },
+    created_at: createdAtColumn
+  },
+  indices: [
+    { name: "ix_otp_challenges_phone_created_at", columns: ["phone", "created_at"] },
+    { name: "ix_otp_challenges_expires_at", columns: ["expires_at"] }
+  ]
 });
 
 export const OrderFileSchema = new EntitySchema<OrderFileEntity>({
@@ -498,6 +528,7 @@ export const PaymentNoteSchema = new EntitySchema<PaymentNoteEntity>({
 
 export const entities = [
   UserSchema,
+  OtpChallengeSchema,
   OrderSchema,
   OrderFileSchema,
   OrderReferenceSchema,

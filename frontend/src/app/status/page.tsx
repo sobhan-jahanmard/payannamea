@@ -69,6 +69,7 @@ const optionalImageCount = z.preprocess((value) => {
 }, z.number().int().min(0, "حداقل مقدار ۰ است").max(1000, "حداکثر ۱۰۰۰ عکس").optional());
 
 const formSchema = z.object({
+  correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
@@ -148,6 +149,7 @@ function fileTypeLabel(type: string) {
 
 function valuesFromOrder(order: Order): FormValues {
   return {
+    correspondence_email: order.correspondence_email,
     degree: order.degree,
     university: order.university,
     title: order.title,
@@ -325,6 +327,7 @@ function StatusContent() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      correspondence_email: "",
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
       student_name: "",
@@ -417,6 +420,7 @@ function StatusContent() {
     setError(null);
     setSuccess(null);
     const payload: OrderUpdatePayload = {
+      correspondence_email: values.correspondence_email.trim(),
       degree: values.degree,
       university: values.university,
       title: values.title.trim(),
@@ -566,6 +570,9 @@ function StatusContent() {
                   <SearchableField id="edit-universities" label="دانشگاه یا مؤسسه آموزشی" error={errors.university?.message} options={universityOptions} inputProps={register("university")} />
                   <Field label="کد معرف" error={errors.moarref_code?.message}>
                     <Input className="ltr text-left" {...register("moarref_code")} />
+                  </Field>
+                  <Field label="ایمیل مکاتبات سفارش" error={errors.correspondence_email?.message}>
+                    <Input className="ltr text-left" type="email" autoComplete="email" {...register("correspondence_email")} />
                   </Field>
                 </div>
 
@@ -752,7 +759,7 @@ function StatusContent() {
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold">{order.title}</h2>
-                <p className="ltr mt-1 text-left text-sm text-muted-foreground">{order.customer.email}</p>
+                <p className="ltr mt-1 text-left text-sm text-muted-foreground">{order.correspondence_email}</p>
               </div>
               <Button type="button" variant="outline" onClick={() => void loadOrder(order.id)} loading={loading}>
                 <RefreshCcw className="h-4 w-4" aria-hidden="true" />
@@ -767,6 +774,7 @@ function StatusContent() {
               <DetailItem label="نوع سفارش" value={display(order.order_type)} />
               <DetailItem label="کد معرف" value={display(order.moarref_code)} />
               <DetailItem label="نام دانشجو" value={display(order.student_name)} />
+              <DetailItem label="ایمیل مکاتبات" value={<span className="ltr inline-block">{order.correspondence_email}</span>} />
               <DetailItem label="تاریخ ثبت" value={formatDateTime(order.created_at)} />
               <DetailItem label="آخرین به‌روزرسانی" value={formatDateTime(order.updated_at)} />
               <DetailItem label="مقطع تحصیلی" value={order.degree} />

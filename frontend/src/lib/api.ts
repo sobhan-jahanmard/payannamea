@@ -2,6 +2,9 @@ import type {
   AuthResponse,
   ForgotPasswordResponse,
   LoginPayload,
+  OtpRequestPayload,
+  OtpRequestResponse,
+  OtpVerifyPayload,
   Order,
   OrderCreatePayload,
   PaymentNoteType,
@@ -9,7 +12,6 @@ import type {
   OrderStatus,
   OrderUpdatePayload,
   ReferenceInput,
-  RegisterPayload,
   ReviewNote,
   User
 } from "../types/api";
@@ -103,8 +105,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function registerAccount(payload: RegisterPayload): Promise<AuthResponse> {
-  return request<AuthResponse>("/api/auth/register", {
+export async function requestLoginOtp(payload: OtpRequestPayload): Promise<OtpRequestResponse> {
+  return request<OtpRequestResponse>("/api/auth/otp/request", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function verifyLoginOtp(payload: OtpVerifyPayload): Promise<AuthResponse> {
+  return request<AuthResponse>("/api/auth/otp/verify", {
     method: "POST",
     body: JSON.stringify(payload)
   });

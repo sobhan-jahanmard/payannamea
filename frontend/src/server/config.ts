@@ -26,6 +26,18 @@ export function authSecret(): string {
   return process.env.AUTH_SECRET?.trim() || "local-dev-auth-secret-change-me";
 }
 
+export function msgWayApiKey(): string {
+  return getRequiredEnv("MSGWAY_API_KEY");
+}
+
+export function msgWayTemplateId(): number {
+  const templateId = Number(getRequiredEnv("MSGWAY_TEMPLATE_ID"));
+  if (!Number.isInteger(templateId) || templateId < 1) {
+    throw new Error("MSGWAY_TEMPLATE_ID must be a positive integer");
+  }
+  return templateId;
+}
+
 export function workerApiKey(): string {
   return process.env.WORKER_API_KEY?.trim() || "local-worker-dev-key";
 }

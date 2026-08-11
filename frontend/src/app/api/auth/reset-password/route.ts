@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const dataSource = await getDataSource();
     const repo = dataSource.getRepository(UserSchema);
     const user = await repo.findOneBy({ reset_token_hash: hashResetToken(payload.token) });
-    if (!user?.reset_token_expires_at) {
+    if (!user?.reset_token_expires_at || user.role !== "admin") {
       throw new ApiError(400, "Invalid reset token");
     }
     if (user.reset_token_expires_at.getTime() < Date.now()) {

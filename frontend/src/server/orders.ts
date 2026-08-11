@@ -109,6 +109,7 @@ function orderFieldsRefinement(
 }
 
 export const orderCreateSchema = z.object({
+  correspondence_email: z.string().trim().email().max(255),
   degree: z.string().min(1).max(120),
   university: z.string().min(1).max(255),
   title: z.string().min(3).max(500),
@@ -183,9 +184,8 @@ function parseDeadline(value?: string | null): Date | null {
 export function serializeUser(user: UserEntity) {
   return {
     id: user.id,
-    full_name: user.full_name,
-    email: user.email,
     phone: user.phone,
+    ...(user.role === "admin" ? { full_name: user.full_name, email: user.email } : {}),
     role: user.role,
     created_at: iso(user.created_at)
   };
@@ -331,6 +331,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     status: order.status,
     payment_status: order.payment_status,
     moarref_payment_status: order.moarref_payment_status,
+    correspondence_email: order.correspondence_email,
     degree: order.degree,
     university: order.university,
     title: order.title,
@@ -444,6 +445,7 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       status: "submitted",
       payment_status: "not_paid",
       moarref_payment_status: "not_paid",
+      correspondence_email: payload.correspondence_email.trim().toLowerCase(),
       degree: payload.degree,
       university: payload.university,
       title: payload.title.trim(),
@@ -516,6 +518,7 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
     await manager.getRepository(OrderSchema).update(
       { id: order.id },
       {
+        correspondence_email: payload.correspondence_email.trim().toLowerCase(),
         degree: payload.degree,
         university: payload.university,
         title: payload.title.trim(),

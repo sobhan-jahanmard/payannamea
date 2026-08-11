@@ -1,6 +1,6 @@
 "use client";
 
-import { LogIn, ShieldAlert, UserPlus } from "lucide-react";
+import { LogIn, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -11,11 +11,12 @@ import {
   getStoredToken,
   getStoredUser,
   loginAccount,
-  registerAccount,
+  requestLoginOtp,
   storeAuthSession,
-  storeAuthUser
+  storeAuthUser,
+  verifyLoginOtp
 } from "../../lib/api";
-import type { LoginPayload, RegisterPayload, User } from "../../types/api";
+import type { LoginPayload, OtpRequestResponse, OtpVerifyPayload, User } from "../../types/api";
 import { Button } from "../ui/button";
 
 interface AuthContextValue {
@@ -24,7 +25,8 @@ interface AuthContextValue {
   loading: boolean;
   isAdmin: boolean;
   login: (payload: LoginPayload) => Promise<User>;
-  register: (payload: RegisterPayload) => Promise<User>;
+  requestOtp: (phone: string) => Promise<OtpRequestResponse>;
+  verifyOtp: (payload: OtpVerifyPayload) => Promise<User>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -78,8 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(session.access_token);
         return session.user;
       },
-      register: async (payload) => {
-        const session = await registerAccount(payload);
+      requestOtp: (phone) => requestLoginOtp({ phone }),
+      verifyOtp: async (payload) => {
+        const session = await verifyLoginOtp(payload);
         storeAuthSession(session);
         setUser(session.user);
         setToken(session.access_token);
@@ -148,12 +151,6 @@ export function AuthGate({
               <Link href="/login">
                 <LogIn className="h-4 w-4" aria-hidden="true" />
                 ورود
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/register">
-                <UserPlus className="h-4 w-4" aria-hidden="true" />
-                ساخت حساب
               </Link>
             </Button>
           </div>

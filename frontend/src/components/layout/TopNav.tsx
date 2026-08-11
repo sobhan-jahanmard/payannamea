@@ -7,8 +7,7 @@ import {
   ListOrdered,
   LogIn,
   LogOut,
-  Mail,
-  UserPlus,
+  Phone,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -80,29 +79,25 @@ export function TopNav() {
             <>
               <div
                 className="inline-flex h-10 max-w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm"
-                title={`${user.full_name} - ${user.email}`}
+                title={isAdmin ? `${user.full_name ?? "مدیر"} - ${user.email ?? ""}` : user.phone ?? ""}
               >
-                <Mail className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="hidden font-medium text-muted-foreground sm:inline">
-                  {user.full_name}
-                </span>
+                <Phone className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span className="ltr max-w-[220px] truncate text-left font-medium text-foreground">
-                  {user.email}
+                  {isAdmin ? user.email : user.phone}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={logout}
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-                title={user.full_name}
+                title="خروج از حساب"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
                 <span>خروج</span>
               </button>
             </>
           ) : (
-            <>
-              <Link
+            <Link
                 href="/login"
                 className={cn(
                   "inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
@@ -114,19 +109,6 @@ export function TopNav() {
                 <LogIn className="h-4 w-4" aria-hidden="true" />
                 <span>ورود</span>
               </Link>
-              <Link
-                href="/register"
-                className={cn(
-                  "inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
-                  pathname.startsWith("/register")
-                    ? "border-primary bg-teal-50 text-teal-900"
-                    : "border-border bg-white text-foreground hover:bg-muted",
-                )}
-              >
-                <UserPlus className="h-4 w-4" aria-hidden="true" />
-                <span>ثبت‌نام</span>
-              </Link>
-            </>
           )}
         </nav>
       </div>
