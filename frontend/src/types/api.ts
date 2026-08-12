@@ -184,7 +184,7 @@ export interface OrderCreatePayload {
   university: string;
   title: string;
   student_name: string;
-  student_number?: string;
+  student_number: string;
   order_type: string;
   methodology: string;
   language: string;
