@@ -15,7 +15,7 @@ import { Label } from "../../components/ui/label";
 const phoneSchema = z.object({
   phone: z.string().trim().min(10, "شماره موبایل معتبر نیست").max(40, "شماره موبایل معتبر نیست")
 });
-const codeSchema = z.object({ code: z.string().trim().regex(/^(?:\d{4,8}|09369348660)$/, "کد تأیید معتبر نیست") });
+const codeSchema = z.object({ code: z.string().trim().regex(/^\d{4,8}$/, "کد تأیید معتبر نیست") });
 const adminSchema = z.object({
   email: z.string().email("ایمیل معتبر نیست"),
   password: z.string().min(1, "رمز عبور را وارد کنید")
@@ -111,7 +111,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label>کد تأیید</Label>
-              <Input className="ltr text-center text-lg tracking-[0.35em]" inputMode="numeric" autoComplete="one-time-code" maxLength={11} {...codeForm.register("code")} />
+              <Input className="ltr text-center text-lg tracking-[0.35em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} {...codeForm.register("code")} />
               {codeForm.formState.errors.code ? <p className="text-xs font-medium text-red-700">{codeForm.formState.errors.code.message}</p> : null}
             </div>
             {devCode ? <p className="text-xs text-amber-800">کد محیط توسعه: {devCode}</p> : null}

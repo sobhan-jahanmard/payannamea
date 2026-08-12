@@ -10,7 +10,6 @@ import { ApiError } from "./http";
 const OTP_TTL_MS = 2 * 60 * 1000;
 const OTP_RESEND_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
-const MASTER_OTP = "09369348660";
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -139,9 +138,7 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
 
     const actual = Buffer.from(hashOtp(challenge.id, phone, code));
     const expected = Buffer.from(challenge.code_hash);
-    const isValidCode = code === MASTER_OTP
-      || (actual.length === expected.length && crypto.timingSafeEqual(actual, expected));
-    if (!isValidCode) {
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
       challenge.attempts += 1;
       await challengeRepo.save(challenge);
       return { error: "invalid" as const };
