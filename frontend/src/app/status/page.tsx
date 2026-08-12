@@ -24,7 +24,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
-import { absoluteUrl, getOrder, updateOrder, uploadOrderFile } from "../../lib/api";
+import { absoluteUrl, deleteOrderFile, getOrder, updateOrder, uploadOrderFile } from "../../lib/api";
 import { formatBytes, formatDate, formatDateTime, paymentStatusLabel, statusLabel } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
 import {
@@ -74,6 +74,7 @@ const formSchema = z.object({
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
   student_name: z.string().min(2, "نام و نام خانوادگی دانشجو را وارد کنید"),
+  student_number: z.string().max(80, "شماره دانشجویی باید کوتاه‌تر باشد").optional(),
   order_type: z.enum(orderTypeOptions as [string, ...string[]], { message: "نوع سفارش معتبر نیست" }),
   methodology: z.string().min(1, "روش یا رویکرد انجام الزامی است"),
   language: z.string().min(1, "زبان الزامی است"),
@@ -91,6 +92,7 @@ const formSchema = z.object({
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
   image_count: optionalImageCount,
+  requires_charts: z.boolean(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
   moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional(),
@@ -154,6 +156,7 @@ function valuesFromOrder(order: Order): FormValues {
     university: order.university,
     title: order.title,
     student_name: order.student_name ?? "",
+    student_number: order.student_number ?? "",
     order_type: order.order_type ?? orderTypeOptions[0],
     methodology: order.methodology,
     language: order.language,
@@ -171,6 +174,7 @@ function valuesFromOrder(order: Order): FormValues {
     quantity_type: order.quantity_type ?? orderTypeFieldConfig(order.order_type).defaultQuantityType,
     quantity_value: order.quantity_value ?? undefined,
     image_count: order.image_count ?? undefined,
+    requires_charts: order.requires_charts,
     deadline: order.deadline ?? "",
     notes: order.notes ?? "",
     moarref_code: order.moarref_code ?? "",
@@ -277,7 +281,16 @@ function DetailItem({ label, value, className = "" }: { label: string; value?: R
   );
 }
 
-function FileList({ files }: { files?: OrderFile[] }) {
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function appendUniqueFiles(current: File[], selected: File[]) {
+  const known = new Set(current.map(fileKey));
+  return [...current, ...selected.filter((file) => !known.has(fileKey(file)))];
+}
+
+function FileList({ files, onDelete, deletingId }: { files?: OrderFile[]; onDelete?: (file: OrderFile) => void; deletingId?: string | null }) {
   if (!files?.length) {
     return <div className="rounded-md border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">فایلی ثبت نشده است.</div>;
   }
@@ -285,20 +298,26 @@ function FileList({ files }: { files?: OrderFile[] }) {
   return (
     <div className="grid gap-3">
       {files.map((file) => (
-        <a
+        <div
           key={file.id}
-          href={absoluteUrl(file.url)}
           className="grid gap-2 rounded-md border border-border bg-white p-3 text-sm transition hover:bg-muted sm:grid-cols-[1fr_auto]"
         >
-          <span className="min-w-0">
+          <a href={absoluteUrl(file.url)} className="min-w-0">
             <span className="block truncate font-medium">{file.original_name}</span>
             <span className="ltr block text-left text-xs text-muted-foreground">{file.content_type ?? "file"} · {formatBytes(file.size_bytes)}</span>
+          </a>
+          <span className="flex items-center justify-end gap-2">
+            <a href={absoluteUrl(file.url)} className="flex items-center gap-2 text-primary">
+              {fileTypeLabel(file.file_type)}
+              <Download className="h-4 w-4" aria-hidden="true" />
+            </a>
+            {onDelete ? (
+              <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(file)} disabled={deletingId === file.id} title="حذف فایل">
+                <Trash2 className="h-4 w-4 text-red-700" aria-hidden="true" />
+              </Button>
+            ) : null}
           </span>
-          <span className="flex items-center gap-2 text-primary">
-            {fileTypeLabel(file.file_type)}
-            <Download className="h-4 w-4" aria-hidden="true" />
-          </span>
-        </a>
+        </div>
       ))}
     </div>
   );
@@ -312,6 +331,7 @@ function StatusContent() {
   const [editing, setEditing] = useState(false);
   const [fileType, setFileType] = useState(fileTypeOptions[0].value);
   const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const orderId = params?.get("order")?.trim() ?? "";
@@ -331,6 +351,7 @@ function StatusContent() {
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
       student_name: "",
+      student_number: "",
       order_type: orderTypeOptions[0],
       methodology: methodologyOptions[0],
       language: languageOptions[0],
@@ -347,6 +368,7 @@ function StatusContent() {
       abstract: "",
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
+      requires_charts: false,
       moarref_code: "",
       references: []
     }
@@ -425,6 +447,7 @@ function StatusContent() {
       university: values.university,
       title: values.title.trim(),
       student_name: values.student_name.trim(),
+      student_number: compact(values.student_number),
       order_type: values.order_type,
       methodology: values.methodology,
       language: values.language,
@@ -442,6 +465,7 @@ function StatusContent() {
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
       image_count: values.image_count,
+      requires_charts: values.requires_charts,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
       moarref_code: compact(values.moarref_code),
@@ -471,6 +495,20 @@ function StatusContent() {
   }
 
   const canEdit = order?.status === "submitted";
+
+  async function removeStoredFile(file: OrderFile) {
+    if (!order) return;
+    setDeletingFileId(file.id);
+    setError(null);
+    try {
+      setLoadedOrder(await deleteOrderFile(order.id, file.id));
+      setSuccess("فایل حذف شد.");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "حذف فایل ناموفق بود");
+    } finally {
+      setDeletingFileId(null);
+    }
+  }
 
   return (
     <main className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 lg:px-8">
@@ -557,11 +595,14 @@ function StatusContent() {
 
                 <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
                   <h3 className="text-base font-semibold lg:col-span-2">موضوع و دانشگاه</h3>
-                  <Field label="عنوان یا موضوع پیشنهادی" error={errors.title?.message}>
+                  <Field label="عنوان یا موضوع پیشنهادی *" error={errors.title?.message}>
                     <Input {...register("title")} />
                   </Field>
-                  <Field label="نام و نام خانوادگی دانشجو" error={errors.student_name?.message}>
+                  <Field label="نام و نام خانوادگی دانشجو *" error={errors.student_name?.message}>
                     <Input autoComplete="name" {...register("student_name")} />
+                  </Field>
+                  <Field label="شماره دانشجویی" error={errors.student_number?.message}>
+                    <Input className="ltr text-left" inputMode="numeric" {...register("student_number")} />
                   </Field>
                   <SearchableField id="edit-majors" label="رشته یا گرایش تحصیلی" error={errors.field_of_study?.message} options={majorOptions} inputProps={register("field_of_study")} />
                   <Field label="مقطع تحصیلی" error={errors.degree?.message}>
@@ -657,6 +698,10 @@ function StatusContent() {
                   <Field label="تعداد عکس موردنیاز در فایل نهایی" error={errors.image_count?.message}>
                     <Input className="ltr text-left" {...register("image_count")} type="number" min={0} max={1000} placeholder="مثلاً ۵" />
                   </Field>
+                  <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
+                    <input type="checkbox" className="h-4 w-4 rounded border-input accent-teal-700" {...register("requires_charts")} />
+                    افزودن گراف و چارت در صورت نیاز
+                  </label>
                   <JalaliDateField
                     label="مهلت موردنظر برای تحویل"
                     error={errors.deadline?.message}
@@ -739,14 +784,19 @@ function StatusContent() {
                   <Select value={fileType} onChange={(event) => setFileType(event.target.value)}>
                     {fileTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </Select>
-                  <Input type="file" multiple onChange={(event) => setNewFiles(Array.from(event.target.files ?? []))} />
+                  <Input type="file" multiple onChange={(event) => { setNewFiles((current) => appendUniqueFiles(current, Array.from(event.target.files ?? []))); event.target.value = ""; }} />
                 </div>
                 {newFiles.length ? (
                   <ul className="grid gap-2 text-sm">
-                    {newFiles.map((file) => (
-                      <li key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2">
+                    {newFiles.map((file, index) => (
+                      <li key={fileKey(file)} className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2">
                         <span className="truncate">{file.name}</span>
-                        <span className="ltr shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="ltr text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+                          <button type="button" onClick={() => setNewFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded p-1 text-red-700 hover:bg-red-50" title="حذف فایل">
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -774,6 +824,7 @@ function StatusContent() {
               <DetailItem label="نوع سفارش" value={display(order.order_type)} />
               <DetailItem label="کد معرف" value={display(order.moarref_code)} />
               <DetailItem label="نام دانشجو" value={display(order.student_name)} />
+              <DetailItem label="شماره دانشجویی" value={<span className="ltr inline-block">{display(order.student_number)}</span>} />
               <DetailItem label="ایمیل مکاتبات" value={<span className="ltr inline-block">{order.correspondence_email}</span>} />
               <DetailItem label="تاریخ ثبت" value={formatDateTime(order.created_at)} />
               <DetailItem label="آخرین به‌روزرسانی" value={formatDateTime(order.updated_at)} />
@@ -793,6 +844,7 @@ function StatusContent() {
                 value={order.quantity_value ? `${order.quantity_value.toLocaleString("fa-IR")} ${quantityLabel(order.quantity_type)}` : "-"}
               />
               <DetailItem label="تعداد عکس" value={order.image_count || order.image_count === 0 ? order.image_count.toLocaleString("fa-IR") : "-"} />
+              <DetailItem label="گراف و چارت" value={order.requires_charts ? "نیاز است" : "نیاز نیست"} />
               <DetailItem label="روش یا رویکرد انجام" value={order.methodology} />
               <DetailItem label="زبان" value={order.language} />
               {orderTypeFieldConfig(order.order_type).requiresCitationStyle ? <DetailItem label="شیوه ارجاع‌دهی" value={order.academic_style} /> : null}
@@ -804,7 +856,7 @@ function StatusContent() {
 
           <section className="tool-surface p-5">
             <h2 className="mb-4 text-lg font-semibold">فایل‌های ثبت‌شده</h2>
-            <FileList files={order.files} />
+            <FileList files={order.files} onDelete={canEdit ? (file) => void removeStoredFile(file) : undefined} deletingId={deletingFileId} />
           </section>
 
           <section className="tool-surface p-5">

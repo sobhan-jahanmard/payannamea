@@ -1,7 +1,7 @@
 import { getCurrentUser } from "../../../../../server/auth";
 import { saveUpload } from "../../../../../server/files";
 import { ApiError, errorResponse, json } from "../../../../../server/http";
-import { addOrderFile, getOrderForUserOr404, serializeOrder } from "../../../../../server/orders";
+import { addOrderFile, deleteOrderFile, getOrderForUserOr404, serializeOrder } from "../../../../../server/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +34,22 @@ export async function POST(request: Request, context: Context) {
       uploaded_by: "customer"
     });
     return json(serializeOrder(updated, true, "customer"), 201);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request, context: Context) {
+  try {
+    const user = await getCurrentUser(request);
+    const { orderId } = await context.params;
+    const order = await getOrderForUserOr404(orderId, user);
+    const fileId = new URL(request.url).searchParams.get("file_id")?.trim();
+    if (!fileId) {
+      throw new ApiError(422, "file_id is required");
+    }
+    const updated = await deleteOrderFile(order, fileId);
+    return json(serializeOrder(updated, true, "customer"));
   } catch (error) {
     return errorResponse(error);
   }

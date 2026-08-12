@@ -41,6 +41,7 @@ export interface OrderEntity {
   university: string;
   title: string;
   student_name: string | null;
+  student_number: string | null;
   order_type: string | null;
   methodology: string;
   language: string;
@@ -59,6 +60,7 @@ export interface OrderEntity {
   quantity_type: string | null;
   quantity_value: number | null;
   image_count: number | null;
+  requires_charts: boolean;
   service_type: string | null;
   project_stage: string | null;
   proposal_status: string | null;
@@ -240,6 +242,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     university: { type: String, length: 255 },
     title: { type: String, length: 500 },
     student_name: { type: String, length: 255, nullable: true },
+    student_number: { type: String, length: 80, nullable: true },
     order_type: { type: String, length: 120, nullable: true },
     methodology: { type: String, length: 160 },
     language: { type: String, length: 80 },
@@ -258,6 +261,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     quantity_type: { type: String, length: 40, nullable: true },
     quantity_value: { type: Number, nullable: true },
     image_count: { type: Number, nullable: true },
+    requires_charts: { type: Boolean, default: false },
     service_type: { type: String, length: 160, nullable: true },
     project_stage: { type: String, length: 160, nullable: true },
     proposal_status: { type: String, length: 160, nullable: true },

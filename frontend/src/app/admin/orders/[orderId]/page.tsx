@@ -274,6 +274,10 @@ function AdminOrderDetail() {
                 <dd className="font-medium">{order.student_name ?? "-"}</dd>
               </div>
               <div>
+                <dt className="text-muted-foreground">شماره دانشجویی</dt>
+                <dd className="ltr text-left font-medium">{order.student_number ?? "-"}</dd>
+              </div>
+              <div>
                 <dt className="text-muted-foreground">ایمیل</dt>
                 <dd className="ltr text-left font-medium">
                   {order.correspondence_email}
@@ -360,6 +364,10 @@ function AdminOrderDetail() {
                     ? order.image_count.toLocaleString("fa-IR")
                     : "-"}
                 </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">گراف و چارت</dt>
+                <dd className="font-medium">{order.requires_charts ? "نیاز است" : "نیاز نیست"}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">روش یا رویکرد انجام</dt>

@@ -29,6 +29,7 @@ import {
   WorkerLockSchema
 } from "./db/entities";
 import { ApiError, compact } from "./http";
+import { deleteStoredUpload } from "./files";
 import {
   academicDetailLabels,
   orderTypeFieldConfig,
@@ -114,6 +115,7 @@ export const orderCreateSchema = z.object({
   university: z.string().min(1).max(255),
   title: z.string().min(3).max(500),
   student_name: z.string().min(2).max(255),
+  student_number: z.string().max(80).optional().nullable(),
   order_type: z.string().min(1).max(120),
   methodology: z.string().min(1).max(160),
   language: z.string().min(1).max(80),
@@ -123,6 +125,7 @@ export const orderCreateSchema = z.object({
   quantity_type: z.enum(quantityTypeOptions as [QuantityType, ...QuantityType[]]).optional().nullable(),
   quantity_value: optionalQuantity,
   image_count: optionalImageCount,
+  requires_charts: z.boolean().default(false),
   deadline: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   moarref_code: z.string().max(120).optional().nullable(),
@@ -336,6 +339,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     university: order.university,
     title: order.title,
     student_name: order.student_name,
+    student_number: order.student_number,
     order_type: order.order_type,
     methodology: order.methodology,
     language: order.language,
@@ -353,6 +357,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     quantity_type: order.quantity_type,
     quantity_value: order.quantity_value,
     image_count: order.image_count,
+    requires_charts: order.requires_charts,
     deadline: iso(order.deadline),
     notes: order.notes,
     moarref_code: order.moarref_code,
@@ -450,6 +455,7 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       university: payload.university,
       title: payload.title.trim(),
       student_name: payload.student_name.trim(),
+      student_number: compact(payload.student_number),
       order_type: payload.order_type,
       methodology: payload.methodology,
       language: payload.language,
@@ -467,6 +473,7 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
       quantity_value: payload.quantity_value ?? null,
       image_count: payload.image_count ?? null,
+      requires_charts: payload.requires_charts,
       deadline: parseDeadline(payload.deadline),
       notes: compact(payload.notes),
       moarref_code: compact(payload.moarref_code)
@@ -523,6 +530,7 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         university: payload.university,
         title: payload.title.trim(),
         student_name: payload.student_name.trim(),
+        student_number: compact(payload.student_number),
         methodology: payload.methodology,
         language: payload.language,
         academic_style: orderTypeFieldConfig(payload.order_type).requiresCitationStyle ? compact(payload.academic_style) ?? "APA 7" : citationStyleNotRequiredValue,
@@ -539,6 +547,7 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
         quantity_value: payload.quantity_value ?? null,
         image_count: payload.image_count ?? null,
+        requires_charts: payload.requires_charts,
         deadline: parseDeadline(payload.deadline),
         notes: compact(payload.notes),
         moarref_code: compact(payload.moarref_code),
@@ -587,6 +596,19 @@ export async function addOrderFile(order: OrderEntity, file: Omit<OrderFileEntit
   assertCustomerEditable(order);
   const dataSource = await getDataSource();
   await dataSource.getRepository(OrderFileSchema).save({ id: randomUUID(), ...file });
+  return getOrderOr404(order.id);
+}
+
+export async function deleteOrderFile(order: OrderEntity, fileId: string): Promise<OrderEntity> {
+  assertCustomerEditable(order);
+  const dataSource = await getDataSource();
+  const repository = dataSource.getRepository(OrderFileSchema);
+  const file = await repository.findOneBy({ id: fileId, order_id: order.id });
+  if (!file) {
+    throw new ApiError(404, "Order file not found");
+  }
+  await repository.delete({ id: file.id });
+  await deleteStoredUpload(file.storage_path);
   return getOrderOr404(order.id);
 }
 

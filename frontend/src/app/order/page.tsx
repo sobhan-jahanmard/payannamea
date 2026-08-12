@@ -75,6 +75,7 @@ const formSchema = z.object({
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
   student_name: z.string().min(2, "نام و نام خانوادگی دانشجو را وارد کنید"),
+  student_number: z.string().max(80, "شماره دانشجویی باید کوتاه‌تر باشد").optional(),
   order_type: z.enum(orderTypeOptions as [string, ...string[]], { message: "نوع سفارش معتبر نیست" }),
   methodology: z.string().min(1, "روش یا رویکرد انجام الزامی است"),
   language: z.string().min(1, "زبان الزامی است"),
@@ -92,6 +93,7 @@ const formSchema = z.object({
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
   image_count: optionalImageCount,
+  requires_charts: z.boolean(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
   moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional(),
@@ -129,13 +131,12 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const steps = ["نوع سفارش", "مشخصات سفارش", "فایل‌ها", "منابع", "کد معرف", "بازبینی"];
+const steps = ["نوع سفارش", "مشخصات سفارش", "فایل‌ها و منابع", "کد معرف", "بازبینی"];
 
 const stepDescriptions = [
   "نوع خدمت را مشخص کنید تا فیلدهای بعدی دقیق‌تر شوند.",
   "اطلاعات دانشگاهی، حجم کار و الزامات خروجی را وارد کنید.",
-  "شیوه‌نامه، منابع و فایل‌های پشتیبان را بارگذاری کنید.",
-  "منابع اجباری یا لینک‌های مهم را جداگانه ثبت کنید.",
+  "فایل‌های پشتیبان و منابع اجباری یا لینک‌های مهم را ثبت کنید.",
   "اگر سفارش با معرفی شخصی ثبت شده، کد او را وارد کنید.",
   "قبل از ارسال، خلاصه سفارش را بررسی کنید."
 ];
@@ -235,20 +236,34 @@ export default function OrderPage() {
   );
 }
 
-function FileSummary({ files }: { files: File[] }) {
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function appendUniqueFiles(current: File[], selected: File[]) {
+  const known = new Set(current.map(fileKey));
+  return [...current, ...selected.filter((file) => !known.has(fileKey(file)))];
+}
+
+function FileSummary({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
   if (files.length === 0) {
     return null;
   }
 
   return (
     <ul className="mt-3 grid gap-2 text-sm">
-      {files.map((file) => (
+      {files.map((file, index) => (
         <li
-          key={`${file.name}-${file.size}`}
+          key={fileKey(file)}
           className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2"
         >
           <span className="truncate">{file.name}</span>
-          <span className="ltr shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="ltr text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+            <button type="button" onClick={() => onRemove(index)} className="rounded p-1 text-red-700 hover:bg-red-50" title="حذف فایل">
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </span>
         </li>
       ))}
     </ul>
@@ -282,6 +297,7 @@ function OrderForm() {
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
       student_name: "",
+      student_number: "",
       order_type: orderTypeOptions[0],
       methodology: methodologyOptions[0],
       language: languageOptions[0],
@@ -298,6 +314,7 @@ function OrderForm() {
       abstract: "",
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
+      requires_charts: false,
       moarref_code: "",
       references: []
     }
@@ -340,6 +357,7 @@ function OrderForm() {
         "university",
         "title",
         "student_name",
+        "student_number",
         "correspondence_email",
         "methodology",
         "language",
@@ -357,8 +375,8 @@ function OrderForm() {
         "quantity_value",
         "image_count"
       ],
-      3: ["references"],
-      4: ["moarref_code"]
+      2: ["references"],
+      3: ["moarref_code"]
     }),
     []
   );
@@ -398,6 +416,7 @@ function OrderForm() {
       university: values.university,
       title: values.title.trim(),
       student_name: values.student_name.trim(),
+      student_number: compact(values.student_number),
       order_type: values.order_type,
       methodology: values.methodology,
       language: values.language,
@@ -415,6 +434,7 @@ function OrderForm() {
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
       image_count: values.image_count,
+      requires_charts: values.requires_charts,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
       moarref_code: compact(values.moarref_code),
@@ -485,7 +505,7 @@ function OrderForm() {
               style={{ width: `${((step + 1) / steps.length) * 100}%` }}
             />
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-6">
+          <div className="mt-4 grid gap-2 sm:grid-cols-5">
             {steps.map((label, index) => (
               <button
                 key={label}
@@ -548,11 +568,14 @@ function OrderForm() {
             <div className="grid gap-6">
               <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
                 <h2 className="text-base font-semibold lg:col-span-2">موضوع و دانشگاه</h2>
-                <Field label="عنوان یا موضوع پیشنهادی" error={errors.title?.message}>
+                <Field label="عنوان یا موضوع پیشنهادی *" error={errors.title?.message}>
                   <Input {...register("title")} />
                 </Field>
                 <Field label="نام و نام خانوادگی دانشجو *" error={errors.student_name?.message}>
                   <Input autoComplete="name" {...register("student_name")} />
+                </Field>
+                <Field label="شماره دانشجویی" error={errors.student_number?.message}>
+                  <Input className="ltr text-left" inputMode="numeric" {...register("student_number")} />
                 </Field>
                 <Field label="ایمیل مکاتبات سفارش *" error={errors.correspondence_email?.message}>
                   <Input className="ltr text-left" type="email" autoComplete="email" placeholder="name@example.com" {...register("correspondence_email")} />
@@ -645,6 +668,10 @@ function OrderForm() {
                 <Field label="تعداد عکس موردنیاز در فایل نهایی" error={errors.image_count?.message}>
                   <Input className="ltr text-left" {...register("image_count")} type="number" min={0} max={1000} placeholder="مثلاً ۵" />
                 </Field>
+                <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
+                  <input type="checkbox" className="h-4 w-4 rounded border-input accent-teal-700" {...register("requires_charts")} />
+                  افزودن گراف و چارت در صورت نیاز
+                </label>
                 <JalaliDateField
                   label="مهلت موردنظر برای تحویل"
                   error={errors.deadline?.message}
@@ -674,31 +701,27 @@ function OrderForm() {
                     <FileUp className="h-4 w-4 text-primary" aria-hidden="true" />
                     شیوه‌نامه، دستورالعمل یا قالب موردنیاز
                   </div>
-                  <Input type="file" multiple onChange={(event) => setGuidelineFiles(Array.from(event.target.files ?? []))} />
-                  <FileSummary files={guidelineFiles} />
+                  <Input type="file" multiple onChange={(event) => { setGuidelineFiles((current) => appendUniqueFiles(current, Array.from(event.target.files ?? []))); event.target.value = ""; }} />
+                  <FileSummary files={guidelineFiles} onRemove={(index) => setGuidelineFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
                 </div>
                 <div className="rounded-md border border-border bg-white p-4">
                   <div className="mb-3 flex items-center gap-2 font-medium">
                     <BookOpen className="h-4 w-4 text-primary" aria-hidden="true" />
                     منابع، مقالات، کتاب‌ها یا داده‌ها
                   </div>
-                  <Input type="file" multiple onChange={(event) => setReferenceFiles(Array.from(event.target.files ?? []))} />
-                  <FileSummary files={referenceFiles} />
+                  <Input type="file" multiple onChange={(event) => { setReferenceFiles((current) => appendUniqueFiles(current, Array.from(event.target.files ?? []))); event.target.value = ""; }} />
+                  <FileSummary files={referenceFiles} onRemove={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
                 </div>
                 <div className="rounded-md border border-border bg-white p-4">
                   <div className="mb-3 flex items-center gap-2 font-medium">
                     <UploadCloud className="h-4 w-4 text-primary" aria-hidden="true" />
                     فایل‌های تکمیلی
                   </div>
-                  <Input type="file" multiple onChange={(event) => setSupportingFiles(Array.from(event.target.files ?? []))} />
-                  <FileSummary files={supportingFiles} />
+                  <Input type="file" multiple onChange={(event) => { setSupportingFiles((current) => appendUniqueFiles(current, Array.from(event.target.files ?? []))); event.target.value = ""; }} />
+                  <FileSummary files={supportingFiles} onRemove={(index) => setSupportingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
                 </div>
               </div>
-            </div>
-          ) : null}
-
-          {step === 3 ? (
-            <div className="grid gap-4">
+              <div className="grid gap-4 border-t border-border pt-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">منابع و اطلاعات اولیه</h2>
                 <Button
@@ -759,10 +782,11 @@ function OrderForm() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           ) : null}
 
-          {step === 4 ? (
+          {step === 3 ? (
             <div className="grid gap-4">
               <div>
                 <h2 className="text-lg font-semibold">کد معرف</h2>
@@ -776,7 +800,7 @@ function OrderForm() {
             </div>
           ) : null}
 
-          {step === 5 ? (
+          {step === 4 ? (
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-md border border-border bg-white p-4">
                 <h2 className="mb-4 text-lg font-semibold">خلاصه سفارش</h2>
@@ -784,6 +808,10 @@ function OrderForm() {
                   <div className="sm:col-span-2">
                     <dt className="text-muted-foreground">ایمیل مکاتبات سفارش</dt>
                     <dd className="ltr text-left font-medium">{watched.correspondence_email || "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">شماره دانشجویی</dt>
+                    <dd className="ltr text-left font-medium">{watched.student_number || "-"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">مقطع تحصیلی</dt>
@@ -820,6 +848,10 @@ function OrderForm() {
                   <div>
                     <dt className="text-muted-foreground">تعداد عکس</dt>
                     <dd className="font-medium">{watched.image_count || watched.image_count === 0 ? watched.image_count.toLocaleString("fa-IR") : "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">گراف و چارت</dt>
+                    <dd className="font-medium">{watched.requires_charts ? "نیاز است" : "نیاز نیست"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">منابع الزامی</dt>

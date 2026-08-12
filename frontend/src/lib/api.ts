@@ -170,6 +170,12 @@ export async function uploadOrderFile(orderId: string, fileType: string, file: F
   return response.json() as Promise<Order>;
 }
 
+export async function deleteOrderFile(orderId: string, fileId: string): Promise<Order> {
+  return request<Order>(`/api/orders/${orderId}/files?file_id=${encodeURIComponent(fileId)}`, {
+    method: "DELETE"
+  });
+}
+
 export async function listMyOrders(): Promise<Order[]> {
   return request<Order[]>("/api/orders");
 }
