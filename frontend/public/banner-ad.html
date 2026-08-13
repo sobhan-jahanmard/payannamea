@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta
+      name="description"
+      content="پیش‌نمایش و کد HTML بنر تبلیغاتی سامانه خدمات دانشگاهی پایان‌نامه"
+    />
+    <title>پیش‌نمایش بنر تبلیغاتی</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: #f2f8f7;
+        color: #17202c;
+        font-family: Tahoma, Arial, sans-serif;
+      }
+      main {
+        width: min(1040px, calc(100% - 32px));
+        margin: 48px auto;
+      }
+      .panel {
+        margin-bottom: 24px;
+        padding: 20px;
+        border: 1px solid #c9dcda;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 16px 45px rgba(24, 39, 75, 0.08);
+      }
+      h1,
+      h2 {
+        margin: 0 0 12px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      h2 {
+        font-size: 18px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #53606c;
+        line-height: 1.8;
+      }
+      .banner-link {
+        display: block;
+        border-radius: 10px;
+        outline-offset: 4px;
+      }
+      .banner-link img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 0;
+        border-radius: 10px;
+      }
+      .banner-link.vertical {
+        max-width: 512px;
+        margin-inline: auto;
+      }
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 270px;
+        resize: vertical;
+        direction: ltr;
+        padding: 14px;
+        border: 1px solid #c9dcda;
+        border-radius: 8px;
+        background: #071f22;
+        color: #e9ffff;
+        font: 13px/1.7 monospace;
+        text-align: left;
+      }
+      button {
+        margin-top: 12px;
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 8px;
+        background: #167f78;
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0f6762;
+      }
+      .copy-status {
+        display: inline-block;
+        margin-right: 10px;
+        color: #167f78;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>پیش‌نمایش بنر افقی</h1>
+        <p>
+          برای آزمایش لینک، روی بنر کلیک کنید. مقصد، صفحه اصلی سایت
+          payanname.vercel.app است.
+        </p>
+        <a
+          id="banner-link"
+          class="banner-link"
+          href="https://payanname.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=horizontal_banner"
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          aria-label="ثبت سفارش خدمات دانشگاهی"
+          title="ثبت سفارش خدمات دانشگاهی از ایده تا تحویل"
+        >
+          <img
+            src="https://ibfcwcbmnkgigkybluiu.supabase.co/storage/v1/object/public/public-assets/academic-services-ad-banner.webp"
+            width="1734"
+            height="907"
+            alt="خدمات دانشگاهی از ایده تا تحویل؛ پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه"
+            decoding="async"
+            referrerpolicy="strict-origin-when-cross-origin"
+          />
+        </a>
+      </section>
+
+      <section class="panel">
+        <h2>کد HTML بنر افقی</h2>
+        <p>این کد با آدرس کامل سایت ساخته شده و آماده کپی است.</p>
+        <textarea id="horizontal-embed-code" readonly aria-label="کد HTML بنر افقی"></textarea>
+        <button id="horizontal-copy-button" type="button">کپی کد بنر افقی</button>
+        <span id="horizontal-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+      </section>
+
+      <section class="panel">
+        <h2>پیش‌نمایش بنر عمودی</h2>
+        <p>این نسخه برای ستون کناری، جایگاه‌های عمودی و نمایش موبایل مناسب است.</p>
+        <a
+          id="vertical-banner-link"
+          class="banner-link vertical"
+          href="https://payanname.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=vertical_banner"
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          aria-label="ثبت سفارش خدمات دانشگاهی"
+          title="ثبت سفارش خدمات دانشگاهی از ایده تا تحویل"
+        >
+          <img
+            src="https://ibfcwcbmnkgigkybluiu.supabase.co/storage/v1/object/public/public-assets/academic-services-ad-banner-vertical.webp"
+            width="1024"
+            height="1536"
+            alt="خدمات دانشگاهی از ایده تا تحویل؛ پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="strict-origin-when-cross-origin"
+          />
+        </a>
+      </section>
+
+      <section class="panel">
+        <h2>کد HTML بنر عمودی</h2>
+        <p>این کد با آدرس کامل سایت ساخته شده و آماده کپی است.</p>
+        <textarea id="vertical-embed-code" readonly aria-label="کد HTML بنر عمودی"></textarea>
+        <button id="vertical-copy-button" type="button">کپی کد بنر عمودی</button>
+        <span id="vertical-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+      </section>
+    </main>
+
+    <script>
+      const horizontalImageUrl =
+        "https://ibfcwcbmnkgigkybluiu.supabase.co/storage/v1/object/public/public-assets/academic-services-ad-banner.webp";
+      const verticalImageUrl =
+        "https://ibfcwcbmnkgigkybluiu.supabase.co/storage/v1/object/public/public-assets/academic-services-ad-banner-vertical.webp";
+
+      function campaignUrl(content) {
+        const url = new URL("https://payanname.vercel.app/");
+        url.searchParams.set("utm_source", "partner_site");
+        url.searchParams.set("utm_medium", "display");
+        url.searchParams.set("utm_campaign", "academic_services_banner");
+        url.searchParams.set("utm_content", content);
+        return url;
+      }
+
+      function bannerCode({ destination, image, width, height, maxWidth }) {
+        return `<a
+  href="${destination.href}"
+  target="_blank"
+  rel="noopener noreferrer sponsored"
+  aria-label="ثبت سفارش خدمات دانشگاهی"
+  title="ثبت سفارش خدمات دانشگاهی از ایده تا تحویل"
+>
+  <img
+    src="${image}"
+    width="${width}"
+    height="${height}"
+    alt="خدمات دانشگاهی از ایده تا تحویل؛ پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه"
+    loading="lazy"
+    decoding="async"
+    referrerpolicy="strict-origin-when-cross-origin"
+    style="display:block;width:100%;max-width:${maxWidth}px;height:auto;border:0;border-radius:10px"
+  />
+</a>`;
+      }
+
+      const horizontalDestination = campaignUrl("horizontal_banner");
+      const verticalDestination = campaignUrl("vertical_banner");
+      const horizontalEmbedCode = bannerCode({
+        destination: horizontalDestination,
+        image: horizontalImageUrl,
+        width: 1734,
+        height: 907,
+        maxWidth: 900,
+      });
+      const verticalEmbedCode = bannerCode({
+        destination: verticalDestination,
+        image: verticalImageUrl,
+        width: 1024,
+        height: 1536,
+        maxWidth: 512,
+      });
+
+      document.getElementById("horizontal-embed-code").value = horizontalEmbedCode;
+      document.getElementById("vertical-embed-code").value = verticalEmbedCode;
+      document.getElementById("banner-link").href = horizontalDestination.href;
+      document.getElementById("vertical-banner-link").href = verticalDestination.href;
+
+      function enableCopy(buttonId, fieldId, statusId, code) {
+        const field = document.getElementById(fieldId);
+        const status = document.getElementById(statusId);
+        document.getElementById(buttonId).addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(code);
+            status.textContent = "کپی شد.";
+          } catch {
+            field.select();
+            document.execCommand("copy");
+            status.textContent = "کپی شد.";
+          }
+        });
+      }
+
+      enableCopy("horizontal-copy-button", "horizontal-embed-code", "horizontal-copy-status", horizontalEmbedCode);
+      enableCopy("vertical-copy-button", "vertical-embed-code", "vertical-copy-status", verticalEmbedCode);
+    </script>
+  </body>
+</html>
