@@ -2,52 +2,43 @@ import { SMTPClient } from "emailjs";
 
 import { getServerIp } from "./get-server-ip";
 
-function parseRecipients(value: string | undefined): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((recipient) => recipient.trim())
-    .filter(Boolean);
-}
+const sender = "s.jahanmard@gmail.com";
+const recipients = ["s.jahanmard@gmail.com"];
 
 class Email {
   private didWarnAboutConfiguration = false;
 
   async send(subject: string, ...texts: string[]): Promise<boolean> {
-    const user = process.env.SMTP_USER?.trim();
     const password = process.env.SMTP_PASSWORD?.trim();
-    const recipients = parseRecipients(
-      process.env.EMAIL_ALERT_TO ?? process.env.SIGNUP_EMAIL_TO ?? "s.jahanmard@gmail.com"
-    );
 
-    if (!user || !password || recipients.length === 0) {
+    if (!password) {
       if (!this.didWarnAboutConfiguration) {
         console.warn(
-          "Email notification skipped: SMTP_USER and SMTP_PASSWORD must be configured"
+          "Email notification skipped: SMTP_PASSWORD must be configured"
         );
         this.didWarnAboutConfiguration = true;
       }
       return false;
     }
 
-    const ssl = process.env.SMTP_SSL?.trim().toLowerCase() !== "false";
-    const port = Number(process.env.SMTP_PORT || (ssl ? 465 : 587));
     const client = new SMTPClient({
-      user,
+      user: sender,
       password,
-      host: process.env.SMTP_HOST?.trim() || "smtp.gmail.com",
-      port,
-      ssl,
-      tls: !ssl,
+      host: "smtp.gmail.com",
+      port: 465,
+      ssl: true,
       timeout: 10_000
     });
+    const text = texts.join(" - ");
 
     try {
       await client.sendAsync({
-        text: texts.join(" - "),
-        from: process.env.SMTP_FROM?.trim() || user,
+        text,
+        from: sender,
         to: recipients.join(", "),
         subject
       });
+      console.info("Email notification sent:", { subject, to: recipients });
       return true;
     } catch (error) {
       console.error("Email notification failed:", error);
