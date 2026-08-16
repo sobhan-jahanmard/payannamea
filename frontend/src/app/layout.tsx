@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 
+import { AnalyticsTracker } from "../components/analytics/AnalyticsTracker";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { TopNav } from "../components/layout/TopNav";
 import "./globals.css";
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="fa" dir="rtl">
       <body>
         <AuthProvider>
+          <AnalyticsTracker />
           <TopNav />
           {children}
         </AuthProvider>

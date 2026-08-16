@@ -25,6 +25,7 @@ import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { createOrder, uploadOrderFile } from "../../lib/api";
+import { trackAnalyticsEvent } from "../../lib/analytics";
 import { formatBytes } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
 import {
@@ -370,9 +371,19 @@ function OrderForm() {
       const fieldsToValidate = stepFields[step];
       const valid = fieldsToValidate ? await trigger(fieldsToValidate) : true;
       if (valid) {
+        trackAnalyticsEvent("order_step_completed", {
+          step_number: step + 1,
+          step_name: steps[step],
+          order_type: watched.order_type
+        });
         const next = Math.min(step + 1, steps.length - 1);
         setMaxVisitedStep((visited) => Math.max(visited, next));
         setStep(next);
+      } else {
+        trackAnalyticsEvent("order_step_validation_failed", {
+          step_number: step + 1,
+          step_name: steps[step]
+        });
       }
     } finally {
       setAdvancingStep(false);
@@ -381,11 +392,16 @@ function OrderForm() {
 
   function goToStep(index: number) {
     if (index <= maxVisitedStep) {
+      trackAnalyticsEvent("order_step_navigated", {
+        from_step: step + 1,
+        to_step: index + 1
+      });
       setStep(index);
     }
   }
 
   function goPrevious() {
+    trackAnalyticsEvent("order_step_back_clicked", { from_step: step + 1 });
     setStep((current) => Math.max(current - 1, 0));
   }
 
@@ -425,6 +441,11 @@ function OrderForm() {
     };
 
     try {
+      trackAnalyticsEvent("order_submission_started", {
+        order_type: values.order_type,
+        file_count: totalFiles,
+        has_referral_code: Boolean(compact(values.moarref_code))
+      });
       const order = await createOrder(payload);
       for (const file of guidelineFiles) {
         await uploadOrderFile(order.id, "university_guideline", file);
@@ -435,9 +456,18 @@ function OrderForm() {
       for (const file of supportingFiles) {
         await uploadOrderFile(order.id, "supporting_material", file);
       }
+      trackAnalyticsEvent("order_created", {
+        order_type: values.order_type,
+        file_count: totalFiles,
+        has_referral_code: Boolean(compact(values.moarref_code))
+      });
       setCreatedOrder(order);
       router.push("/orders");
     } catch (error) {
+      trackAnalyticsEvent("order_submission_failed", {
+        order_type: values.order_type,
+        file_count: totalFiles
+      });
       setSubmitError(error instanceof Error ? error.message : "ثبت سفارش ناموفق بود");
     }
   }
@@ -446,7 +476,11 @@ function OrderForm() {
 
   return (
     <main className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 lg:px-8">
-      <form onSubmit={(event) => event.preventDefault()} className="grid gap-5">
+      <form
+        onSubmit={(event) => event.preventDefault()}
+        className="grid gap-5"
+        data-analytics-form="order_form"
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-normal">ثبت سفارش خدمات دانشگاهی</h1>

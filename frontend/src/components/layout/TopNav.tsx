@@ -35,7 +35,11 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white/92 backdrop-blur">
       <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-        <Link href="/" className="flex items-center gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-3"
+          data-analytics-event="nav_brand_clicked"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <ClipboardList className="h-5 w-5" aria-hidden="true" />
           </div>
@@ -63,6 +67,7 @@ export function TopNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                data-analytics-event={`nav_${item.href === "/" ? "home" : item.href.slice(1).replaceAll("/", "_")}_clicked`}
                 className={cn(
                   "inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
                   isActive
@@ -89,6 +94,7 @@ export function TopNav() {
               <button
                 type="button"
                 onClick={logout}
+                data-analytics-event="nav_logout_clicked"
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-medium text-foreground transition hover:bg-muted"
                 title="خروج از حساب"
               >
@@ -99,6 +105,7 @@ export function TopNav() {
           ) : (
             <Link
                 href="/login"
+                data-analytics-event="nav_login_clicked"
                 className={cn(
                   "inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
                   pathname.startsWith("/login")

@@ -30,31 +30,37 @@ const features = [
 
 const services = [
   {
+    analyticsKey: "bachelor_thesis",
     icon: FileText,
     title: "پایان‌نامه کارشناسی",
     body: "راهنمایی در انتخاب موضوع، تنظیم ساختار، گردآوری منابع، نگارش بخش‌ها و آماده‌سازی فایل نهایی مطابق خواسته دانشگاه."
   },
   {
+    analyticsKey: "master_thesis",
     icon: FileText,
     title: "پایان‌نامه کارشناسی ارشد",
     body: "از انتخاب موضوع و پروپوزال تا نگارش فصل‌ها، تحلیل، و آماده‌سازی فایل نهایی طبق شیوه‌نامه دانشگاه."
   },
   {
+    analyticsKey: "doctoral_dissertation",
     icon: FileCheck2,
     title: "رساله دکتری",
     body: "برنامه‌ریزی ساختار رساله، تنظیم فصل‌ها، یکپارچه‌سازی منابع، و آماده‌سازی خروجی قابل بازبینی."
   },
   {
+    analyticsKey: "proposal",
     icon: ClipboardList,
     title: "پروپوزال پایان‌نامه",
     body: "تبدیل ایده اولیه به پروپوزال منظم شامل مسئله پژوهش، اهداف، پرسش‌ها، روش انجام و منابع اولیه."
   },
   {
+    analyticsKey: "research_assignment",
     icon: SearchCheck,
     title: "تحقیق دانشگاهی",
     body: "تهیه تحقیق کلاسی یا پژوهشی با ساختار منظم، منابع قابل بررسی، و نگارش متناسب با خواسته استاد."
   },
   {
+    analyticsKey: "presentation",
     icon: Presentation,
     title: "ارائه و پاورپوینت",
     body: "طراحی اسلاید دفاع، ارائه کلاسی یا ارائه پژوهشی با متن منسجم، ساختار روشن و فایل قابل تحویل."
@@ -98,13 +104,23 @@ export default function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild className="border-amber-300 bg-amber-300 text-slate-950 hover:bg-amber-200">
-                <Link href="/order">
+                <Link
+                  href="/order"
+                  data-analytics-event="landing_order_cta_clicked"
+                  data-analytics-location="hero"
+                >
                   ثبت سفارش
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
               <Button asChild variant="outline" className="border-white/70 bg-white/95 text-slate-950 hover:bg-white">
-                <Link href="/orders">سفارش‌های من</Link>
+                <Link
+                  href="/orders"
+                  data-analytics-event="landing_orders_cta_clicked"
+                  data-analytics-location="hero"
+                >
+                  سفارش‌های من
+                </Link>
               </Button>
             </div>
           </div>
@@ -135,7 +151,12 @@ export default function LandingPage() {
           {services.map((service) => {
             const Icon = service.icon;
             return (
-              <article key={service.title} className="tool-surface p-5">
+              <article
+                key={service.title}
+                className="tool-surface p-5"
+                data-analytics-impression={`landing_service_${service.analyticsKey}_viewed`}
+                data-analytics-label={service.analyticsKey}
+              >
                 <Icon className="mb-4 h-6 w-6 text-primary" aria-hidden="true" />
                 <h3 className="text-base font-semibold">{service.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">{service.body}</p>

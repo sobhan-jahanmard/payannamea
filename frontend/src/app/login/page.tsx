@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useAuth } from "../../components/auth/AuthProvider";
+import { trackAnalyticsEvent } from "../../lib/analytics";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -47,7 +48,9 @@ export default function LoginPage() {
       setChallengeId(result.challenge_id);
       setDevCode(result.dev_code ?? null);
       if (result.dev_code) codeForm.setValue("code", result.dev_code);
+      trackAnalyticsEvent("otp_requested");
     } catch (requestError) {
+      trackAnalyticsEvent("otp_request_failed");
       setError(requestError instanceof Error ? requestError.message : "ارسال کد ناموفق بود");
     }
   }
@@ -57,8 +60,10 @@ export default function LoginPage() {
     setError(null);
     try {
       await verifyOtp({ phone, challenge_id: challengeId, code: values.code.trim() });
+      trackAnalyticsEvent("customer_login_completed");
       router.push("/orders");
     } catch (verifyError) {
+      trackAnalyticsEvent("customer_login_failed");
       setError(verifyError instanceof Error ? verifyError.message : "تأیید شماره ناموفق بود");
     }
   }
@@ -67,8 +72,10 @@ export default function LoginPage() {
     setError(null);
     try {
       await login({ email: values.email.trim(), password: values.password });
+      trackAnalyticsEvent("admin_login_completed");
       router.push("/admin");
     } catch (loginError) {
+      trackAnalyticsEvent("admin_login_failed");
       setError(loginError instanceof Error ? loginError.message : "ورود ناموفق بود");
     }
   }
@@ -90,7 +97,11 @@ export default function LoginPage() {
         ) : null}
 
         {!adminMode && !challengeId ? (
-          <form onSubmit={phoneForm.handleSubmit(sendCode)} className="grid gap-4">
+          <form
+            onSubmit={phoneForm.handleSubmit(sendCode)}
+            className="grid gap-4"
+            data-analytics-form="phone_login_form"
+          >
             <div className="space-y-2">
               <Label>شماره موبایل</Label>
               <Input className="ltr text-left" type="tel" inputMode="tel" autoComplete="tel" placeholder="09123456789" {...phoneForm.register("phone")} />
@@ -105,7 +116,11 @@ export default function LoginPage() {
         ) : null}
 
         {!adminMode && challengeId ? (
-          <form onSubmit={codeForm.handleSubmit(submitCode)} className="grid gap-4">
+          <form
+            onSubmit={codeForm.handleSubmit(submitCode)}
+            className="grid gap-4"
+            data-analytics-form="otp_verification_form"
+          >
             <div className="rounded-md bg-muted px-4 py-3 text-sm">
               کد تأیید برای <span className="ltr inline-block font-medium">{phone}</span> ارسال شد.
             </div>
@@ -127,7 +142,11 @@ export default function LoginPage() {
         ) : null}
 
         {adminMode ? (
-          <form onSubmit={adminForm.handleSubmit(submitAdmin)} className="grid gap-4">
+          <form
+            onSubmit={adminForm.handleSubmit(submitAdmin)}
+            className="grid gap-4"
+            data-analytics-form="admin_login_form"
+          >
             <div className="space-y-2">
               <Label>ایمیل مدیر</Label>
               <Input className="ltr text-left" type="email" autoComplete="email" {...adminForm.register("email")} />
@@ -150,6 +169,7 @@ export default function LoginPage() {
           type="button"
           className="mt-5 text-xs font-medium text-muted-foreground hover:text-primary"
           onClick={() => { setAdminMode((value) => !value); setChallengeId(null); setError(null); }}
+          data-analytics-event="login_mode_toggled"
         >
           {adminMode ? "بازگشت به ورود با موبایل" : "ورود مدیر سامانه"}
         </button>
