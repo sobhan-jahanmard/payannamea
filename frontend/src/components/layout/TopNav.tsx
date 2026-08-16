@@ -2,6 +2,7 @@
 
 import {
   ClipboardList,
+  ChartNoAxesCombined,
   Home,
   LayoutDashboard,
   ListOrdered,
@@ -28,7 +29,10 @@ export function TopNav() {
       ? [{ href: "/orders", label: "سفارش‌های من", icon: ListOrdered }]
       : []),
     ...(isAdmin
-      ? [{ href: "/admin", label: "مدیریت", icon: LayoutDashboard }]
+      ? [
+          { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
+          { href: "/admin/analytics", label: "آمار بازدید", icon: ChartNoAxesCombined },
+        ]
       : []),
   ];
 
@@ -55,6 +59,7 @@ export function TopNav() {
             const Icon = item.icon;
             const isActive = (() => {
               if (item.href === "/") return pathname === "/";
+              if (item.href === "/admin") return pathname === "/admin";
               // match exact or nested routes: /order and /order/123 but not /orders
               if (pathname === item.href) return true;
               if (pathname.startsWith(item.href + "/")) return true;

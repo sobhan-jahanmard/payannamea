@@ -1,5 +1,6 @@
 import type {
   AuthResponse,
+  AnalyticsDashboard,
   ForgotPasswordResponse,
   LoginPayload,
   OtpRequestPayload,
@@ -202,6 +203,22 @@ export async function updateOrder(orderId: string, payload: OrderUpdatePayload):
 export async function listAdminOrders(statusFilter?: string): Promise<Order[]> {
   const params = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : "";
   return request<Order[]>(`/api/admin/orders${params}`);
+}
+
+export async function getAdminAnalytics(params: {
+  from?: string;
+  to?: string;
+  event?: string;
+  path?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AnalyticsDashboard> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return request<AnalyticsDashboard>(`/api/admin/analytics?${query.toString()}`);
 }
 
 export async function getAdminOrder(orderId: string): Promise<Order> {

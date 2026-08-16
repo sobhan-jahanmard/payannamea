@@ -197,7 +197,21 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_otp_challenges_phone_created_at on otp_challenges(phone, created_at)`,
-  `create index if not exists ix_otp_challenges_expires_at on otp_challenges(expires_at)`
+  `create index if not exists ix_otp_challenges_expires_at on otp_challenges(expires_at)`,
+  `create table if not exists analytics_events (
+    id varchar(36) primary key,
+    visitor_id varchar(36) not null,
+    session_id varchar(36) not null,
+    event_name varchar(120) not null,
+    path varchar(500) not null,
+    properties jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists ix_analytics_events_created_at on analytics_events(created_at)`,
+  `create index if not exists ix_analytics_events_event_name on analytics_events(event_name)`,
+  `create index if not exists ix_analytics_events_path on analytics_events(path)`,
+  `create index if not exists ix_analytics_events_visitor_id on analytics_events(visitor_id)`,
+  `create index if not exists ix_analytics_events_session_id on analytics_events(session_id)`
 ];
 
 async function main() {

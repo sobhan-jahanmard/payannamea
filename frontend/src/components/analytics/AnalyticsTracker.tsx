@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import {
   analyticsPageKey,
   flushAnalyticsEvents,
+  pageViewProperties,
   trackAnalyticsEvent
 } from "../../lib/analytics";
 
@@ -31,6 +32,7 @@ export function AnalyticsTracker() {
   }, []);
 
   useEffect(() => {
+    if (pathname.startsWith("/admin")) return;
     const pageKey = analyticsPageKey(pathname);
     let visibleMilliseconds = 0;
     let visibleSince = document.visibilityState === "visible" ? Date.now() : null;
@@ -38,6 +40,11 @@ export function AnalyticsTracker() {
     let ended = false;
     const reachedEngagement = new Set<number>();
     const reachedScroll = new Set<number>();
+
+    trackAnalyticsEvent("page_view", {
+      page_name: pageKey,
+      ...pageViewProperties()
+    });
 
     const visibleSeconds = () =>
       Math.floor(
@@ -110,6 +117,7 @@ export function AnalyticsTracker() {
   }, [pathname]);
 
   useEffect(() => {
+    if (pathname.startsWith("/admin")) return;
     const startedForms = new WeakSet<Element>();
 
     const handleInteraction = (event: Event) => {

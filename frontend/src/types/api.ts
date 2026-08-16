@@ -210,3 +210,29 @@ export interface OrderCreatePayload {
 }
 
 export type OrderUpdatePayload = OrderCreatePayload;
+
+export interface AnalyticsEventRecord {
+  id: string;
+  visitor_id: string;
+  session_id: string;
+  event_name: string;
+  path: string;
+  properties: Record<string, string | number | boolean>;
+  created_at: string;
+}
+
+export interface AnalyticsDashboard {
+  range: { from: string; to: string };
+  summary: {
+    total_events: number;
+    unique_visitors: number;
+    sessions: number;
+    page_views: number;
+    avg_engaged_seconds: number;
+  };
+  top_events: Array<{ event_name: string; count: number; visitors: number }>;
+  top_pages: Array<{ path: string; views: number; visitors: number; sessions: number }>;
+  daily: Array<{ date: string; events: number; page_views: number; visitors: number; sessions: number }>;
+  events: AnalyticsEventRecord[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}

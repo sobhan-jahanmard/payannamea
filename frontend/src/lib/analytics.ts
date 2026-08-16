@@ -1,17 +1,43 @@
 export type AnalyticsProperties = Record<string, string | number | boolean>;
 
 type QueuedAnalyticsEvent = {
-  name: string;
+  visitor_id: string;
+  session_id: string;
+  event_name: string;
+  path: string;
   properties: AnalyticsProperties;
 };
 
-declare global {
-  interface Window {
-    zaraz?: {
-      track: (name: string, properties?: AnalyticsProperties) => Promise<unknown>;
-    };
-    __zarazEventQueue?: QueuedAnalyticsEvent[];
+const VISITOR_KEY = "payanname_analytics_visitor";
+const SESSION_KEY = "payanname_analytics_session";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const queue: QueuedAnalyticsEvent[] = [];
+let sending = false;
+let memoryVisitorId: string | null = null;
+let memorySessionId: string | null = null;
+
+function storedUuid(storage: Storage, key: string, memoryValue: string | null): string {
+  try {
+    const current = storage.getItem(key);
+    if (current && /^[0-9a-f-]{36}$/i.test(current)) return current;
+    const created = crypto.randomUUID();
+    storage.setItem(key, created);
+    return created;
+  } catch {
+    return memoryValue ?? crypto.randomUUID();
   }
+}
+
+function visitorId(): string {
+  const value = storedUuid(window.localStorage, VISITOR_KEY, memoryVisitorId);
+  memoryVisitorId = value;
+  return value;
+}
+
+function sessionId(): string {
+  const value = storedUuid(window.sessionStorage, SESSION_KEY, memorySessionId);
+  memorySessionId = value;
+  return value;
 }
 
 export function analyticsPageKey(pathname: string): string {
@@ -24,33 +50,73 @@ export function analyticsPageKey(pathname: string): string {
     .replace(/[^a-zA-Z0-9]+/g, "_") || "home";
 }
 
-export function flushAnalyticsEvents(): void {
-  if (typeof window === "undefined" || !window.zaraz?.track) return;
-  const queue = window.__zarazEventQueue?.splice(0) ?? [];
-  for (const event of queue) {
-    void window.zaraz.track(event.name, event.properties).catch(() => undefined);
+export function pageViewProperties(): AnalyticsProperties {
+  const params = new URLSearchParams(window.location.search);
+  let referrerHost = "direct";
+  try {
+    if (document.referrer) referrerHost = new URL(document.referrer).hostname;
+  } catch {
+    // Keep the privacy-safe direct fallback for malformed referrers.
   }
+
+  const width = window.innerWidth;
+  return {
+    referrer_host: referrerHost,
+    device_type: width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop",
+    viewport_width: width,
+    language: navigator.language.slice(0, 20),
+    ...(params.get("utm_source") ? { utm_source: params.get("utm_source")!.slice(0, 100) } : {}),
+    ...(params.get("utm_medium") ? { utm_medium: params.get("utm_medium")!.slice(0, 100) } : {}),
+    ...(params.get("utm_campaign") ? { utm_campaign: params.get("utm_campaign")!.slice(0, 100) } : {})
+  };
+}
+
+export function flushAnalyticsEvents(): void {
+  if (typeof window === "undefined" || sending || queue.length === 0) return;
+  const event = queue.shift();
+  if (!event) return;
+  sending = true;
+  let retryLater = false;
+
+  void fetch(`${API_BASE_URL}/api/analytics/events`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(event),
+    keepalive: true,
+    credentials: "same-origin"
+  })
+    .then((response) => {
+      if (!response.ok && response.status >= 500) {
+        queue.unshift(event);
+        retryLater = true;
+      }
+    })
+    .catch(() => {
+      queue.unshift(event);
+      retryLater = true;
+    })
+    .finally(() => {
+      sending = false;
+      if (retryLater) {
+        window.setTimeout(flushAnalyticsEvents, 5_000);
+      } else if (queue.length > 0) {
+        flushAnalyticsEvents();
+      }
+    });
 }
 
 export function trackAnalyticsEvent(
-  name: string,
+  eventName: string,
   properties: AnalyticsProperties = {}
 ): void {
   if (typeof window === "undefined") return;
-
-  const event = {
-    name,
-    properties: {
-      ...properties,
-      page_path: window.location.pathname
-    }
-  };
-  if (window.zaraz?.track) {
-    void window.zaraz.track(event.name, event.properties).catch(() => undefined);
-    return;
-  }
-
-  const queue = (window.__zarazEventQueue ??= []);
-  queue.push(event);
-  if (queue.length > 50) queue.shift();
+  queue.push({
+    visitor_id: visitorId(),
+    session_id: sessionId(),
+    event_name: eventName,
+    path: window.location.pathname.slice(0, 500),
+    properties
+  });
+  if (queue.length > 100) queue.shift();
+  flushAnalyticsEvents();
 }

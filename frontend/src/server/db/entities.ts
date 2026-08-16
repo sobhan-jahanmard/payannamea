@@ -193,6 +193,16 @@ export interface PaymentNoteEntity {
   order?: OrderEntity;
 }
 
+export interface AnalyticsEventEntity {
+  id: string;
+  visitor_id: string;
+  session_id: string;
+  event_name: string;
+  path: string;
+  properties: Record<string, string | number | boolean>;
+  created_at: Date;
+}
+
 const idColumn = {
   type: String,
   primary: true,
@@ -530,6 +540,27 @@ export const PaymentNoteSchema = new EntitySchema<PaymentNoteEntity>({
   }
 });
 
+export const AnalyticsEventSchema = new EntitySchema<AnalyticsEventEntity>({
+  name: "AnalyticsEvent",
+  tableName: "analytics_events",
+  columns: {
+    id: idColumn,
+    visitor_id: { type: String, length: 36 },
+    session_id: { type: String, length: 36 },
+    event_name: { type: String, length: 120 },
+    path: { type: String, length: 500 },
+    properties: { type: "jsonb", default: {} },
+    created_at: createdAtColumn
+  },
+  indices: [
+    { name: "ix_analytics_events_created_at", columns: ["created_at"] },
+    { name: "ix_analytics_events_event_name", columns: ["event_name"] },
+    { name: "ix_analytics_events_path", columns: ["path"] },
+    { name: "ix_analytics_events_visitor_id", columns: ["visitor_id"] },
+    { name: "ix_analytics_events_session_id", columns: ["session_id"] }
+  ]
+});
+
 export const entities = [
   UserSchema,
   OtpChallengeSchema,
@@ -541,5 +572,6 @@ export const entities = [
   WorkerSubmissionSchema,
   FinalOutputSchema,
   ReviewNoteSchema,
-  PaymentNoteSchema
+  PaymentNoteSchema,
+  AnalyticsEventSchema
 ];
