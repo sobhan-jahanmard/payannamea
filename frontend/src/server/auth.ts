@@ -21,29 +21,56 @@ function fromBase64url(input: string): Buffer {
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16);
-  const digest = crypto.pbkdf2Sync(password, salt, PASSWORD_ITERATIONS, 32, "sha256");
-  return [PASSWORD_ALGORITHM, PASSWORD_ITERATIONS, base64url(salt), base64url(digest)].join("$");
+  const digest = crypto.pbkdf2Sync(
+    password,
+    salt,
+    PASSWORD_ITERATIONS,
+    32,
+    "sha256",
+  );
+  return [
+    PASSWORD_ALGORITHM,
+    PASSWORD_ITERATIONS,
+    base64url(salt),
+    base64url(digest),
+  ].join("$");
 }
 
-export function verifyPassword(password: string, storedHash: string | null | undefined): boolean {
+export function verifyPassword(
+  password: string,
+  storedHash: string | null | undefined,
+): boolean {
   if (!storedHash) {
     return false;
   }
 
   const [algorithm, iterationsRaw, saltRaw, digestRaw] = storedHash.split("$");
-  if (algorithm !== PASSWORD_ALGORITHM || !iterationsRaw || !saltRaw || !digestRaw) {
+  if (
+    algorithm !== PASSWORD_ALGORITHM ||
+    !iterationsRaw ||
+    !saltRaw ||
+    !digestRaw
+  ) {
     return false;
   }
 
   const iterations = Number(iterationsRaw);
   const salt = fromBase64url(saltRaw);
   const expected = fromBase64url(digestRaw);
-  const actual = crypto.pbkdf2Sync(password, salt, iterations, expected.length, "sha256");
+  const actual = crypto.pbkdf2Sync(
+    password,
+    salt,
+    iterations,
+    expected.length,
+    "sha256",
+  );
   return crypto.timingSafeEqual(actual, expected);
 }
 
 function sign(input: string): string {
-  return base64url(crypto.createHmac("sha256", authSecret()).update(input).digest());
+  return base64url(
+    crypto.createHmac("sha256", authSecret()).update(input).digest(),
+  );
 }
 
 export function createAccessToken(user: UserEntity): string {
@@ -54,14 +81,17 @@ export function createAccessToken(user: UserEntity): string {
       sub: user.id,
       role: user.role,
       iat: now,
-      exp: now + TOKEN_TTL_SECONDS
-    })
+      exp: now + TOKEN_TTL_SECONDS,
+    }),
   );
   const signingInput = `${header}.${payload}`;
   return `${signingInput}.${sign(signingInput)}`;
 }
 
-export function decodeAccessToken(token: string): { sub: string; role: string } {
+export function decodeAccessToken(token: string): {
+  sub: string;
+  role: string;
+} {
   const [header, payload, signature] = token.split(".");
   if (!header || !payload || !signature) {
     throw new ApiError(401, "Invalid token");
@@ -86,7 +116,10 @@ export function decodeAccessToken(token: string): { sub: string; role: string } 
   if (typeof decoded.sub !== "string" || typeof decoded.role !== "string") {
     throw new ApiError(401, "Invalid token");
   }
-  if (typeof decoded.exp !== "number" || decoded.exp < Math.floor(Date.now() / 1000)) {
+  if (
+    typeof decoded.exp !== "number" ||
+    decoded.exp < Math.floor(Date.now() / 1000)
+  ) {
     throw new ApiError(401, "Token expired");
   }
   return { sub: decoded.sub, role: decoded.role };
@@ -95,14 +128,17 @@ export function decodeAccessToken(token: string): { sub: string; role: string } 
 export async function getCurrentUser(request: Request): Promise<UserEntity> {
   const authorization = request.headers.get("authorization");
   const prefix = "Bearer ";
-  let token = authorization?.startsWith(prefix) ? authorization.slice(prefix.length).trim() : null;
+  let token = authorization?.startsWith(prefix)
+    ? authorization.slice(prefix.length).trim()
+    : null;
   if (!token) {
     const cookie = request.headers.get("cookie") ?? "";
-    token = cookie
-      .split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`))
-      ?.slice(AUTH_COOKIE_NAME.length + 1) ?? null;
+    token =
+      cookie
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`))
+        ?.slice(AUTH_COOKIE_NAME.length + 1) ?? null;
     token = token ? decodeURIComponent(token) : null;
   }
   if (!token) {
@@ -111,7 +147,9 @@ export async function getCurrentUser(request: Request): Promise<UserEntity> {
 
   const payload = decodeAccessToken(token);
   const dataSource = await getDataSource();
-  const user = await dataSource.getRepository(UserSchema).findOneBy({ id: payload.sub });
+  const user = await dataSource
+    .getRepository(UserSchema)
+    .findOneBy({ id: payload.sub });
   if (!user) {
     throw new ApiError(401, "User not found");
   }
@@ -126,12 +164,16 @@ export async function requireAdmin(request: Request): Promise<UserEntity> {
   return user;
 }
 
-export function makeResetToken(): { token: string; tokenHash: string; expiresAt: Date } {
+export function makeResetToken(): {
+  token: string;
+  tokenHash: string;
+  expiresAt: Date;
+} {
   const token = crypto.randomBytes(32).toString("base64url");
   return {
     token,
     tokenHash: hashResetToken(token),
-    expiresAt: new Date(Date.now() + RESET_TTL_SECONDS * 1000)
+    expiresAt: new Date(Date.now() + RESET_TTL_SECONDS * 1000),
   };
 }
 

@@ -30,6 +30,7 @@ import {
 } from "./db/entities";
 import { ApiError, compact } from "./http";
 import { deleteStoredUpload } from "./files";
+import { email } from "./email";
 import {
   academicDetailLabels,
   orderTypeFieldConfig,
@@ -504,7 +505,9 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
     });
   });
 
-  return getOrderOr404(orderId);
+  const order = await getOrderOr404(orderId);
+  await email.sendNewOrder(order);
+  return order;
 }
 
 function assertCustomerEditable(order: OrderEntity): void {

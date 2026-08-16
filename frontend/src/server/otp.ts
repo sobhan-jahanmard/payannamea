@@ -5,6 +5,7 @@ import { MoreThan } from "typeorm";
 import { appEnvironment, authSecret, msgWayApiKey, msgWayTemplateId } from "./config";
 import { getDataSource } from "./db/data-source";
 import { OtpChallengeSchema, UserSchema } from "./db/entities";
+import { email } from "./email";
 import { ApiError } from "./http";
 
 const OTP_TTL_MS = 2 * 60 * 1000;
@@ -151,6 +152,7 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
     await manager.query("select pg_advisory_xact_lock(hashtext($1))", [phone]);
     const userRepo = manager.getRepository(UserSchema);
     let user = await userRepo.findOneBy({ phone });
+    let isNewUser = false;
     if (!user) {
       user = await userRepo.save({
         id: randomUUID(),
@@ -162,12 +164,16 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
         reset_token_hash: null,
         reset_token_expires_at: null
       });
+      isNewUser = true;
     }
-    return { user };
+    return { user, isNewUser };
   });
 
   if ("error" in result) {
     throw new ApiError(401, "کد تأیید نادرست است");
+  }
+  if (result.isNewUser) {
+    await email.sendNewUserSignup(result.user.phone ?? phone);
   }
   return result.user;
 }
