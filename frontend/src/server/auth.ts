@@ -7,7 +7,7 @@ import { ApiError } from "./http";
 
 const PASSWORD_ALGORITHM = "pbkdf2_sha256";
 const PASSWORD_ITERATIONS = 390_000;
-const TOKEN_TTL_SECONDS = 60 * 60 * 24;
+const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
 const AUTH_COOKIE_NAME = "payanname_auth_token";
 

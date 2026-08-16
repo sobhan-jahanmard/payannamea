@@ -19,6 +19,7 @@ import type {
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TOKEN_KEY = "payanname_auth_token";
 const USER_KEY = "payanname_auth_user";
+const AUTH_SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") {
@@ -50,7 +51,7 @@ export function storeAuthSession(session: AuthResponse): void {
   }
   window.localStorage.setItem(TOKEN_KEY, session.access_token);
   window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
-  window.document.cookie = `${TOKEN_KEY}=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=86400; SameSite=Lax`;
+  window.document.cookie = `${TOKEN_KEY}=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${AUTH_SESSION_TTL_SECONDS}; SameSite=Lax`;
 }
 
 export function storeAuthUser(user: User): void {
