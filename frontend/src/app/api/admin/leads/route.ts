@@ -2,7 +2,7 @@ import { requireAdmin } from "../../../../server/auth";
 import {
   consultationLeadQuerySchema,
   listConsultationLeads,
-  updateConsultationLeadStatus
+  updateConsultationLead
 } from "../../../../server/leads";
 import { errorResponse, json } from "../../../../server/http";
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     await requireAdmin(request);
-    return json(await updateConsultationLeadStatus(await request.json()));
+    return json(await updateConsultationLead(await request.json()));
   } catch (error) {
     return errorResponse(error);
   }

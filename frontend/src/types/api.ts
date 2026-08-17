@@ -244,6 +244,7 @@ export interface ConsultationLead {
   phone: string;
   source: string;
   status: ConsultationLeadStatus;
+  admin_note: string;
   request_count: number;
   last_requested_at: string;
   created_at: string;

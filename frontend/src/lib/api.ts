@@ -237,13 +237,13 @@ export async function getAdminConsultationLeads(params: {
   return request<ConsultationLeadsResponse>(`/api/admin/leads?${query.toString()}`);
 }
 
-export async function updateConsultationLeadStatus(
+export async function updateConsultationLead(
   id: string,
-  status: ConsultationLeadStatus
+  changes: { status?: ConsultationLeadStatus; admin_note?: string }
 ): Promise<ConsultationLead> {
   return request<ConsultationLead>("/api/admin/leads", {
     method: "PATCH",
-    body: JSON.stringify({ id, status })
+    body: JSON.stringify({ id, ...changes })
   });
 }
 

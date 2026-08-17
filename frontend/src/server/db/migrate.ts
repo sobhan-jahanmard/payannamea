@@ -217,11 +217,13 @@ const statements = [
     phone varchar(40) not null unique,
     source varchar(80) not null default 'landing_page',
     status varchar(32) not null default 'new',
+    admin_note text not null default '',
     request_count integer not null default 1,
     last_requested_at timestamptz not null default now(),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
   )`,
+  `alter table consultation_leads add column if not exists admin_note text not null default ''`,
   `create index if not exists ix_consultation_leads_status on consultation_leads(status)`,
   `create index if not exists ix_consultation_leads_last_requested_at on consultation_leads(last_requested_at)`
 ];

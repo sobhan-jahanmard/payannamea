@@ -25,7 +25,10 @@ export const consultationLeadQuerySchema = z.object({
 
 export const consultationLeadUpdateSchema = z.object({
   id: z.string().uuid(),
-  status: z.enum(["new", "contacted", "closed"])
+  status: z.enum(["new", "contacted", "closed"]).optional(),
+  admin_note: z.string().trim().max(2_000).optional()
+}).refine((input) => input.status !== undefined || input.admin_note !== undefined, {
+  message: "Status or admin note is required"
 });
 
 export async function createConsultationLead(rawInput: unknown) {
@@ -77,14 +80,14 @@ export async function listConsultationLeads(rawQuery: unknown) {
   }
   if (query.search) {
     values.push(`%${query.search}%`);
-    conditions.push(`phone ilike $${values.length}`);
+    conditions.push(`(phone ilike $${values.length} or admin_note ilike $${values.length})`);
   }
   const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const offset = (query.page - 1) * query.limit;
 
   const [leads, countRows, statusRows] = await Promise.all([
     dataSource.query(
-      `select id, phone, source, status, request_count, last_requested_at, created_at, updated_at
+      `select id, phone, source, status, admin_note, request_count, last_requested_at, created_at, updated_at
        from consultation_leads ${where}
        order by last_requested_at desc limit $${values.length + 1} offset $${values.length + 2}`,
       [...values, query.limit, offset]
@@ -107,12 +110,17 @@ export async function listConsultationLeads(rawQuery: unknown) {
   };
 }
 
-export async function updateConsultationLeadStatus(rawInput: unknown) {
+export async function updateConsultationLead(rawInput: unknown) {
   const input = consultationLeadUpdateSchema.parse(rawInput);
   const dataSource = await getDataSource();
   const repo = dataSource.getRepository(ConsultationLeadSchema);
   const lead = await repo.findOneBy({ id: input.id });
   if (!lead) throw new ApiError(404, "Consultation lead not found");
-  lead.status = input.status as ConsultationLeadStatus;
+  if (input.status !== undefined) {
+    lead.status = input.status as ConsultationLeadStatus;
+  }
+  if (input.admin_note !== undefined) {
+    lead.admin_note = input.admin_note;
+  }
   return repo.save(lead);
 }

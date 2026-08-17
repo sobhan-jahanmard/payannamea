@@ -210,6 +210,7 @@ export interface ConsultationLeadEntity {
   phone: string;
   source: string;
   status: ConsultationLeadStatus;
+  admin_note: string;
   request_count: number;
   last_requested_at: Date;
   created_at: Date;
@@ -582,6 +583,7 @@ export const ConsultationLeadSchema = new EntitySchema<ConsultationLeadEntity>({
     phone: { type: String, length: 40, unique: true },
     source: { type: String, length: 80, default: "landing_page" },
     status: { type: String, length: 32, default: "new" },
+    admin_note: { type: "text", default: "" },
     request_count: { type: Number, default: 1 },
     last_requested_at: { type: "timestamptz" },
     created_at: createdAtColumn,
