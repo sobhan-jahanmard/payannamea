@@ -211,7 +211,19 @@ const statements = [
   `create index if not exists ix_analytics_events_event_name on analytics_events(event_name)`,
   `create index if not exists ix_analytics_events_path on analytics_events(path)`,
   `create index if not exists ix_analytics_events_visitor_id on analytics_events(visitor_id)`,
-  `create index if not exists ix_analytics_events_session_id on analytics_events(session_id)`
+  `create index if not exists ix_analytics_events_session_id on analytics_events(session_id)`,
+  `create table if not exists consultation_leads (
+    id varchar(36) primary key,
+    phone varchar(40) not null unique,
+    source varchar(80) not null default 'landing_page',
+    status varchar(32) not null default 'new',
+    request_count integer not null default 1,
+    last_requested_at timestamptz not null default now(),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  )`,
+  `create index if not exists ix_consultation_leads_status on consultation_leads(status)`,
+  `create index if not exists ix_consultation_leads_last_requested_at on consultation_leads(last_requested_at)`
 ];
 
 async function main() {

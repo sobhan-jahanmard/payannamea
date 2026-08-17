@@ -1,6 +1,9 @@
 import type {
   AuthResponse,
   AnalyticsDashboard,
+  ConsultationLead,
+  ConsultationLeadsResponse,
+  ConsultationLeadStatus,
   ForgotPasswordResponse,
   LoginPayload,
   OtpRequestPayload,
@@ -219,6 +222,29 @@ export async function getAdminAnalytics(params: {
     if (value !== undefined && value !== "") query.set(key, String(value));
   }
   return request<AnalyticsDashboard>(`/api/admin/analytics?${query.toString()}`);
+}
+
+export async function getAdminConsultationLeads(params: {
+  search?: string;
+  status?: ConsultationLeadStatus;
+  page?: number;
+  limit?: number;
+}): Promise<ConsultationLeadsResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return request<ConsultationLeadsResponse>(`/api/admin/leads?${query.toString()}`);
+}
+
+export async function updateConsultationLeadStatus(
+  id: string,
+  status: ConsultationLeadStatus
+): Promise<ConsultationLead> {
+  return request<ConsultationLead>("/api/admin/leads", {
+    method: "PATCH",
+    body: JSON.stringify({ id, status })
+  });
 }
 
 export async function getAdminOrder(orderId: string): Promise<Order> {

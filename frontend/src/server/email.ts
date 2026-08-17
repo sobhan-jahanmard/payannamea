@@ -14,7 +14,7 @@ class Email {
     if (!password) {
       if (!this.didWarnAboutConfiguration) {
         console.warn(
-          "Email notification skipped: SMTP_PASSWORD must be configured"
+          "Email notification skipped: SMTP_PASSWORD must be configured",
         );
         this.didWarnAboutConfiguration = true;
       }
@@ -27,7 +27,7 @@ class Email {
       host: "smtp.gmail.com",
       port: 465,
       ssl: true,
-      timeout: 10_000
+      timeout: 10_000,
     });
     const text = texts.join(" - ");
 
@@ -36,7 +36,7 @@ class Email {
         text,
         from: sender,
         to: recipients.join(", "),
-        subject
+        subject,
       });
       console.info("Email notification sent:", { subject, to: recipients });
       return true;
@@ -49,8 +49,11 @@ class Email {
   }
 
   async sendNewUserSignup(phone: string): Promise<boolean> {
-    const subject = `New user signup on server: ${getServerIp()}`;
-    return this.send(subject, `A new user signed up with phone number ${phone}`);
+    const subject = `New user signup on Payanname Website}`;
+    return this.send(
+      subject,
+      `A new user signed up with phone number ${phone}`,
+    );
   }
 
   async sendNewOrder(order: {
@@ -61,7 +64,7 @@ class Email {
     university: string;
     customer?: { phone: string | null };
   }): Promise<boolean> {
-    const subject = `New order on server: ${getServerIp()}`;
+    const subject = `New order on Payanname Website}`;
     return this.send(
       subject,
       `Order ID: ${order.id}`,
@@ -69,7 +72,21 @@ class Email {
       `Correspondence email: ${order.correspondence_email}`,
       `Order type: ${order.order_type ?? "unknown"}`,
       `Title: ${order.title}`,
-      `University: ${order.university}`
+      `University: ${order.university}`,
+    );
+  }
+
+  async sendConsultationLead(
+    phone: string,
+    repeated: boolean,
+  ): Promise<boolean> {
+    const subject = `Free consultation request on Payanname Website}`;
+    return this.send(
+      subject,
+      `Phone: ${phone}`,
+      repeated
+        ? "This phone has requested consultation before"
+        : "New consultation lead",
     );
   }
 }

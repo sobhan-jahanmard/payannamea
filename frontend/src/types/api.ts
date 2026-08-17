@@ -236,3 +236,22 @@ export interface AnalyticsDashboard {
   events: AnalyticsEventRecord[];
   pagination: { page: number; limit: number; total: number; pages: number };
 }
+
+export type ConsultationLeadStatus = "new" | "contacted" | "closed";
+
+export interface ConsultationLead {
+  id: string;
+  phone: string;
+  source: string;
+  status: ConsultationLeadStatus;
+  request_count: number;
+  last_requested_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultationLeadsResponse {
+  leads: ConsultationLead[];
+  counts: Partial<Record<ConsultationLeadStatus, number>>;
+  pagination: { page: number; limit: number; total: number; pages: number };
+}

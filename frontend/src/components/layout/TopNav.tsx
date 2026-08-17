@@ -4,6 +4,7 @@ import {
   ClipboardList,
   ChartNoAxesCombined,
   Home,
+  Headset,
   LayoutDashboard,
   ListOrdered,
   LogIn,
@@ -31,13 +32,14 @@ export function TopNav() {
     ...(isAdmin
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
+          { href: "/admin/leads", label: "درخواست‌های مشاوره", icon: Headset },
           { href: "/admin/analytics", label: "آمار بازدید", icon: ChartNoAxesCombined },
         ]
       : []),
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-white/92 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-white/88 backdrop-blur-2xl">
       <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-8">
         <Link
           href="/"

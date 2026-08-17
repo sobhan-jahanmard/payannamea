@@ -54,9 +54,11 @@ textarea {
 
 .tool-surface {
   border: 1px solid hsl(var(--border));
-  background: rgba(255, 255, 255, 0.91);
+  background: rgba(255, 255, 255, 0.82);
   border-radius: 8px;
   box-shadow: 0 16px 45px rgba(24, 39, 75, 0.08);
+  -webkit-backdrop-filter: blur(32px);
+  backdrop-filter: blur(32px);
 }
 
 .hero-text-shadow {

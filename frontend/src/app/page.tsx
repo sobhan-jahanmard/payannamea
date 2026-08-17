@@ -1,31 +1,45 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ClipboardList, FileCheck2, FileText, Gauge, Presentation, SearchCheck, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ClipboardList,
+  FileCheck2,
+  FileText,
+  Gauge,
+  Presentation,
+  SearchCheck,
+  ShieldCheck,
+} from "lucide-react";
 
 import { Button } from "../components/ui/button";
+import { FreeConsultationForm } from "../components/landing/FreeConsultationForm";
+
+const ORDER_DISCOUNT_PERCENT: number = 30;
+const ORDER_DISCOUNT_LABEL = ORDER_DISCOUNT_PERCENT.toLocaleString("fa-IR");
 
 const steps = [
   "ثبت دقیق مشخصات و فایل‌ها",
   "بررسی و تأیید سفارش توسط مدیر",
-  "انجام کار و تحویل خروجی نهایی"
+  "انجام کار و تحویل خروجی نهایی",
 ];
 
 const features = [
   {
     icon: ClipboardList,
     title: "ثبت سفارش دقیق",
-    body: "موضوع، دانشگاه، رشته، مرحله کار، منابع، شیوه‌نامه و فایل‌های لازم در یک فرم منظم دریافت می‌شود."
+    body: "موضوع، دانشگاه، رشته، مرحله کار، منابع، شیوه‌نامه و فایل‌های لازم در یک فرم منظم دریافت می‌شود.",
   },
   {
     icon: Gauge,
     title: "بررسی پیش از شروع",
-    body: "هر سفارش ابتدا توسط مدیر بررسی می‌شود و فقط پس از تأیید وارد مسیر انجام می‌شود."
+    body: "هر سفارش ابتدا توسط مدیر بررسی می‌شود و فقط پس از تأیید وارد مسیر انجام می‌شود.",
   },
   {
     icon: FileCheck2,
     title: "پیگیری و تحویل",
-    body: "وضعیت سفارش، فایل‌های ثبت‌شده، یادداشت‌ها و خروجی نهایی همیشه از حساب کاربری قابل پیگیری است."
-  }
+    body: "وضعیت سفارش، فایل‌های ثبت‌شده، یادداشت‌ها و خروجی نهایی همیشه از حساب کاربری قابل پیگیری است.",
+  },
 ];
 
 const services = [
@@ -33,38 +47,38 @@ const services = [
     analyticsKey: "bachelor_thesis",
     icon: FileText,
     title: "پایان‌نامه کارشناسی",
-    body: "راهنمایی در انتخاب موضوع، تنظیم ساختار، گردآوری منابع، نگارش بخش‌ها و آماده‌سازی فایل نهایی مطابق خواسته دانشگاه."
+    body: "راهنمایی در انتخاب موضوع، تنظیم ساختار، گردآوری منابع، نگارش بخش‌ها و آماده‌سازی فایل نهایی مطابق خواسته دانشگاه.",
   },
   {
     analyticsKey: "master_thesis",
     icon: FileText,
     title: "پایان‌نامه کارشناسی ارشد",
-    body: "از انتخاب موضوع و پروپوزال تا نگارش فصل‌ها، تحلیل، و آماده‌سازی فایل نهایی طبق شیوه‌نامه دانشگاه."
+    body: "از انتخاب موضوع و پروپوزال تا نگارش فصل‌ها، تحلیل، و آماده‌سازی فایل نهایی طبق شیوه‌نامه دانشگاه.",
   },
   {
     analyticsKey: "doctoral_dissertation",
     icon: FileCheck2,
     title: "رساله دکتری",
-    body: "برنامه‌ریزی ساختار رساله، تنظیم فصل‌ها، یکپارچه‌سازی منابع، و آماده‌سازی خروجی قابل بازبینی."
+    body: "برنامه‌ریزی ساختار رساله، تنظیم فصل‌ها، یکپارچه‌سازی منابع، و آماده‌سازی خروجی قابل بازبینی.",
   },
   {
     analyticsKey: "proposal",
     icon: ClipboardList,
     title: "پروپوزال پایان‌نامه",
-    body: "تبدیل ایده اولیه به پروپوزال منظم شامل مسئله پژوهش، اهداف، پرسش‌ها، روش انجام و منابع اولیه."
+    body: "تبدیل ایده اولیه به پروپوزال منظم شامل مسئله پژوهش، اهداف، پرسش‌ها، روش انجام و منابع اولیه.",
   },
   {
     analyticsKey: "research_assignment",
     icon: SearchCheck,
     title: "تحقیق دانشگاهی",
-    body: "تهیه تحقیق کلاسی یا پژوهشی با ساختار منظم، منابع قابل بررسی، و نگارش متناسب با خواسته استاد."
+    body: "تهیه تحقیق کلاسی یا پژوهشی با ساختار منظم، منابع قابل بررسی، و نگارش متناسب با خواسته استاد.",
   },
   {
     analyticsKey: "presentation",
     icon: Presentation,
     title: "ارائه و پاورپوینت",
-    body: "طراحی اسلاید دفاع، ارائه کلاسی یا ارائه پژوهشی با متن منسجم، ساختار روشن و فایل قابل تحویل."
-  }
+    body: "طراحی اسلاید دفاع، ارائه کلاسی یا ارائه پژوهشی با متن منسجم، ساختار روشن و فایل قابل تحویل.",
+  },
 ];
 
 const requiredInputs = [
@@ -72,12 +86,28 @@ const requiredInputs = [
   "نام دانشگاه، رشته، مقطع و شیوه‌نامه یا قالب دانشگاه",
   "منابع، مقالات، فایل داده، پروپوزال یا هر فایل آماده‌ای که دارید",
   "مهلت تحویل، زبان سفارش، روش یا رویکرد موردنظر استاد",
-  "توضیحات استاد، اصلاحات قبلی، یا نکته‌هایی که باید رعایت شود"
+  "توضیحات استاد، اصلاحات قبلی، یا نکته‌هایی که باید رعایت شود",
 ];
 
 export default function LandingPage() {
   return (
     <main>
+      {ORDER_DISCOUNT_PERCENT > 0 ? (
+        <Link
+          href="/order"
+          className="flex min-h-12 items-center justify-center gap-2 bg-amber-300 px-4 py-2 text-center text-sm font-bold text-slate-950 transition hover:bg-amber-200 sm:text-base"
+          data-analytics-event="landing_discount_banner_clicked"
+          data-analytics-discount={ORDER_DISCOUNT_PERCENT}
+        >
+          <span className="flex flex-wrap items-center justify-center gap-x-2">
+            <span>تخفیف ویژه</span>
+            <strong className="text-3xl font-black text-red-700 sm:text-4xl">
+              {ORDER_DISCOUNT_LABEL}٪
+            </strong>
+            <span>روی تمام سفارش‌ها</span>
+          </span>
+        </Link>
+      ) : null}
       <section className="relative min-h-[calc(100svh-64px)] overflow-hidden">
         <Image
           src="/images/thesis-hero.png"
@@ -90,8 +120,8 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-slate-950/26" />
         <div className="absolute inset-0 bg-gradient-to-l from-teal-950/88 via-slate-950/58 to-slate-900/18" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.28),transparent_30%)]" />
-        <div className="relative mx-auto flex min-h-[calc(100svh-64px)] w-full max-w-7xl items-center px-4 pb-24 pt-16 lg:px-8">
-          <div className="max-w-2xl rounded-lg border border-white/16 bg-slate-950/62 p-5 text-white shadow-2xl shadow-slate-950/35 backdrop-blur-sm hero-text-shadow sm:p-7">
+        <div className="relative mx-auto grid min-h-[calc(100svh-64px)] w-full max-w-7xl items-center gap-6 px-4 pb-24 pt-16 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
+          <div className="max-w-2xl rounded-lg border border-white/16 bg-slate-950/62 p-5 text-white shadow-2xl shadow-slate-950/35 backdrop-blur-[32px] hero-text-shadow sm:p-7">
             <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-amber-200/70 bg-amber-300 px-3 py-2 text-sm font-medium text-slate-950 shadow-sm">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />
               پایان‌نامه کارشناسی، ارشد، رساله، پروپوزال، تحقیق و ارائه
@@ -100,10 +130,14 @@ export default function LandingPage() {
               خدمات دانشگاهی از ایده تا تحویل
             </h1>
             <p className="mt-5 max-w-xl text-base leading-8 text-white sm:text-lg">
-              سفارش پژوهشی خود را با جزئیات ثبت کنید، مسیر انجام را شفاف ببینید و خروجی نهایی را در زمان توافق‌شده دریافت کنید.
+              سفارش پژوهشی خود را با جزئیات ثبت کنید، مسیر انجام را شفاف ببینید
+              و خروجی نهایی را در زمان توافق‌شده دریافت کنید.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild className="border-amber-300 bg-amber-300 text-slate-950 hover:bg-amber-200">
+              <Button
+                asChild
+                className="border-amber-300 bg-amber-300 text-slate-950 hover:bg-amber-200"
+              >
                 <Link
                   href="/order"
                   data-analytics-event="landing_order_cta_clicked"
@@ -113,7 +147,11 @@ export default function LandingPage() {
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white/70 bg-white/95 text-slate-950 hover:bg-white">
+              <Button
+                asChild
+                variant="outline"
+                className="border-white/70 bg-white/95 text-slate-950 hover:bg-white"
+              >
                 <Link
                   href="/orders"
                   data-analytics-event="landing_orders_cta_clicked"
@@ -124,13 +162,17 @@ export default function LandingPage() {
               </Button>
             </div>
           </div>
+          <FreeConsultationForm />
         </div>
       </section>
 
       <section className="-mt-16 relative z-10 mx-auto grid w-full max-w-7xl gap-4 px-4 pb-10 lg:px-8">
         <div className="tool-surface grid gap-4 p-4 sm:grid-cols-3">
           {steps.map((step, index) => (
-            <div key={step} className="flex items-start gap-3 rounded-md bg-white p-4">
+            <div
+              key={step}
+              className="flex items-start gap-3 rounded-md bg-white p-4"
+            >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-teal-50 text-sm font-bold text-teal-800">
                 {index + 1}
               </span>
@@ -144,7 +186,9 @@ export default function LandingPage() {
         <div>
           <h2 className="text-2xl font-semibold">چه کارهایی انجام می‌شود؟</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
-            این سامانه برای سفارش‌های دانشگاهی طراحی شده است؛ از کارهای پژوهشی بلندمدت تا تحقیق و ارائه کلاسی. قبل از شروع، سفارش توسط مدیر بررسی می‌شود تا محدوده کار، فایل‌های لازم و زمان تحویل روشن باشد.
+            این سامانه برای سفارش‌های دانشگاهی طراحی شده است؛ از کارهای پژوهشی
+            بلندمدت تا تحقیق و ارائه کلاسی. قبل از شروع، سفارش توسط مدیر بررسی
+            می‌شود تا محدوده کار، فایل‌های لازم و زمان تحویل روشن باشد.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -157,9 +201,14 @@ export default function LandingPage() {
                 data-analytics-impression={`landing_service_${service.analyticsKey}_viewed`}
                 data-analytics-label={service.analyticsKey}
               >
-                <Icon className="mb-4 h-6 w-6 text-primary" aria-hidden="true" />
+                <Icon
+                  className="mb-4 h-6 w-6 text-primary"
+                  aria-hidden="true"
+                />
                 <h3 className="text-base font-semibold">{service.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">{service.body}</p>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                  {service.body}
+                </p>
               </article>
             );
           })}
@@ -169,7 +218,8 @@ export default function LandingPage() {
           <div>
             <h2 className="text-2xl font-semibold">روند کار شفاف است</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              از ثبت اولیه تا تأیید مدیر و تحویل خروجی، همه چیز در حساب کاربری شما قابل مشاهده است.
+              از ثبت اولیه تا تأیید مدیر و تحویل خروجی، همه چیز در حساب کاربری
+              شما قابل مشاهده است.
             </p>
           </div>
         </div>
@@ -178,29 +228,44 @@ export default function LandingPage() {
             const Icon = feature.icon;
             return (
               <article key={feature.title} className="tool-surface p-5">
-                <Icon className="mb-4 h-6 w-6 text-primary" aria-hidden="true" />
+                <Icon
+                  className="mb-4 h-6 w-6 text-primary"
+                  aria-hidden="true"
+                />
                 <h3 className="text-base font-semibold">{feature.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">{feature.body}</p>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                  {feature.body}
+                </p>
               </article>
             );
           })}
         </div>
         <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-          سفارش پس از تأیید مدیر وارد مرحله انجام می‌شود و فایل نهایی پس از بازبینی در همین سامانه قرار می‌گیرد.
+          سفارش پس از تأیید مدیر وارد مرحله انجام می‌شود و فایل نهایی پس از
+          بازبینی در همین سامانه قرار می‌گیرد.
         </div>
 
         <section className="tool-surface grid gap-5 p-5 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
-            <h2 className="text-xl font-semibold">برای ثبت سفارش چه چیزهایی لازم است؟</h2>
+            <h2 className="text-xl font-semibold">
+              برای ثبت سفارش چه چیزهایی لازم است؟
+            </h2>
             <p className="mt-2 text-sm leading-7 text-muted-foreground">
-              هرچه اطلاعات اولیه دقیق‌تر باشد، بررسی مدیر سریع‌تر انجام می‌شود و سفارش با ابهام کمتری شروع می‌شود.
+              هرچه اطلاعات اولیه دقیق‌تر باشد، بررسی مدیر سریع‌تر انجام می‌شود و
+              سفارش با ابهام کمتری شروع می‌شود.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {requiredInputs.map((item) => (
-              <div key={item} className="flex items-start gap-2 rounded-md border border-border bg-white p-3 text-sm leading-7">
-                <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <div
+                key={item}
+                className="flex items-start gap-2 rounded-md border border-border bg-white p-3 text-sm leading-7"
+              >
+                <CheckCircle2
+                  className="mt-1 h-4 w-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
                 <span>{item}</span>
               </div>
             ))}
