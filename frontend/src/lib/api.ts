@@ -255,7 +255,7 @@ export async function getAdminUsers(params: {
 
 export async function updateAdminUser(
   id: string,
-  changes: { admin_followup_status?: UserFollowupStatus; admin_note?: string }
+  changes: { full_name?: string | null; email?: string | null; admin_followup_status?: UserFollowupStatus; admin_note?: string }
 ): Promise<AdminUser> {
   return request<AdminUser>("/api/admin/users", {
     method: "PATCH",

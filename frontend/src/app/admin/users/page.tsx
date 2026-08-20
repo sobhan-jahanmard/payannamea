@@ -19,6 +19,11 @@ const statusLabels: Record<UserFollowupStatus, string> = {
   closed: "بسته‌شده"
 };
 
+const roleLabels = {
+  customer: "کاربر عادی",
+  admin: "ادمین"
+} as const;
+
 function number(value: number | undefined) {
   return Number(value ?? 0).toLocaleString("fa-IR");
 }
@@ -30,7 +35,7 @@ function AdminUsersPanel() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { admin_followup_status: UserFollowupStatus; admin_note: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { full_name: string; email: string; admin_followup_status: UserFollowupStatus; admin_note: string }>>({});
   const [error, setError] = useState<string | null>(null);
 
   async function load(nextPage = page, statusOverride?: UserFollowupStatus | "") {
@@ -46,7 +51,7 @@ function AdminUsersPanel() {
       setData(response);
       setDrafts(Object.fromEntries(response.users.map((user) => [
         user.id,
-        { admin_followup_status: user.admin_followup_status, admin_note: user.admin_note ?? "" }
+        { full_name: user.full_name ?? "", email: user.email ?? "", admin_followup_status: user.admin_followup_status, admin_note: user.admin_note ?? "" }
       ])));
       setPage(nextPage);
     } catch (loadError) {
@@ -71,7 +76,7 @@ function AdminUsersPanel() {
       } : current);
       setDrafts((current) => ({
         ...current,
-        [id]: { admin_followup_status: updated.admin_followup_status, admin_note: updated.admin_note ?? "" }
+        [id]: { full_name: updated.full_name ?? "", email: updated.email ?? "", admin_followup_status: updated.admin_followup_status, admin_note: updated.admin_note ?? "" }
       }));
       void load(page);
     } catch (updateError) {
@@ -109,15 +114,17 @@ function AdminUsersPanel() {
       {error ? <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
 
       <section className="tool-surface overflow-x-auto p-5">
-        <table className="w-full min-w-[1200px] text-right text-sm">
-          <thead className="border-b border-border text-xs text-muted-foreground"><tr><th className="p-3">نام</th><th className="p-3">شماره موبایل</th><th className="p-3">ایمیل</th><th className="p-3">تاریخ ثبت‌نام</th><th className="p-3">سفارش‌ها</th><th className="w-48 p-3">وضعیت پیگیری</th><th className="w-80 p-3">یادداشت ادمین</th><th className="p-3">عملیات</th></tr></thead>
+        <table className="w-full min-w-[1400px] text-right text-sm">
+          <thead className="border-b border-border text-xs text-muted-foreground"><tr><th className="w-56 p-3">نام</th><th className="p-3">نقش</th><th className="p-3">شماره موبایل</th><th className="w-64 p-3">ایمیل</th><th className="p-3">تاریخ ثبت‌نام</th><th className="p-3">سفارش‌ها</th><th className="w-48 p-3">وضعیت پیگیری</th><th className="w-80 p-3">یادداشت ادمین</th><th className="p-3">عملیات</th></tr></thead>
           <tbody>{data?.users.map((user) => {
-            const draft = drafts[user.id] ?? { admin_followup_status: user.admin_followup_status, admin_note: user.admin_note ?? "" };
+            const draft = drafts[user.id] ?? { full_name: user.full_name ?? "", email: user.email ?? "", admin_followup_status: user.admin_followup_status, admin_note: user.admin_note ?? "" };
             const isSaving = updatingId === user.id;
+            const canEditIdentity = user.role === "customer";
             return <tr key={user.id} className="border-b border-border/70 align-top">
-              <td className="p-3 font-medium">{user.full_name || "بدون نام"}</td>
+              <td className="p-3"><Input value={draft.full_name} disabled={isSaving || !canEditIdentity} maxLength={255} placeholder="بدون نام" onChange={(e) => setDrafts((current) => ({ ...current, [user.id]: { ...draft, full_name: e.target.value } }))} /></td>
+              <td className="whitespace-nowrap p-3">{roleLabels[user.role]}</td>
               <td className="ltr p-3 text-left">{user.phone || "-"}</td>
-              <td className="ltr p-3 text-left">{user.email || "-"}</td>
+              <td className="p-3"><Input className="ltr text-left" value={draft.email} disabled={isSaving || !canEditIdentity} maxLength={255} placeholder="-" onChange={(e) => setDrafts((current) => ({ ...current, [user.id]: { ...draft, email: e.target.value } }))} /></td>
               <td className="whitespace-nowrap p-3">{formatDateTime(user.created_at)}</td>
               <td className="p-3">{number(user.order_count)}</td>
               <td className="p-3"><Select value={draft.admin_followup_status} disabled={isSaving} onChange={(e) => setDrafts((current) => ({ ...current, [user.id]: { ...draft, admin_followup_status: e.target.value as UserFollowupStatus } }))}>{(Object.keys(statusLabels) as UserFollowupStatus[]).map((key) => <option key={key} value={key}>{statusLabels[key]}</option>)}</Select></td>

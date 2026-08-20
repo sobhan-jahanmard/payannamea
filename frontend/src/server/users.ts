@@ -11,12 +11,27 @@ export const adminUserQuerySchema = z.object({
   limit: z.coerce.number().int().min(10).max(100).default(50)
 });
 
+const optionalText = (max: number) => z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? null : value,
+  z.string().trim().max(max).nullable().optional()
+);
+
 export const adminUserUpdateSchema = z.object({
   id: z.string().uuid(),
+  full_name: optionalText(255),
+  email: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().trim().email().max(255).nullable().optional()
+  ),
   admin_followup_status: z.enum(["new", "contacted", "closed"]).optional(),
   admin_note: z.string().trim().max(2_000).optional()
-}).refine((input) => input.admin_followup_status !== undefined || input.admin_note !== undefined, {
-  message: "Follow-up status or admin note is required"
+}).refine((input) => (
+  input.full_name !== undefined
+  || input.email !== undefined
+  || input.admin_followup_status !== undefined
+  || input.admin_note !== undefined
+), {
+  message: "A user change is required"
 });
 
 type AdminUserRow = Pick<
@@ -48,8 +63,8 @@ export function serializeAdminUser(user: AdminUserRow) {
 export async function listAdminUsers(rawQuery: unknown) {
   const query = adminUserQuerySchema.parse(rawQuery);
   const dataSource = await getDataSource();
-  const values: unknown[] = ["customer"];
-  const conditions = [`u.role = $1`];
+  const values: unknown[] = [];
+  const conditions: string[] = [];
   if (query.status) {
     values.push(query.status);
     conditions.push(`u.admin_followup_status = $${values.length}`);
@@ -63,7 +78,7 @@ export async function listAdminUsers(rawQuery: unknown) {
       or u.admin_note ilike $${values.length}
     )`);
   }
-  const where = `where ${conditions.join(" and ")}`;
+  const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const offset = (query.page - 1) * query.limit;
 
   const [users, countRows, statusRows] = await Promise.all([
@@ -82,7 +97,6 @@ export async function listAdminUsers(rawQuery: unknown) {
     dataSource.query(
       `select admin_followup_status as status, count(*)::int as count
        from users
-       where role = 'customer'
        group by admin_followup_status
        order by admin_followup_status`
     )
@@ -105,8 +119,23 @@ export async function updateAdminUser(rawInput: unknown) {
   const input = adminUserUpdateSchema.parse(rawInput);
   const dataSource = await getDataSource();
   const repo = dataSource.getRepository(UserSchema);
-  const user = await repo.findOneBy({ id: input.id, role: "customer" });
+  const user = await repo.findOneBy({ id: input.id });
   if (!user) throw new ApiError(404, "User not found");
+  if ((input.full_name !== undefined || input.email !== undefined) && user.role !== "customer") {
+    throw new ApiError(403, "Only customer users can be edited");
+  }
+  if (input.full_name !== undefined) {
+    user.full_name = input.full_name;
+  }
+  if (input.email !== undefined) {
+    if (input.email) {
+      const existing = await repo.findOneBy({ email: input.email });
+      if (existing && existing.id !== user.id) {
+        throw new ApiError(409, "Email is already used by another user");
+      }
+    }
+    user.email = input.email;
+  }
   if (input.admin_followup_status !== undefined) {
     user.admin_followup_status = input.admin_followup_status as UserFollowupStatus;
   }
