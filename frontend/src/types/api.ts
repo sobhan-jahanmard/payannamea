@@ -9,6 +9,7 @@ export type OrderStatus =
 
 export type PaymentStatus = "fully_paid" | "partially_paid" | "not_paid" | "refunded";
 export type PaymentNoteType = "payment" | "moarref_payment";
+export type UserFollowupStatus = "new" | "contacted" | "closed";
 
 export interface User {
   id: string;
@@ -17,6 +18,20 @@ export interface User {
   phone: string | null;
   role: "customer" | "admin";
   created_at: string;
+}
+
+export interface AdminUser extends User {
+  full_name: string | null;
+  email: string | null;
+  admin_followup_status: UserFollowupStatus;
+  admin_note: string;
+  order_count: number;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  counts: Partial<Record<UserFollowupStatus, number>>;
+  pagination: { page: number; limit: number; total: number; pages: number };
 }
 
 export interface OtpRequestPayload {

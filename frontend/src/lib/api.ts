@@ -1,5 +1,7 @@
 import type {
   AuthResponse,
+  AdminUser,
+  AdminUsersResponse,
   AnalyticsDashboard,
   ConsultationLead,
   ConsultationLeadsResponse,
@@ -17,7 +19,8 @@ import type {
   OrderUpdatePayload,
   ReferenceInput,
   ReviewNote,
-  User
+  User,
+  UserFollowupStatus
 } from "../types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -235,6 +238,29 @@ export async function getAdminConsultationLeads(params: {
     if (value !== undefined && value !== "") query.set(key, String(value));
   }
   return request<ConsultationLeadsResponse>(`/api/admin/leads?${query.toString()}`);
+}
+
+export async function getAdminUsers(params: {
+  search?: string;
+  status?: UserFollowupStatus;
+  page?: number;
+  limit?: number;
+}): Promise<AdminUsersResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return request<AdminUsersResponse>(`/api/admin/users?${query.toString()}`);
+}
+
+export async function updateAdminUser(
+  id: string,
+  changes: { admin_followup_status?: UserFollowupStatus; admin_note?: string }
+): Promise<AdminUser> {
+  return request<AdminUser>("/api/admin/users", {
+    method: "PATCH",
+    body: JSON.stringify({ id, ...changes })
+  });
 }
 
 export async function updateConsultationLead(

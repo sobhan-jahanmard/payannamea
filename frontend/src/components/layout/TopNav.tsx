@@ -10,6 +10,7 @@ import {
   LogIn,
   LogOut,
   Phone,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +34,7 @@ export function TopNav() {
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
           { href: "/admin/leads", label: "درخواست‌های مشاوره", icon: Headset },
+          { href: "/admin/users", label: "کاربران", icon: Users },
           { href: "/admin/analytics", label: "آمار بازدید", icon: ChartNoAxesCombined },
         ]
       : []),

@@ -16,6 +16,7 @@ export const PAYMENT_NOTE_TYPES = ["payment", "moarref_payment"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentNoteType = (typeof PAYMENT_NOTE_TYPES)[number];
 export type UserRole = "customer" | "admin";
+export type UserFollowupStatus = "new" | "contacted" | "closed";
 
 export interface UserEntity {
   id: string;
@@ -24,6 +25,8 @@ export interface UserEntity {
   phone: string | null;
   password_hash: string | null;
   role: UserRole;
+  admin_followup_status: UserFollowupStatus;
+  admin_note: string;
   reset_token_hash: string | null;
   reset_token_expires_at: Date | null;
   created_at: Date;
@@ -238,11 +241,16 @@ export const UserSchema = new EntitySchema<UserEntity>({
     phone: { type: String, length: 40, nullable: true, unique: true },
     password_hash: { type: String, length: 255, nullable: true },
     role: { type: String, length: 32, default: "customer" },
+    admin_followup_status: { type: String, length: 32, default: "new" },
+    admin_note: { type: "text", default: "" },
     reset_token_hash: { type: String, length: 128, nullable: true },
     reset_token_expires_at: { type: "timestamptz", nullable: true },
     created_at: createdAtColumn
   },
-  indices: [{ name: "ix_users_role", columns: ["role"] }],
+  indices: [
+    { name: "ix_users_role", columns: ["role"] },
+    { name: "ix_users_admin_followup_status", columns: ["admin_followup_status"] }
+  ],
   relations: {
     orders: {
       type: "one-to-many",
