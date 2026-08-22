@@ -5,6 +5,7 @@ type UserCandidateRow = {
   id: string;
   phone: string | null;
   created_at: Date | string;
+  admin_note: string | null;
 };
 
 type ConsultationCandidateRow = {
@@ -13,18 +14,47 @@ type ConsultationCandidateRow = {
   status: string;
   request_count: number;
   last_requested_at: Date | string;
+  admin_note: string | null;
 };
 
 type ReportCandidate = {
   phone: string;
   source: "users" | "consultation_leads" | "users + consultation_leads";
   arrivedAt: Date | string;
+  adminNote: string | null;
 };
 
 function normalizePhone(phone: string | null | undefined): string | null {
   const value = phone?.trim();
 
   return value || null;
+}
+
+function normalizeAdminNote(
+  adminNote: string | null | undefined,
+): string | null {
+  const value = adminNote?.trim();
+
+  return value || null;
+}
+
+function mergeAdminNotes(
+  existingNote: string | null,
+  newNote: string | null,
+): string | null {
+  if (!existingNote) {
+    return newNote;
+  }
+
+  if (!newNote) {
+    return existingNote;
+  }
+
+  if (existingNote === newNote) {
+    return existingNote;
+  }
+
+  return `${existingNote} | ${newNote}`;
 }
 
 export function formatIranDate(
@@ -81,6 +111,7 @@ function buildNewFollowupReport(
       phone,
       source: "users",
       arrivedAt: user.created_at,
+      adminNote: normalizeAdminNote(user.admin_note),
     });
   }
 
@@ -99,18 +130,23 @@ function buildNewFollowupReport(
         phone,
         source: "consultation_leads",
         arrivedAt: lead.last_requested_at,
+        adminNote: normalizeAdminNote(lead.admin_note),
       });
 
       continue;
     }
 
     // The phone exists in both tables.
-    // Keep one row and merge the sources.
+    // Keep one row and merge the sources and admin notes.
     existing.source = "users + consultation_leads";
+
+    existing.adminNote = mergeAdminNotes(
+      existing.adminNote,
+      normalizeAdminNote(lead.admin_note),
+    );
 
     // Use the latest date as "Came at".
     const existingTime = new Date(existing.arrivedAt).getTime();
-
     const consultationTime = new Date(lead.last_requested_at).getTime();
 
     if (
@@ -126,7 +162,6 @@ function buildNewFollowupReport(
   // Newest first
   candidates.sort((left, right) => {
     const leftTime = new Date(left.arrivedAt).getTime();
-
     const rightTime = new Date(right.arrivedAt).getTime();
 
     return rightTime - leftTime;
@@ -167,6 +202,16 @@ function buildNewFollowupReport(
           ">
             ${escapeHtml(formatIranDate(candidate.arrivedAt))}
           </td>
+
+          <td style="
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-width: 400px;
+          ">
+            ${candidate.adminNote ? escapeHtml(candidate.adminNote) : "-"}
+          </td>
         </tr>
       `,
     )
@@ -193,7 +238,7 @@ function buildNewFollowupReport(
 ">
 
   <div style="
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
     background: #ffffff;
     padding: 24px;
@@ -256,6 +301,15 @@ function buildNewFollowupReport(
           ">
             Came at
           </th>
+
+          <th style="
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            background-color: #f3f4f6;
+            text-align: left;
+          ">
+            Admin Note
+          </th>
         </tr>
       </thead>
 
@@ -265,7 +319,7 @@ function buildNewFollowupReport(
           `
             <tr>
               <td
-                colspan="4"
+                colspan="5"
                 style="
                   padding: 24px;
                   text-align: center;
@@ -305,27 +359,26 @@ export async function sendNewFollowupCandidatesReport() {
   const dataSource = await getDataSource();
 
   const [users, consultationLeads] = (await Promise.all([
-    // Fetch users independently.
-    // No orders join and no order-count restriction.
     dataSource.query(
       `select
         u.id,
         u.phone,
-        u.created_at
+        u.created_at,
+        u.admin_note
        from users u
        where u.admin_followup_status = 'new'
        and u.role = 'customer'
        order by u.created_at desc`,
     ),
 
-    // Fetch consultation leads independently.
     dataSource.query(
       `select
         id,
         phone,
         status,
         request_count,
-        last_requested_at
+        last_requested_at,
+        admin_note
        from consultation_leads
        where status = 'new'
          and request_count = 1
