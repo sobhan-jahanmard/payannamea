@@ -1,6 +1,7 @@
-import { SMTPClient } from "emailjs";
+import { Message, SMTPClient } from "emailjs";
 
 import { getServerIp } from "./get-server-ip";
+import { formatIranDate } from "./new-followup-report";
 
 const sender = "s.jahanmard@gmail.com";
 const recipients = ["s.jahanmard@gmail.com"];
@@ -38,6 +39,58 @@ class Email {
         to: recipients.join(", "),
         subject,
       });
+      console.info("Email notification sent:", { subject, to: recipients });
+      return true;
+    } catch (error) {
+      console.error("Email notification failed:", error);
+      return false;
+    } finally {
+      client.smtp.close();
+    }
+  }
+
+  async sendHtml(
+    subject: string,
+    text: string,
+    html: string,
+  ): Promise<boolean> {
+    const password = process.env.SMTP_PASSWORD?.trim();
+
+    if (!password) {
+      if (!this.didWarnAboutConfiguration) {
+        console.warn(
+          "Email notification skipped: SMTP_PASSWORD must be configured",
+        );
+        this.didWarnAboutConfiguration = true;
+      }
+      return false;
+    }
+
+    const client = new SMTPClient({
+      user: sender,
+      password,
+      host: "smtp.gmail.com",
+      port: 465,
+      ssl: true,
+      timeout: 10_000,
+    });
+
+    try {
+      await client.sendAsync(
+        new Message({
+          text,
+          from: sender,
+          to: recipients.join(", "),
+          subject,
+          attachment: [
+            {
+              data: html,
+              alternative: true,
+              contentType: "text/html",
+            },
+          ],
+        }),
+      );
       console.info("Email notification sent:", { subject, to: recipients });
       return true;
     } catch (error) {
@@ -88,6 +141,15 @@ class Email {
         ? "This phone has requested consultation before"
         : "New consultation lead",
     );
+  }
+
+  async sendNewFollowupCandidatesReport(
+    text: string,
+    html: string,
+    count: number,
+  ): Promise<boolean> {
+    const subject = `New follow-up candidates on Payanname Website (${count}) - ${formatIranDate(new Date())}}`;
+    return this.sendHtml(subject, text, html);
   }
 }
 
