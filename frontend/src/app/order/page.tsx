@@ -60,6 +60,7 @@ const optionalImageCount = z.preprocess((value) => {
 }, z.number().int().min(0, "حداقل مقدار ۰ است").max(1000, "حداکثر ۱۰۰۰ عکس").optional());
 
 const formSchema = z.object({
+  customer_phone: z.string().trim().max(40).optional(),
   correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
@@ -262,7 +263,6 @@ function OrderForm() {
   const { user } = useAuth();
   const router = useRouter();
   const isStaff = user?.role === "operator" || user?.role === "admin";
-  const [customerPhone, setCustomerPhone] = useState("");
   const [step, setStep] = useState(0);
   const [maxVisitedStep, setMaxVisitedStep] = useState(0);
   const [guidelineFiles, setGuidelineFiles] = useState<File[]>([]);
@@ -282,6 +282,7 @@ function OrderForm() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      customer_phone: "",
       correspondence_email: "",
       degree: orderTypeFieldConfig(orderTypeOptions[0]).defaultDegree,
       university: universityOptions[0],
@@ -338,7 +339,7 @@ function OrderForm() {
 
   const stepFields = useMemo<Record<number, (keyof FormValues)[]>>(
     () => ({
-      0: ["order_type"],
+      0: [...(isStaff ? ["customer_phone" as const] : []), "order_type"],
       1: [
         "degree",
         "university",
@@ -364,7 +365,7 @@ function OrderForm() {
       ],
       3: ["moarref_code"]
     }),
-    []
+    [isStaff]
   );
 
   async function goNext() {
@@ -410,13 +411,13 @@ function OrderForm() {
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
     setCreatedOrder(null);
-    if (isStaff && !customerPhone.trim()) {
+    if (isStaff && !compact(values.customer_phone)) {
       setSubmitError("شماره موبایل مشتری را وارد کنید.");
       return;
     }
 
     const payload: OrderCreatePayload = {
-      ...(isStaff ? { customer_phone: customerPhone.trim() } : {}),
+      ...(isStaff ? { customer_phone: values.customer_phone!.trim() } : {}),
       correspondence_email: values.correspondence_email.trim(),
       degree: values.degree,
       university: values.university,
@@ -492,24 +493,7 @@ function OrderForm() {
           <div>
             <h1 className="text-2xl font-semibold tracking-normal">{isStaff ? "ثبت سفارش برای مشتری" : "ثبت سفارش خدمات دانشگاهی"}</h1>
             <p className="mt-1 text-sm text-muted-foreground">ابتدا نوع سفارش را انتخاب کنید، سپس مشخصات دانشگاهی، فایل‌ها و منابع لازم را وارد کنید تا سفارش برای بررسی مدیر ارسال شود.</p>
-            {isStaff ? (
-              <div className="mt-3 max-w-sm space-y-2">
-                <Label htmlFor="customer-phone">شماره موبایل مشتری</Label>
-                <Input
-                  id="customer-phone"
-                  className="ltr text-left"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="off"
-                  maxLength={40}
-                  placeholder="09123456789"
-                  value={customerPhone}
-                  onChange={(event) => setCustomerPhone(event.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">سفارش در پنل همین مشتری ثبت می‌شود و فقط در فهرست سفارش‌های ثبت‌شدهٔ شما نمایش داده خواهد شد.</p>
-              </div>
-            ) : user ? (
+            {user && !isStaff ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 سفارش با حساب <span className="ltr inline-block">{user.phone}</span> ثبت می‌شود.
               </p>
@@ -567,6 +551,22 @@ function OrderForm() {
         <section className="tool-surface p-5">
           {step === 0 ? (
             <div className="grid gap-4">
+              {isStaff ? (
+                <div className="rounded-md border border-primary/25 bg-teal-50 p-4">
+                  <Field label="شماره موبایل مشتری *" error={errors.customer_phone?.message}>
+                    <Input
+                      className="ltr text-left"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="off"
+                      maxLength={40}
+                      placeholder="09123456789"
+                      {...register("customer_phone", { required: "شماره موبایل مشتری الزامی است" })}
+                    />
+                  </Field>
+                  <p className="mt-2 text-xs text-muted-foreground">در صورت نبودن این شماره، حساب مشتریِ تأییدنشده به‌صورت خودکار ساخته می‌شود.</p>
+                </div>
+              ) : null}
               <div>
                 <h2 className="text-lg font-semibold">نوع سفارش را انتخاب کنید</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
