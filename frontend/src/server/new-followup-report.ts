@@ -1,6 +1,24 @@
 import { getDataSource } from "./db/data-source";
 import { email } from "./email";
 
+// قیمت‌ها را به صورت بازه (مثلاً "15-20") وارد کنید.
+const bachelorThesisPrice = "10-20";
+const masterThesisPrice = "20-30";
+const doctoralDissertationPrice = "30-50";
+const thesisProposalPrice = "5-10";
+const universityResearchPrice = "2-10";
+const presentationAndPowerpointPrice = "2-10";
+const depositPercentage = "20%";
+
+const orderPrices = [
+  { label: "پایان‌نامه کارشناسی", price: bachelorThesisPrice },
+  { label: "پایان‌نامه کارشناسی ارشد", price: masterThesisPrice },
+  { label: "رساله دکتری", price: doctoralDissertationPrice },
+  { label: "پروپوزال پایان‌نامه", price: thesisProposalPrice },
+  { label: "تحقیق دانشگاهی", price: universityResearchPrice },
+  { label: "ارائه و پاورپوینت", price: presentationAndPowerpointPrice },
+];
+
 type UserCandidateRow = {
   id: string;
   phone: string | null;
@@ -66,10 +84,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function buildFollowupReport(
-  userRows: UserCandidateRow[],
-  title: string,
-) {
+function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
   const candidatesByPhone = new Map<string, ReportCandidate>();
 
   // Include both regular OTP users and consultation requests, identified by verification status.
@@ -101,6 +116,16 @@ function buildFollowupReport(
   });
 
   const generatedAt = formatIranDate(new Date());
+
+  const priceItems = orderPrices
+    .map(
+      ({ label, price }) => `
+        <li style="margin: 0 0 6px;">
+          ${escapeHtml(label)}: <strong>${escapeHtml(price)}</strong>
+        </li>
+      `,
+    )
+    .join("");
 
   const rows = candidates
     .map(
@@ -191,6 +216,23 @@ function buildFollowupReport(
     ">
       Generated at: ${escapeHtml(generatedAt)}
     </p>
+
+    <section dir="rtl" style="
+      margin: 0 0 20px;
+      padding: 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background-color: #f9fafb;
+      text-align: right;
+    ">
+      <h3 style="margin: 0 0 10px; color: #111827;">بازه قیمت انواع سفارش</h3>
+      <ul style="margin: 0; padding-right: 20px; color: #374151;">
+        ${priceItems}
+      </ul>
+      <p style="margin: 12px 0 0; color: #374151;">
+        درصد بیعانه: <strong>${escapeHtml(depositPercentage)}</strong>
+      </p>
+    </section>
 
     <table style="
       width: 100%;
@@ -291,8 +333,8 @@ function buildFollowupReport(
 export async function sendNewFollowupCandidatesReport() {
   const dataSource = await getDataSource();
 
-  const users = await dataSource.query(
-      `select
+  const users = (await dataSource.query(
+    `select
         u.id,
         u.phone,
         u.is_verified,
@@ -302,7 +344,7 @@ export async function sendNewFollowupCandidatesReport() {
        where u.admin_followup_status = 'new'
        and u.role = 'customer'
        order by u.created_at desc`,
-    ) as UserCandidateRow[];
+  )) as UserCandidateRow[];
 
   const report = buildFollowupReport(users, "New follow-up candidates report");
 
@@ -321,8 +363,8 @@ export async function sendNewFollowupCandidatesReport() {
 export async function sendContactedFollowupCandidatesReport() {
   const dataSource = await getDataSource();
 
-  const users = await dataSource.query(
-      `select
+  const users = (await dataSource.query(
+    `select
         u.id,
         u.phone,
         u.is_verified,
@@ -332,9 +374,12 @@ export async function sendContactedFollowupCandidatesReport() {
        where u.admin_followup_status = 'contacted'
        and u.role = 'customer'
        order by u.created_at desc`,
-    ) as UserCandidateRow[];
+  )) as UserCandidateRow[];
 
-  const report = buildFollowupReport(users, "Contacted follow-up candidates report");
+  const report = buildFollowupReport(
+    users,
+    "Contacted follow-up candidates report",
+  );
 
   const sent = await email.sendContactedFollowupCandidatesReport(
     "",
