@@ -3,9 +3,6 @@ import type {
   AdminUser,
   AdminUsersResponse,
   AnalyticsDashboard,
-  ConsultationLead,
-  ConsultationLeadsResponse,
-  ConsultationLeadStatus,
   ForgotPasswordResponse,
   LoginPayload,
   OtpRequestPayload,
@@ -144,8 +141,7 @@ export async function findPhoneFollowup(phone: string): Promise<PhoneFollowupRes
 }
 
 export async function updatePhoneFollowup(payload:
-  | { target: "user"; id: string; admin_followup_status?: UserFollowupStatus; admin_note?: string }
-  | { target: "lead"; id: string; status?: ConsultationLeadStatus; admin_note?: string }
+  { id: string; admin_followup_status?: UserFollowupStatus; admin_note?: string }
 ): Promise<void> {
   await request("/api/follow-up", { method: "PATCH", body: JSON.stringify(payload) });
 }
@@ -239,19 +235,6 @@ export async function getAdminAnalytics(params: {
   return request<AnalyticsDashboard>(`/api/admin/analytics?${query.toString()}`);
 }
 
-export async function getAdminConsultationLeads(params: {
-  search?: string;
-  status?: ConsultationLeadStatus;
-  page?: number;
-  limit?: number;
-}): Promise<ConsultationLeadsResponse> {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") query.set(key, String(value));
-  }
-  return request<ConsultationLeadsResponse>(`/api/admin/leads?${query.toString()}`);
-}
-
 export async function getAdminUsers(params: {
   search?: string;
   status?: UserFollowupStatus;
@@ -270,16 +253,6 @@ export async function updateAdminUser(
   changes: { full_name?: string | null; email?: string | null; admin_followup_status?: UserFollowupStatus; admin_note?: string }
 ): Promise<AdminUser> {
   return request<AdminUser>("/api/admin/users", {
-    method: "PATCH",
-    body: JSON.stringify({ id, ...changes })
-  });
-}
-
-export async function updateConsultationLead(
-  id: string,
-  changes: { status?: ConsultationLeadStatus; admin_note?: string }
-): Promise<ConsultationLead> {
-  return request<ConsultationLead>("/api/admin/leads", {
     method: "PATCH",
     body: JSON.stringify({ id, ...changes })
   });

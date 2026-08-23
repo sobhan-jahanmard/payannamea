@@ -214,11 +214,12 @@ function AdminUsersPanel() {
       ) : null}
 
       <section className="tool-surface overflow-x-auto p-5">
-        <table className="w-full min-w-[1400px] text-right text-sm">
+        <table className="w-full min-w-[1500px] text-right text-sm">
           <thead className="border-b border-border text-xs text-muted-foreground">
             <tr>
               <th className="w-56 p-3">نام</th>
               <th className="p-3">نقش</th>
+              <th className="p-3">تأیید OTP</th>
               <th className="p-3">شماره موبایل</th>
               <th className="w-64 p-3">ایمیل</th>
               <th className="p-3">تاریخ ثبت‌نام</th>
@@ -259,6 +260,9 @@ function AdminUsersPanel() {
                   </td>
                   <td className="whitespace-nowrap p-3">
                     {roleLabels[user.role]}
+                  </td>
+                  <td className="whitespace-nowrap p-3">
+                    {user.is_verified ? "تأییدشده" : "تأییدنشده"}
                   </td>
                   <td className="ltr p-3 text-left">{user.phone || "-"}</td>
                   <td className="p-3">

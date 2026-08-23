@@ -26,6 +26,7 @@ export interface UserEntity {
   phone: string | null;
   password_hash: string | null;
   role: UserRole;
+  is_verified: boolean;
   admin_followup_status: UserFollowupStatus;
   admin_note: string;
   reset_token_hash: string | null;
@@ -207,20 +208,6 @@ export interface AnalyticsEventEntity {
   created_at: Date;
 }
 
-export type ConsultationLeadStatus = "new" | "contacted" | "closed";
-
-export interface ConsultationLeadEntity {
-  id: string;
-  phone: string;
-  source: string;
-  status: ConsultationLeadStatus;
-  admin_note: string;
-  request_count: number;
-  last_requested_at: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
 const idColumn = {
   type: String,
   primary: true,
@@ -243,6 +230,7 @@ export const UserSchema = new EntitySchema<UserEntity>({
     phone: { type: String, length: 40, nullable: true, unique: true },
     password_hash: { type: String, length: 255, nullable: true },
     role: { type: String, length: 32, default: "customer" },
+    is_verified: { type: Boolean, default: true },
     admin_followup_status: { type: String, length: 32, default: "new" },
     admin_note: { type: "text", default: "" },
     reset_token_hash: { type: String, length: 128, nullable: true },
@@ -586,26 +574,6 @@ export const AnalyticsEventSchema = new EntitySchema<AnalyticsEventEntity>({
   ]
 });
 
-export const ConsultationLeadSchema = new EntitySchema<ConsultationLeadEntity>({
-  name: "ConsultationLead",
-  tableName: "consultation_leads",
-  columns: {
-    id: idColumn,
-    phone: { type: String, length: 40, unique: true },
-    source: { type: String, length: 80, default: "landing_page" },
-    status: { type: String, length: 32, default: "new" },
-    admin_note: { type: "text", default: "" },
-    request_count: { type: Number, default: 1 },
-    last_requested_at: { type: "timestamptz" },
-    created_at: createdAtColumn,
-    updated_at: { type: "timestamptz", updateDate: true }
-  },
-  indices: [
-    { name: "ix_consultation_leads_status", columns: ["status"] },
-    { name: "ix_consultation_leads_last_requested_at", columns: ["last_requested_at"] }
-  ]
-});
-
 export const entities = [
   UserSchema,
   OtpChallengeSchema,
@@ -618,6 +586,5 @@ export const entities = [
   FinalOutputSchema,
   ReviewNoteSchema,
   PaymentNoteSchema,
-  AnalyticsEventSchema,
-  ConsultationLeadSchema
+  AnalyticsEventSchema
 ];

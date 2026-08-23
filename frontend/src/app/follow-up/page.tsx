@@ -24,10 +24,9 @@ function FollowUpPanel() {
   const [phone, setPhone] = useState("");
   const [data, setData] = useState<PhoneFollowupResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<"user" | "lead" | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState<{ status: UserFollowupStatus; note: string } | null>(null);
-  const [leadDraft, setLeadDraft] = useState<{ status: UserFollowupStatus; note: string } | null>(null);
 
   async function search() {
     if (!phone.trim()) return;
@@ -37,7 +36,6 @@ function FollowUpPanel() {
       const result = await findPhoneFollowup(phone.trim());
       setData(result);
       setUserDraft(result.user ? { status: result.user.admin_followup_status, note: result.user.admin_note ?? "" } : null);
-      setLeadDraft(result.lead ? { status: result.lead.status, note: result.lead.admin_note ?? "" } : null);
     } catch (searchError) {
       setData(null);
       setError(searchError instanceof Error ? searchError.message : "جست‌وجوی شماره ناموفق بود");
@@ -46,23 +44,19 @@ function FollowUpPanel() {
     }
   }
 
-  async function save(target: "user" | "lead") {
-    const draft = target === "user" ? userDraft : leadDraft;
-    const record = target === "user" ? data?.user : data?.lead;
+  async function save() {
+    const draft = userDraft;
+    const record = data?.user;
     if (!draft || !record) return;
-    setSaving(target);
+    setSaving(true);
     setError(null);
     try {
-      if (target === "user") {
-        await updatePhoneFollowup({ target, id: record.id, admin_followup_status: draft.status, admin_note: draft.note });
-      } else {
-        await updatePhoneFollowup({ target, id: record.id, status: draft.status, admin_note: draft.note });
-      }
+      await updatePhoneFollowup({ id: record.id, admin_followup_status: draft.status, admin_note: draft.note });
       await search();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "ذخیره پیگیری ناموفق بود");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   }
 
@@ -72,15 +66,14 @@ function FollowUpPanel() {
 
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-5 px-4 py-6 lg:px-8">
-      <div><h1 className="text-2xl font-semibold">پیگیری شماره تلفن</h1><p className="mt-1 text-sm text-muted-foreground">شماره را جست‌وجو کنید تا سابقهٔ کاربر و درخواست مشاورهٔ آن هم‌زمان نمایش داده شود.</p></div>
+      <div><h1 className="text-2xl font-semibold">پیگیری شماره تلفن</h1><p className="mt-1 text-sm text-muted-foreground">شماره را جست‌وجو کنید تا درخواست‌های مشاورهٔ تأییدنشده نمایش داده شوند.</p></div>
       <section className="tool-surface grid gap-4 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="space-y-2"><Label>شماره موبایل</Label><Input className="ltr text-left" value={phone} onChange={(event) => setPhone(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void search(); }} inputMode="tel" placeholder="09123456789" /></div>
         <Button type="button" onClick={() => void search()} loading={loading}><Search className="h-4 w-4" />جست‌وجو</Button>
       </section>
       {error ? <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
       {data ? <><p className="text-sm text-muted-foreground">نتیجه برای <span className="ltr inline-block font-medium text-foreground">{data.phone}</span></p>
-        <FollowupCard title="کاربر ثبت‌نام‌شده" exists={Boolean(data.user)} meta={data.user ? `${data.user.full_name ?? "بدون نام"} · ${data.user.order_count.toLocaleString("fa-IR")} سفارش · ثبت‌نام ${formatDateTime(data.user.created_at)}` : undefined} draft={userDraft} saving={saving === "user"} onChange={setUserDraft} onSave={() => void save("user")} />
-        <FollowupCard title="درخواست مشاوره" exists={Boolean(data.lead)} meta={data.lead ? `${data.lead.request_count.toLocaleString("fa-IR")} درخواست · آخرین درخواست ${formatDateTime(data.lead.last_requested_at)}` : undefined} draft={leadDraft} saving={saving === "lead"} onChange={setLeadDraft} onSave={() => void save("lead")} />
+        <FollowupCard title="درخواست مشاوره" exists={Boolean(data.user)} meta={data.user ? `${data.user.full_name ?? "بدون نام"} · ${data.user.order_count.toLocaleString("fa-IR")} سفارش · ثبت درخواست ${formatDateTime(data.user.created_at)}` : undefined} draft={userDraft} saving={saving} onChange={setUserDraft} onSave={() => void save()} />
       </> : null}
     </main>
   );

@@ -17,6 +17,7 @@ export interface User {
   email?: string | null;
   phone: string | null;
   role: "customer" | "operator" | "admin";
+  is_verified: boolean;
   username?: string | null;
   created_at: string;
 }
@@ -58,7 +59,6 @@ export interface LoginPayload {
 export interface PhoneFollowupResponse {
   phone: string;
   user: AdminUser | null;
-  lead: ConsultationLead | null;
 }
 
 export interface AuthResponse {
@@ -256,25 +256,5 @@ export interface AnalyticsDashboard {
   top_pages: Array<{ path: string; views: number; visitors: number; sessions: number }>;
   daily: Array<{ date: string; events: number; page_views: number; visitors: number; sessions: number }>;
   events: AnalyticsEventRecord[];
-  pagination: { page: number; limit: number; total: number; pages: number };
-}
-
-export type ConsultationLeadStatus = "new" | "contacted" | "closed";
-
-export interface ConsultationLead {
-  id: string;
-  phone: string;
-  source: string;
-  status: ConsultationLeadStatus;
-  admin_note: string;
-  request_count: number;
-  last_requested_at: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ConsultationLeadsResponse {
-  leads: ConsultationLead[];
-  counts: Partial<Record<ConsultationLeadStatus, number>>;
   pagination: { page: number; limit: number; total: number; pages: number };
 }

@@ -11,6 +11,7 @@ const statements = [
     phone varchar(40),
     password_hash varchar(255),
     role varchar(32) not null default 'customer',
+    is_verified boolean not null default true,
     admin_followup_status varchar(32) not null default 'new',
     admin_note text not null default '',
     reset_token_hash varchar(128),
@@ -18,6 +19,8 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_users_role on users(role)`,
+  `alter table users add column if not exists is_verified boolean not null default true`,
+  `create index if not exists ix_users_is_verified on users(is_verified)`,
   `alter table users add column if not exists username varchar(80)`,
   `create unique index if not exists uq_users_username on users(username) where username is not null`,
   `alter table users add column if not exists admin_followup_status varchar(32) not null default 'new'`,
@@ -220,20 +223,16 @@ const statements = [
   `create index if not exists ix_analytics_events_path on analytics_events(path)`,
   `create index if not exists ix_analytics_events_visitor_id on analytics_events(visitor_id)`,
   `create index if not exists ix_analytics_events_session_id on analytics_events(session_id)`,
-  `create table if not exists consultation_leads (
-    id varchar(36) primary key,
-    phone varchar(40) not null unique,
-    source varchar(80) not null default 'landing_page',
-    status varchar(32) not null default 'new',
-    admin_note text not null default '',
-    request_count integer not null default 1,
-    last_requested_at timestamptz not null default now(),
-    created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
-  )`,
-  `alter table consultation_leads add column if not exists admin_note text not null default ''`,
-  `create index if not exists ix_consultation_leads_status on consultation_leads(status)`,
-  `create index if not exists ix_consultation_leads_last_requested_at on consultation_leads(last_requested_at)`
+  `do $$
+   begin
+     if to_regclass('public.consultation_leads') is not null then
+       insert into users (id, full_name, email, phone, password_hash, role, is_verified, admin_followup_status, admin_note, reset_token_hash, reset_token_expires_at, created_at)
+       select id, null, null, phone, null, 'customer', false, status, admin_note, null, null, created_at
+       from consultation_leads
+       on conflict (phone) where phone is not null do nothing;
+       drop table consultation_leads;
+     end if;
+   end $$`
 ];
 
 async function main() {

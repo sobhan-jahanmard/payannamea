@@ -4,22 +4,14 @@ import { email } from "./email";
 type UserCandidateRow = {
   id: string;
   phone: string | null;
+  is_verified: boolean;
   created_at: Date | string;
-  admin_note: string | null;
-};
-
-type ConsultationCandidateRow = {
-  id: string;
-  phone: string | null;
-  status: string;
-  request_count: number;
-  last_requested_at: Date | string;
   admin_note: string | null;
 };
 
 type ReportCandidate = {
   phone: string;
-  source: "users" | "consultation_leads" | "users + consultation_leads";
+  source: "کاربر تأییدشده" | "درخواست مشاوره (تأییدنشده)";
   arrivedAt: Date | string;
   adminNote: string | null;
 };
@@ -36,25 +28,6 @@ function normalizeAdminNote(
   const value = adminNote?.trim();
 
   return value || null;
-}
-
-function mergeAdminNotes(
-  existingNote: string | null,
-  newNote: string | null,
-): string | null {
-  if (!existingNote) {
-    return newNote;
-  }
-
-  if (!newNote) {
-    return existingNote;
-  }
-
-  if (existingNote === newNote) {
-    return existingNote;
-  }
-
-  return `${existingNote} | ${newNote}`;
 }
 
 export function formatIranDate(
@@ -93,13 +66,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function buildNewFollowupReport(
-  userRows: UserCandidateRow[],
-  consultationRows: ConsultationCandidateRow[],
-) {
+function buildNewFollowupReport(userRows: UserCandidateRow[]) {
   const candidatesByPhone = new Map<string, ReportCandidate>();
 
-  // Add all users with admin_followup_status = 'new'
+  // Include both regular OTP users and consultation requests, identified by verification status.
   for (const user of userRows) {
     const phone = normalizePhone(user.phone);
 
@@ -109,52 +79,12 @@ function buildNewFollowupReport(
 
     candidatesByPhone.set(phone, {
       phone,
-      source: "users",
+      source: user.is_verified
+        ? "کاربر تأییدشده"
+        : "درخواست مشاوره (تأییدنشده)",
       arrivedAt: user.created_at,
       adminNote: normalizeAdminNote(user.admin_note),
     });
-  }
-
-  // Add consultation leads and merge duplicate phone numbers
-  for (const lead of consultationRows) {
-    const phone = normalizePhone(lead.phone);
-
-    if (!phone) {
-      continue;
-    }
-
-    const existing = candidatesByPhone.get(phone);
-
-    if (!existing) {
-      candidatesByPhone.set(phone, {
-        phone,
-        source: "consultation_leads",
-        arrivedAt: lead.last_requested_at,
-        adminNote: normalizeAdminNote(lead.admin_note),
-      });
-
-      continue;
-    }
-
-    // The phone exists in both tables.
-    // Keep one row and merge the sources and admin notes.
-    existing.source = "users + consultation_leads";
-
-    existing.adminNote = mergeAdminNotes(
-      existing.adminNote,
-      normalizeAdminNote(lead.admin_note),
-    );
-
-    // Use the latest date as "Came at".
-    const existingTime = new Date(existing.arrivedAt).getTime();
-    const consultationTime = new Date(lead.last_requested_at).getTime();
-
-    if (
-      !Number.isNaN(consultationTime) &&
-      (Number.isNaN(existingTime) || consultationTime > existingTime)
-    ) {
-      existing.arrivedAt = lead.last_requested_at;
-    }
   }
 
   const candidates = [...candidatesByPhone.values()];
@@ -358,36 +288,20 @@ function buildNewFollowupReport(
 export async function sendNewFollowupCandidatesReport() {
   const dataSource = await getDataSource();
 
-  const [users, consultationLeads] = (await Promise.all([
-    dataSource.query(
+  const users = await dataSource.query(
       `select
         u.id,
         u.phone,
+        u.is_verified,
         u.created_at,
         u.admin_note
        from users u
        where u.admin_followup_status = 'new'
        and u.role = 'customer'
        order by u.created_at desc`,
-    ),
+    ) as UserCandidateRow[];
 
-    dataSource.query(
-      `select
-        id,
-        phone,
-        status,
-        request_count,
-        last_requested_at,
-        admin_note
-       from consultation_leads
-       where status = 'new'
-         and request_count = 1
-       order by last_requested_at desc`,
-    ),
-  ])) as [UserCandidateRow[], ConsultationCandidateRow[]];
-
-  // Merge both independent lists by phone.
-  const report = buildNewFollowupReport(users, consultationLeads);
+  const report = buildNewFollowupReport(users);
 
   const sent = await email.sendNewFollowupCandidatesReport(
     "",

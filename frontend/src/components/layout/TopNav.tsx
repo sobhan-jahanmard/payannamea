@@ -4,7 +4,6 @@ import {
   ClipboardList,
   ChartNoAxesCombined,
   Home,
-  Headset,
   LayoutDashboard,
   ListOrdered,
   LogIn,
@@ -36,7 +35,6 @@ export function TopNav() {
     ...(isAdmin
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
-          { href: "/admin/leads", label: "درخواست‌های مشاوره", icon: Headset },
           { href: "/admin/users", label: "کاربران", icon: Users },
           { href: "/admin/analytics", label: "آمار بازدید", icon: ChartNoAxesCombined },
         ]

@@ -161,10 +161,14 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
         email: null,
         password_hash: null,
         role: "customer",
+        is_verified: true,
         reset_token_hash: null,
         reset_token_expires_at: null
       });
       isNewUser = true;
+    } else if (!user.is_verified) {
+      user.is_verified = true;
+      user = await userRepo.save(user);
     }
     return { user, isNewUser };
   });

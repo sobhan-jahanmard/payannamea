@@ -37,6 +37,7 @@ async function main() {
       username,
       phone,
       role,
+      is_verified: true,
       reset_token_hash: null,
       reset_token_expires_at: null
     });
@@ -46,6 +47,7 @@ async function main() {
   user.username = username;
   user.phone = phone;
   user.role = role;
+  user.is_verified = true;
   user.password_hash = hashPassword(password);
   user.reset_token_hash = null;
   user.reset_token_expires_at = null;
