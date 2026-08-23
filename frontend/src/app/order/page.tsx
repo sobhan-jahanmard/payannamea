@@ -275,6 +275,7 @@ function OrderForm() {
   const {
     register,
     handleSubmit,
+    setError,
     setValue,
     trigger,
     watch,
@@ -373,7 +374,14 @@ function OrderForm() {
     try {
       const fieldsToValidate = stepFields[step];
       const valid = fieldsToValidate ? await trigger(fieldsToValidate) : true;
-      if (valid) {
+      const hasRequiredCustomerPhone = !isStaff || step !== 0 || Boolean(compact(watched.customer_phone));
+      if (!hasRequiredCustomerPhone) {
+        setError("customer_phone", {
+          type: "required",
+          message: "شماره موبایل مشتری الزامی است"
+        });
+      }
+      if (valid && hasRequiredCustomerPhone) {
         trackAnalyticsEvent("order_step_completed", {
           step_number: step + 1,
           step_name: steps[step],
