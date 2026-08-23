@@ -189,7 +189,7 @@ export function serializeUser(user: UserEntity) {
   return {
     id: user.id,
     phone: user.phone,
-    ...(user.role === "admin" ? { full_name: user.full_name, email: user.email } : {}),
+    ...(user.role !== "customer" ? { full_name: user.full_name, email: user.email, username: user.username } : {}),
     role: user.role,
     created_at: iso(user.created_at)
   };

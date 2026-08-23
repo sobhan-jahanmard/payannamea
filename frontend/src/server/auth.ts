@@ -164,6 +164,18 @@ export async function requireAdmin(request: Request): Promise<UserEntity> {
   return user;
 }
 
+export function isStaffRole(role: string): role is "operator" | "admin" {
+  return role === "admin" || role === "operator";
+}
+
+export async function requireFollowupAccess(request: Request): Promise<UserEntity> {
+  const user = await getCurrentUser(request);
+  if (!isStaffRole(user.role)) {
+    throw new ApiError(403, "Operator or admin role required");
+  }
+  return user;
+}
+
 export function makeResetToken(): {
   token: string;
   tokenHash: string;

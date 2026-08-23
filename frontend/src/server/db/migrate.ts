@@ -6,6 +6,7 @@ const statements = [
   `create table if not exists users (
     id varchar(36) primary key,
     full_name varchar(255) not null,
+    username varchar(80) unique,
     email varchar(255) not null unique,
     phone varchar(40),
     password_hash varchar(255),
@@ -17,6 +18,8 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_users_role on users(role)`,
+  `alter table users add column if not exists username varchar(80)`,
+  `create unique index if not exists uq_users_username on users(username) where username is not null`,
   `alter table users add column if not exists admin_followup_status varchar(32) not null default 'new'`,
   `alter table users add column if not exists admin_note text not null default ''`,
   `create index if not exists ix_users_admin_followup_status on users(admin_followup_status)`,

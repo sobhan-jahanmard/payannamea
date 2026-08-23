@@ -19,8 +19,11 @@ function readArg(name: string, fallback?: string): string {
 
 async function main() {
   const email = readArg("email").trim().toLowerCase();
+  const username = readArg("username", email).trim().toLowerCase();
   const password = readArg("password");
   const name = readArg("name", "مدیر").trim();
+  const role = readArg("role", "admin").trim().toLowerCase();
+  if (role !== "admin" && role !== "operator") throw new Error("--role must be admin or operator");
   const phone = readArg("phone", "09000000000").trim();
 
   const dataSource = await getDataSource();
@@ -31,22 +34,24 @@ async function main() {
       id: randomUUID(),
       email,
       full_name: name,
+      username,
       phone,
-      role: "admin",
+      role,
       reset_token_hash: null,
       reset_token_expires_at: null
     });
   }
 
   user.full_name = name;
+  user.username = username;
   user.phone = phone;
-  user.role = "admin";
+  user.role = role;
   user.password_hash = hashPassword(password);
   user.reset_token_hash = null;
   user.reset_token_expires_at = null;
   await repo.save(user);
   await dataSource.destroy();
-  console.log(`Admin ready: ${email}`);
+  console.log(`${role} ready: ${username}`);
 }
 
 main().catch((error) => {

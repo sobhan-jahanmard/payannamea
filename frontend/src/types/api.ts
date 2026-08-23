@@ -16,7 +16,8 @@ export interface User {
   full_name?: string | null;
   email?: string | null;
   phone: string | null;
-  role: "customer" | "admin";
+  role: "customer" | "operator" | "admin";
+  username?: string | null;
   created_at: string;
 }
 
@@ -50,8 +51,14 @@ export interface OtpVerifyPayload extends OtpRequestPayload {
 }
 
 export interface LoginPayload {
-  email: string;
+  username: string;
   password: string;
+}
+
+export interface PhoneFollowupResponse {
+  phone: string;
+  user: AdminUser | null;
+  lead: ConsultationLead | null;
 }
 
 export interface AuthResponse {

@@ -20,7 +20,8 @@ import type {
   ReferenceInput,
   ReviewNote,
   User,
-  UserFollowupStatus
+  UserFollowupStatus,
+  PhoneFollowupResponse
 } from "../types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -136,6 +137,17 @@ export async function loginAccount(payload: LoginPayload): Promise<AuthResponse>
 
 export async function getMe(): Promise<User> {
   return request<User>("/api/auth/me");
+}
+
+export async function findPhoneFollowup(phone: string): Promise<PhoneFollowupResponse> {
+  return request<PhoneFollowupResponse>(`/api/follow-up?phone=${encodeURIComponent(phone)}`);
+}
+
+export async function updatePhoneFollowup(payload:
+  | { target: "user"; id: string; admin_followup_status?: UserFollowupStatus; admin_note?: string }
+  | { target: "lead"; id: string; status?: ConsultationLeadStatus; admin_note?: string }
+): Promise<void> {
+  await request("/api/follow-up", { method: "PATCH", body: JSON.stringify(payload) });
 }
 
 export async function forgotPassword(email: string): Promise<ForgotPasswordResponse> {

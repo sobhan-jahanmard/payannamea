@@ -18,7 +18,7 @@ const phoneSchema = z.object({
 });
 const codeSchema = z.object({ code: z.string().trim().regex(/^\d{4,8}$/, "کد تأیید معتبر نیست") });
 const adminSchema = z.object({
-  email: z.string().email("ایمیل معتبر نیست"),
+  username: z.string().trim().min(1, "نام کاربری یا ایمیل را وارد کنید").max(255),
   password: z.string().min(1, "رمز عبور را وارد کنید")
 });
 
@@ -71,9 +71,9 @@ export default function LoginPage() {
   async function submitAdmin(values: AdminValues) {
     setError(null);
     try {
-      await login({ email: values.email.trim(), password: values.password });
-      trackAnalyticsEvent("admin_login_completed");
-      router.push("/admin");
+      const loggedInUser = await login({ username: values.username.trim(), password: values.password });
+      trackAnalyticsEvent("staff_login_completed");
+      router.push(loggedInUser.role === "admin" ? "/admin" : "/follow-up");
     } catch (loginError) {
       trackAnalyticsEvent("admin_login_failed");
       setError(loginError instanceof Error ? loginError.message : "ورود ناموفق بود");
@@ -148,9 +148,9 @@ export default function LoginPage() {
             data-analytics-form="admin_login_form"
           >
             <div className="space-y-2">
-              <Label>ایمیل مدیر</Label>
-              <Input className="ltr text-left" type="email" autoComplete="email" {...adminForm.register("email")} />
-              {adminForm.formState.errors.email ? <p className="text-xs font-medium text-red-700">{adminForm.formState.errors.email.message}</p> : null}
+              <Label>نام کاربری یا ایمیل</Label>
+              <Input className="ltr text-left" autoComplete="username" {...adminForm.register("username")} />
+              {adminForm.formState.errors.username ? <p className="text-xs font-medium text-red-700">{adminForm.formState.errors.username.message}</p> : null}
             </div>
             <div className="space-y-2">
               <Label>رمز عبور</Label>
@@ -160,7 +160,7 @@ export default function LoginPage() {
             {error ? <ErrorBox message={error} /> : null}
             <Button type="submit" loading={adminForm.formState.isSubmitting}>
               <LogIn className="h-4 w-4" aria-hidden="true" />
-              ورود مدیر
+              ورود کارکنان
             </Button>
           </form>
         ) : null}
@@ -171,7 +171,7 @@ export default function LoginPage() {
           onClick={() => { setAdminMode((value) => !value); setChallengeId(null); setError(null); }}
           data-analytics-event="login_mode_toggled"
         >
-          {adminMode ? "بازگشت به ورود با موبایل" : "ورود مدیر سامانه"}
+          {adminMode ? "بازگشت به ورود با موبایل" : "ورود مدیر یا اپراتور"}
         </button>
       </section>
     </main>

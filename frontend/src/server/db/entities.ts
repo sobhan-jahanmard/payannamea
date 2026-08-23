@@ -15,12 +15,13 @@ export const PAYMENT_STATUSES = ["fully_paid", "partially_paid", "not_paid", "re
 export const PAYMENT_NOTE_TYPES = ["payment", "moarref_payment"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentNoteType = (typeof PAYMENT_NOTE_TYPES)[number];
-export type UserRole = "customer" | "admin";
+export type UserRole = "customer" | "operator" | "admin";
 export type UserFollowupStatus = "new" | "contacted" | "closed";
 
 export interface UserEntity {
   id: string;
   full_name: string | null;
+  username: string | null;
   email: string | null;
   phone: string | null;
   password_hash: string | null;
@@ -237,6 +238,7 @@ export const UserSchema = new EntitySchema<UserEntity>({
   columns: {
     id: idColumn,
     full_name: { type: String, length: 255, nullable: true },
+    username: { type: String, length: 80, unique: true, nullable: true },
     email: { type: String, length: 255, unique: true, nullable: true },
     phone: { type: String, length: 40, nullable: true, unique: true },
     password_hash: { type: String, length: 255, nullable: true },
@@ -249,6 +251,7 @@ export const UserSchema = new EntitySchema<UserEntity>({
   },
   indices: [
     { name: "ix_users_role", columns: ["role"] },
+    { name: "ix_users_username", columns: ["username"] },
     { name: "ix_users_admin_followup_status", columns: ["admin_followup_status"] }
   ],
   relations: {

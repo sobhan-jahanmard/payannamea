@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const user = await repo.findOneBy({ email: payload.email.trim().toLowerCase() });
     let reset_token: string | null = null;
 
-    if (user?.role === "admin") {
+    if (user && (user.role === "admin" || user.role === "operator")) {
       const reset = makeResetToken();
       user.reset_token_hash = reset.tokenHash;
       user.reset_token_expires_at = reset.expiresAt;

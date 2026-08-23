@@ -24,6 +24,8 @@ interface AuthContextValue {
   token: string | null;
   loading: boolean;
   isAdmin: boolean;
+  isOperator: boolean;
+  canFollowUp: boolean;
   login: (payload: LoginPayload) => Promise<User>;
   requestOtp: (phone: string) => Promise<OtpRequestResponse>;
   verifyOtp: (payload: OtpVerifyPayload) => Promise<User>;
@@ -73,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       loading,
       isAdmin: user?.role === "admin",
+      isOperator: user?.role === "operator",
+      canFollowUp: user?.role === "admin" || user?.role === "operator",
       login: async (payload) => {
         const session = await loginAccount(payload);
         storeAuthSession(session);

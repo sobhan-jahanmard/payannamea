@@ -30,6 +30,7 @@ const statusLabels: Record<UserFollowupStatus, string> = {
 
 const roleLabels = {
   customer: "کاربر عادی",
+  operator: "اپراتور",
   admin: "ادمین",
 } as const;
 

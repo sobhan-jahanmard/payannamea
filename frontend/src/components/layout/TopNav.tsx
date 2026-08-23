@@ -10,6 +10,7 @@ import {
   LogIn,
   LogOut,
   Phone,
+  SearchCheck,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,16 +21,18 @@ import { useAuth } from "../auth/AuthProvider";
 
 export function TopNav() {
   const pathname = usePathname() ?? "/";
-  const { user, isAdmin, logout } = useAuth();
-  const isCustomer = user && !isAdmin;
+  const { user, isAdmin, canFollowUp, logout } = useAuth();
+  const isCustomer = user?.role === "customer";
+  const canUseCustomerPages = Boolean(user && user.role !== "admin");
   const navItems = [
     { href: "/", label: "خانه", icon: Home },
-    ...(!user || isCustomer
+    ...(!user || canUseCustomerPages
       ? [{ href: "/order", label: "ثبت سفارش", icon: ClipboardList }]
       : []),
-    ...(isCustomer
+    ...(canUseCustomerPages
       ? [{ href: "/orders", label: "سفارش‌های من", icon: ListOrdered }]
       : []),
+    ...(canFollowUp ? [{ href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck }] : []),
     ...(isAdmin
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
@@ -93,11 +96,11 @@ export function TopNav() {
             <>
               <div
                 className="inline-flex h-10 max-w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm"
-                title={isAdmin ? `${user.full_name ?? "مدیر"} - ${user.email ?? ""}` : user.phone ?? ""}
+                title={!isCustomer ? `${user.full_name ?? "کارکنان"} - ${user.username ?? user.email ?? ""}` : user.phone ?? ""}
               >
                 <Phone className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span className="ltr max-w-[220px] truncate text-left font-medium text-foreground">
-                  {isAdmin ? user.email : user.phone}
+                  {!isCustomer ? user.username ?? user.email : user.phone}
                 </span>
               </div>
               <button
