@@ -3,9 +3,11 @@
 import {
   ChevronLeft,
   ChevronRight,
+  Check,
   RefreshCcw,
   Save,
   Search,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -262,7 +264,17 @@ function AdminUsersPanel() {
                     {roleLabels[user.role]}
                   </td>
                   <td className="whitespace-nowrap p-3">
-                    {user.is_verified ? "تأییدشده" : "تأییدنشده"}
+                    {user.is_verified ? (
+                      <Check
+                        className="h-5 w-5 text-emerald-600"
+                        aria-label="تأییدشده"
+                      />
+                    ) : (
+                      <X
+                        className="h-5 w-5 text-red-600"
+                        aria-label="تأییدنشده"
+                      />
+                    )}
                   </td>
                   <td className="ltr p-3 text-left">{user.phone || "-"}</td>
                   <td className="p-3">
