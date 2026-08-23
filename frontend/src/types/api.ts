@@ -28,6 +28,7 @@ export interface AdminUser extends User {
   admin_followup_status: UserFollowupStatus;
   admin_note: string;
   order_count: number;
+  utm_source: string | null;
 }
 
 export interface AdminUsersResponse {
@@ -49,6 +50,7 @@ export interface OtpRequestResponse {
 export interface OtpVerifyPayload extends OtpRequestPayload {
   challenge_id: string;
   code: string;
+  utm_source?: string | null;
 }
 
 export interface LoginPayload {

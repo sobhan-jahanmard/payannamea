@@ -29,6 +29,7 @@ export interface UserEntity {
   is_verified: boolean;
   admin_followup_status: UserFollowupStatus;
   admin_note: string;
+  utm_source: string | null;
   reset_token_hash: string | null;
   reset_token_expires_at: Date | null;
   created_at: Date;
@@ -233,6 +234,7 @@ export const UserSchema = new EntitySchema<UserEntity>({
     is_verified: { type: Boolean, default: true },
     admin_followup_status: { type: String, length: 32, default: "new" },
     admin_note: { type: "text", default: "" },
+    utm_source: { type: String, length: 100, nullable: true },
     reset_token_hash: { type: String, length: 128, nullable: true },
     reset_token_expires_at: { type: "timestamptz", nullable: true },
     created_at: createdAtColumn

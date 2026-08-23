@@ -25,6 +25,7 @@ const statements = [
   `create unique index if not exists uq_users_username on users(username) where username is not null`,
   `alter table users add column if not exists admin_followup_status varchar(32) not null default 'new'`,
   `alter table users add column if not exists admin_note text not null default ''`,
+  `alter table users add column if not exists utm_source varchar(100)`,
   `create index if not exists ix_users_admin_followup_status on users(admin_followup_status)`,
   `alter table users alter column full_name drop not null`,
   `alter table users alter column email drop not null`,

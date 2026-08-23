@@ -241,7 +241,7 @@ function AdminUsersPanel() {
       ) : null}
 
       <section className="tool-surface overflow-x-auto p-5">
-        <table className="w-full min-w-[1500px] text-right text-sm">
+        <table className="w-full min-w-[1620px] text-right text-sm">
           <thead className="border-b border-border text-xs text-muted-foreground">
             <tr>
               <th className="w-56 p-3">نام</th>
@@ -249,6 +249,7 @@ function AdminUsersPanel() {
               <th className="p-3">تأیید OTP</th>
               <th className="p-3">شماره موبایل</th>
               <th className="w-64 p-3">ایمیل</th>
+              <th className="p-3">منبع UTM</th>
               <th className="p-3">تاریخ ثبت‌نام</th>
               <th className="p-3">سفارش‌ها</th>
               <th className="w-48 p-3">وضعیت پیگیری</th>
@@ -317,6 +318,7 @@ function AdminUsersPanel() {
                       }
                     />
                   </td>
+                  <td className="ltr p-3 text-left">{user.utm_source || "-"}</td>
                   <td className="whitespace-nowrap p-3">
                     {formatDateTime(user.created_at)}
                   </td>

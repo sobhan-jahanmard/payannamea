@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import {
   analyticsPageKey,
+  captureUtmSource,
   flushAnalyticsEvents,
   pageViewProperties,
   trackAnalyticsEvent
@@ -26,6 +27,7 @@ export function AnalyticsTracker() {
   const pathname = usePathname() ?? "/";
 
   useEffect(() => {
+    captureUtmSource();
     const flushTimer = window.setInterval(flushAnalyticsEvents, 1_000);
     flushAnalyticsEvents();
     return () => window.clearInterval(flushTimer);

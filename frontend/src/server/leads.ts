@@ -9,7 +9,8 @@ import { normalizeIranianPhone } from "./otp";
 
 export const consultationLeadCreateSchema = z.object({
   phone: z.string().min(1).max(40),
-  source: z.literal("landing_page").default("landing_page")
+  source: z.literal("landing_page").default("landing_page"),
+  utm_source: z.string().trim().min(1).max(100).nullable().optional()
 });
 
 export async function createConsultationUser(rawInput: unknown) {
@@ -22,10 +23,11 @@ export async function createConsultationUser(rawInput: unknown) {
     const repo = manager.getRepository(UserSchema);
     const existing = await repo.findOneBy({ phone });
     if (existing) {
+      if (!existing.utm_source && input.utm_source) existing.utm_source = input.utm_source;
       if (existing.role === "customer" && !existing.is_verified) {
         existing.admin_followup_status = "new";
-        await repo.save(existing);
       }
+      await repo.save(existing);
       return { user: existing, repeated: true, notify: false };
     }
 
@@ -39,6 +41,7 @@ export async function createConsultationUser(rawInput: unknown) {
       is_verified: false,
       admin_followup_status: "new",
       admin_note: "",
+      utm_source: input.utm_source ?? null,
       reset_token_hash: null,
       reset_token_expires_at: null
     });

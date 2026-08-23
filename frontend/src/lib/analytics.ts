@@ -10,11 +10,44 @@ type QueuedAnalyticsEvent = {
 
 const VISITOR_KEY = "payanname_analytics_visitor";
 const SESSION_KEY = "payanname_analytics_session";
+const UTM_SOURCE_KEY = "payanname_utm_source";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const queue: QueuedAnalyticsEvent[] = [];
 let sending = false;
 let memoryVisitorId: string | null = null;
 let memorySessionId: string | null = null;
+let memoryUtmSource: string | null = null;
+
+/** Keeps the first campaign source for the current browser until it converts. */
+export function captureUtmSource(): string | null {
+  if (typeof window === "undefined") return null;
+  const source = new URLSearchParams(window.location.search).get("utm_source")?.trim().slice(0, 100);
+  try {
+    const stored = window.localStorage.getItem(UTM_SOURCE_KEY)?.trim().slice(0, 100) || null;
+    if (stored) {
+      memoryUtmSource = stored;
+      return stored;
+    }
+    if (source) {
+      window.localStorage.setItem(UTM_SOURCE_KEY, source);
+      memoryUtmSource = source;
+      return source;
+    }
+  } catch {
+    if (memoryUtmSource) return memoryUtmSource;
+    if (source) memoryUtmSource = source;
+  }
+  return null;
+}
+
+export function clearCapturedUtmSource(): void {
+  memoryUtmSource = null;
+  try {
+    window.localStorage.removeItem(UTM_SOURCE_KEY);
+  } catch {
+    // The in-memory value has already been cleared.
+  }
+}
 
 function storedUuid(
   storage: Storage,

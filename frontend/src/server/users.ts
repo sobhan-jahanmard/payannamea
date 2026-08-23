@@ -36,7 +36,7 @@ export const adminUserUpdateSchema = z.object({
 
 type AdminUserRow = Pick<
   UserEntity,
-  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "created_at"
+  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "utm_source" | "created_at"
 > & {
   order_count: number;
 };
@@ -56,6 +56,7 @@ export function serializeAdminUser(user: AdminUserRow) {
     is_verified: user.is_verified,
     admin_followup_status: user.admin_followup_status,
     admin_note: user.admin_note ?? "",
+    utm_source: user.utm_source ?? null,
     order_count: Number(user.order_count ?? 0),
     created_at: iso(user.created_at)
   };
@@ -84,7 +85,7 @@ export async function listAdminUsers(rawQuery: unknown) {
 
   const [users, countRows, statusRows] = await Promise.all([
     dataSource.query(
-      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.created_at,
+      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.utm_source, u.created_at,
         count(o.id)::int as order_count
        from users u
        left join orders o on o.user_id = u.id

@@ -66,7 +66,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function buildNewFollowupReport(userRows: UserCandidateRow[]) {
+function buildFollowupReport(
+  userRows: UserCandidateRow[],
+  title: string,
+) {
   const candidatesByPhone = new Map<string, ReportCandidate>();
 
   // Include both regular OTP users and consultation requests, identified by verification status.
@@ -179,7 +182,7 @@ function buildNewFollowupReport(userRows: UserCandidateRow[]) {
       margin: 0 0 8px;
       color: #111827;
     ">
-      New follow-up candidates report
+      ${escapeHtml(title)}
     </h2>
 
     <p style="
@@ -301,9 +304,39 @@ export async function sendNewFollowupCandidatesReport() {
        order by u.created_at desc`,
     ) as UserCandidateRow[];
 
-  const report = buildNewFollowupReport(users);
+  const report = buildFollowupReport(users, "New follow-up candidates report");
 
   const sent = await email.sendNewFollowupCandidatesReport(
+    "",
+    report.body,
+    report.candidates.length,
+  );
+
+  return {
+    ...report,
+    sent,
+  };
+}
+
+export async function sendContactedFollowupCandidatesReport() {
+  const dataSource = await getDataSource();
+
+  const users = await dataSource.query(
+      `select
+        u.id,
+        u.phone,
+        u.is_verified,
+        u.created_at,
+        u.admin_note
+       from users u
+       where u.admin_followup_status = 'contacted'
+       and u.role = 'customer'
+       order by u.created_at desc`,
+    ) as UserCandidateRow[];
+
+  const report = buildFollowupReport(users, "Contacted follow-up candidates report");
+
+  const sent = await email.sendContactedFollowupCandidatesReport(
     "",
     report.body,
     report.candidates.length,

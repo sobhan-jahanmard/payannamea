@@ -151,6 +151,15 @@ class Email {
     const subject = `New follow-up candidates on Payanname Website (${count}) - ${formatIranDate(new Date())}}`;
     return this.sendHtml(subject, text, html);
   }
+
+  async sendContactedFollowupCandidatesReport(
+    text: string,
+    html: string,
+    count: number,
+  ): Promise<boolean> {
+    const subject = `Contacted follow-up candidates on Payanname Website (${count}) - ${formatIranDate(new Date())}`;
+    return this.sendHtml(subject, text, html);
+  }
 }
 
 export const email = new Email();

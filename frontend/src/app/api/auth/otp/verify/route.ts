@@ -11,13 +11,14 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   phone: z.string().min(1).max(40),
   challenge_id: z.string().uuid(),
-  code: z.string().regex(/^\d{4,8}$/)
+  code: z.string().regex(/^\d{4,8}$/),
+  utm_source: z.string().trim().min(1).max(100).nullable().optional()
 });
 
 export async function POST(request: Request) {
   try {
     const payload = schema.parse(await request.json());
-    const user = await verifyOtp(payload.phone, payload.challenge_id, payload.code);
+    const user = await verifyOtp(payload.phone, payload.challenge_id, payload.code, payload.utm_source);
     return json({
       access_token: createAccessToken(user),
       token_type: "bearer",

@@ -120,8 +120,9 @@ export async function requestOtp(rawPhone: string): Promise<{ challenge_id: stri
   };
 }
 
-export async function verifyOtp(rawPhone: string, challengeId: string, code: string) {
+export async function verifyOtp(rawPhone: string, challengeId: string, code: string, rawUtmSource?: string | null) {
   const phone = normalizeIranianPhone(rawPhone);
+  const utmSource = rawUtmSource?.trim().slice(0, 100) || null;
   const dataSource = await getDataSource();
 
   const result = await dataSource.transaction(async (manager) => {
@@ -163,11 +164,16 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
         role: "customer",
         is_verified: true,
         reset_token_hash: null,
-        reset_token_expires_at: null
+        reset_token_expires_at: null,
+        utm_source: utmSource
       });
       isNewUser = true;
     } else if (!user.is_verified) {
       user.is_verified = true;
+      if (!user.utm_source && utmSource) user.utm_source = utmSource;
+      user = await userRepo.save(user);
+    } else if (!user.utm_source && utmSource) {
+      user.utm_source = utmSource;
       user = await userRepo.save(user);
     }
     return { user, isNewUser };

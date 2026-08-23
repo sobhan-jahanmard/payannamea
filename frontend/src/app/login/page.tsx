@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useAuth } from "../../components/auth/AuthProvider";
-import { trackAnalyticsEvent } from "../../lib/analytics";
+import { captureUtmSource, clearCapturedUtmSource, trackAnalyticsEvent } from "../../lib/analytics";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -59,7 +59,8 @@ export default function LoginPage() {
     if (!challengeId) return;
     setError(null);
     try {
-      await verifyOtp({ phone, challenge_id: challengeId, code: values.code.trim() });
+      await verifyOtp({ phone, challenge_id: challengeId, code: values.code.trim(), utm_source: captureUtmSource() });
+      clearCapturedUtmSource();
       trackAnalyticsEvent("customer_login_completed");
       router.push("/orders");
     } catch (verifyError) {

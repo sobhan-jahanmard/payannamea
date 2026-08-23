@@ -1,3 +1,5 @@
+import { captureUtmSource, clearCapturedUtmSource } from "./analytics";
+
 interface ConsultationResponse {
   id: string;
   message: string;
@@ -9,7 +11,7 @@ export async function requestFreeConsultation(phone: string): Promise<Consultati
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ phone, source: "landing_page" }),
+    body: JSON.stringify({ phone, source: "landing_page", utm_source: captureUtmSource() }),
   });
 
   const body = (await response.json().catch(() => null)) as
@@ -29,5 +31,6 @@ export async function requestFreeConsultation(phone: string): Promise<Consultati
     throw new Error("پاسخ نامعتبر از سرور دریافت شد.");
   }
 
+  clearCapturedUtmSource();
   return { id: body.id, message: body.message };
 }

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:create-admin": "tsx src/server/scripts/create-admin.ts",
-    "report-followups": "tsx src/server/scripts/send-new-followups-report.ts"
+    "report-followups": "tsx src/server/scripts/send-new-followups-report.ts",
+    "report-contacted-followups": "tsx src/server/scripts/send-contacted-followups-report.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
