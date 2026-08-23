@@ -80,6 +80,7 @@ export interface OrderEntity {
   created_at: Date;
   updated_at: Date;
   customer?: UserEntity;
+  created_by?: UserEntity | null;
   files?: OrderFileEntity[];
   references?: OrderReferenceEntity[];
   status_logs?: OrderStatusLogEntity[];
@@ -312,6 +313,13 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
       inverseSide: "orders",
       joinColumn: { name: "user_id" },
       onDelete: "CASCADE"
+    },
+    created_by: {
+      type: "many-to-one",
+      target: "User",
+      joinColumn: { name: "created_by_user_id" },
+      onDelete: "SET NULL",
+      nullable: true
     },
     files: { type: "one-to-many", target: "OrderFile", inverseSide: "order" },
     references: { type: "one-to-many", target: "OrderReference", inverseSide: "order" },

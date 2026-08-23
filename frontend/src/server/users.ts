@@ -162,8 +162,14 @@ export async function deleteAdminUser(userId: string) {
     throw new ApiError(403, "Admin users cannot be deleted");
   }
 
-  // orders.user_id is ON DELETE CASCADE; each order's dependent records also cascade.
-  await repo.delete({ id });
+  await dataSource.transaction(async (manager) => {
+    if (user.role === "operator") {
+      // Remove orders created by this operator; their dependent records cascade from orders.
+      await manager.query("delete from orders where created_by_user_id = $1", [id]);
+    }
+    // orders.user_id is ON DELETE CASCADE; each order's dependent records also cascade.
+    await manager.getRepository(UserSchema).delete({ id });
+  });
 }
 
 export async function findCustomerByPhone(rawPhone: string): Promise<UserEntity> {

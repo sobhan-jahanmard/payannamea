@@ -110,6 +110,7 @@ function AdminPanel() {
                 </span>
                 <span>{formatDateTime(order.created_at)}</span>
               </div>
+              {order.created_by?.role === "operator" ? <p className="text-xs text-primary">ثبت‌شده توسط اپراتور: {order.created_by.full_name ?? order.created_by.username ?? order.created_by.email ?? "بدون نام"}</p> : null}
             </a>
           ))}
           {orders.length === 0 ? (

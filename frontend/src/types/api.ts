@@ -184,6 +184,7 @@ export interface Order {
   created_at: string;
   updated_at: string;
   customer: User;
+  created_by?: User | null;
   files?: OrderFile[];
   references?: OrderReference[];
   status_logs?: StatusLog[];

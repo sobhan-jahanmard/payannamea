@@ -37,9 +37,11 @@ function OrdersList() {
     <main className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal">{user?.role === "customer" ? "سفارش‌های من" : "سفارش‌های ثبت‌شده توسط من"}</h1>
+          <h1 className="text-2xl font-semibold tracking-normal">{user?.role === "admin" ? "همه سفارش‌ها" : user?.role === "customer" ? "سفارش‌های من" : "سفارش‌های ثبت‌شده توسط من"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {user?.role === "customer"
+            {user?.role === "admin"
+              ? "همه سفارش‌های ثبت‌شده در سایت در این صفحه دیده می‌شوند."
+              : user?.role === "customer"
               ? <>همه سفارش‌های ثبت‌شده با شماره <span className="ltr inline-block">{user.phone}</span> در این صفحه دیده می‌شود.</>
               : "در این صفحه فقط سفارش‌هایی را می‌بینید که خودتان برای مشتریان ثبت کرده‌اید."}
           </p>
@@ -66,7 +68,7 @@ function OrdersList() {
             {orders.map((order) => (
               <Link
                 key={order.id}
-                href={`/status?order=${encodeURIComponent(order.id)}`}
+                href={user?.role === "admin" ? `/admin/orders/${encodeURIComponent(order.id)}` : `/status?order=${encodeURIComponent(order.id)}`}
                 className="grid gap-3 rounded-md border border-border bg-white p-4 transition hover:bg-muted lg:grid-cols-[1fr_auto]"
               >
                 <div className="min-w-0">
@@ -84,6 +86,7 @@ function OrdersList() {
                     <span>{order.university}</span>
                     <span>مهلت: {formatDate(order.deadline)}</span>
                   </div>
+                  {user?.role === "admin" && order.created_by?.role === "operator" ? <p className="mt-2 text-xs text-primary">ثبت‌شده توسط اپراتور: {order.created_by.full_name ?? order.created_by.username ?? order.created_by.email ?? "بدون نام"}</p> : null}
                 </div>
                 <div className="flex items-end justify-between gap-3 lg:flex-col lg:items-end">
                   <span className="text-sm text-muted-foreground">{formatDateTime(order.created_at)}</span>

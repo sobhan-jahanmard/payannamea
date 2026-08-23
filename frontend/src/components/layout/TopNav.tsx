@@ -29,7 +29,7 @@ export function TopNav() {
       ? [{ href: "/order", label: user && !isCustomer ? "ثبت سفارش برای مشتری" : "ثبت سفارش", icon: ClipboardList }]
       : []),
     ...(canUseCustomerPages
-      ? [{ href: "/orders", label: user && !isCustomer ? "سفارش‌های ثبت‌شده" : "سفارش‌های من", icon: ListOrdered }]
+      ? [{ href: "/orders", label: isAdmin ? "همه سفارش‌ها" : user && !isCustomer ? "سفارش‌های ثبت‌شده" : "سفارش‌های من", icon: ListOrdered }]
       : []),
     ...(canFollowUp ? [{ href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck }] : []),
     ...(isAdmin

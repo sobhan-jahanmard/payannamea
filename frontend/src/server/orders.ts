@@ -153,6 +153,7 @@ export const paymentNoteSchema = z.object({
 
 const detailRelations = {
   customer: true,
+  created_by: true,
   files: true,
   references: true,
   status_logs: true,
@@ -365,7 +366,8 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     moarref_code: order.moarref_code,
     created_at: iso(order.created_at),
     updated_at: iso(order.updated_at),
-    customer: serializeUser(order.customer)
+    customer: serializeUser(order.customer),
+    created_by: order.created_by?.role === "operator" ? serializeUser(order.created_by) : null
   };
 
   if (!detail) {
@@ -586,7 +588,7 @@ export async function listCustomerOrders(user: UserEntity): Promise<OrderEntity[
   const dataSource = await getDataSource();
   return dataSource.getRepository(OrderSchema).find({
     where: user.role === "customer" ? { user_id: user.id } : { created_by_user_id: user.id },
-    relations: { customer: true },
+    relations: { customer: true, created_by: true },
     order: { created_at: "DESC" }
   });
 }
@@ -595,7 +597,7 @@ export async function listAdminOrders(statusFilter: string | null): Promise<Orde
   const dataSource = await getDataSource();
   return dataSource.getRepository(OrderSchema).find({
     where: statusFilter ? { status: statusFilter as OrderStatus } : {},
-    relations: { customer: true },
+    relations: { customer: true, created_by: true },
     order: { created_at: "DESC" }
   });
 }

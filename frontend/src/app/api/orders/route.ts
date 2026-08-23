@@ -1,5 +1,5 @@
 import { getCurrentUser, isStaffRole } from "../../../server/auth";
-import { createCustomerOrder, listCustomerOrders, serializeOrder } from "../../../server/orders";
+import { createCustomerOrder, listAdminOrders, listCustomerOrders, serializeOrder } from "../../../server/orders";
 import { errorResponse, json } from "../../../server/http";
 import { findOrCreateCustomerByPhone } from "../../../server/users";
 import { z } from "zod";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser(request);
-    const orders = await listCustomerOrders(user);
+    const orders = user.role === "admin" ? await listAdminOrders(null) : await listCustomerOrders(user);
     return json(orders.map((order) => serializeOrder(order, false)));
   } catch (error) {
     return errorResponse(error);
