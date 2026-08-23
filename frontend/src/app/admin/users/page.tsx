@@ -7,6 +7,7 @@ import {
   RefreshCcw,
   Save,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -17,7 +18,7 @@ import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Select } from "../../../components/ui/select";
 import { Textarea } from "../../../components/ui/textarea";
-import { getAdminUsers, updateAdminUser } from "../../../lib/api";
+import { deleteAdminUser, getAdminUsers, updateAdminUser } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/format";
 import type {
   AdminUsersResponse,
@@ -136,6 +137,30 @@ function AdminUsersPanel() {
           ? updateError.message
           : "ذخیره تغییرات ناموفق بود",
       );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function removeUser(id: string, role: "customer" | "operator" | "admin") {
+    if (role === "admin") return;
+    if (!window.confirm("کاربر و تمام سفارش‌ها و اطلاعات وابسته به او حذف شوند؟ این عملیات قابل بازگشت نیست.")) return;
+    setUpdatingId(id);
+    setError(null);
+    try {
+      await deleteAdminUser(id);
+      setData((current) => current ? {
+        ...current,
+        users: current.users.filter((user) => user.id !== id),
+        pagination: { ...current.pagination, total: Math.max(0, current.pagination.total - 1) }
+      } : current);
+      setDrafts((current) => {
+        const { [id]: _deleted, ...rest } = current;
+        return rest;
+      });
+      void load(page);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "حذف کاربر ناموفق بود");
     } finally {
       setUpdatingId(null);
     }
@@ -336,16 +361,32 @@ function AdminUsersPanel() {
                     />
                   </td>
                   <td className="p-3">
-                    <Button
-                      type="button"
-                      size="sm"
-                      loading={isSaving}
-                      disabled={updatingId !== null && !isSaving}
-                      onClick={() => void saveUser(user.id)}
-                    >
-                      <Save className="h-4 w-4" />
-                      ذخیره
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        loading={isSaving}
+                        disabled={updatingId !== null && !isSaving}
+                        onClick={() => void saveUser(user.id)}
+                      >
+                        <Save className="h-4 w-4" />
+                        ذخیره
+                      </Button>
+                      {user.role !== "admin" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+                          disabled={updatingId !== null}
+                          onClick={() => void removeUser(user.id, user.role)}
+                          title="حذف کاربر و اطلاعات وابسته"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          حذف
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );

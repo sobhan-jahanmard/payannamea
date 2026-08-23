@@ -108,6 +108,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(Array.isArray(message) ? JSON.stringify(message) : message);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -255,6 +259,12 @@ export async function updateAdminUser(
   return request<AdminUser>("/api/admin/users", {
     method: "PATCH",
     body: JSON.stringify({ id, ...changes })
+  });
+}
+
+export async function deleteAdminUser(id: string): Promise<void> {
+  await request<unknown>(`/api/admin/users?id=${encodeURIComponent(id)}`, {
+    method: "DELETE"
   });
 }
 

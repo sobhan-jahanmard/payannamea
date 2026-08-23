@@ -147,3 +147,17 @@ export async function updateAdminUser(rawInput: unknown) {
   const orderRows = await dataSource.query("select count(*)::int as count from orders where user_id = $1", [saved.id]);
   return serializeAdminUser({ ...saved, order_count: orderRows[0]?.count ?? 0 });
 }
+
+export async function deleteAdminUser(userId: string) {
+  const id = z.string().uuid().parse(userId);
+  const dataSource = await getDataSource();
+  const repo = dataSource.getRepository(UserSchema);
+  const user = await repo.findOneBy({ id });
+  if (!user) throw new ApiError(404, "User not found");
+  if (user.role === "admin") {
+    throw new ApiError(403, "Admin users cannot be deleted");
+  }
+
+  // orders.user_id is ON DELETE CASCADE; each order's dependent records also cascade.
+  await repo.delete({ id });
+}
