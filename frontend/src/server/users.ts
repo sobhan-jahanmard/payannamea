@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import { getDataSource } from "./db/data-source";
 import { UserSchema, type UserEntity, type UserFollowupStatus } from "./db/entities";
 import { ApiError } from "./http";
+import { normalizeIranianPhone } from "./otp";
 
 export const adminUserQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
@@ -161,4 +164,44 @@ export async function deleteAdminUser(userId: string) {
 
   // orders.user_id is ON DELETE CASCADE; each order's dependent records also cascade.
   await repo.delete({ id });
+}
+
+export async function findCustomerByPhone(rawPhone: string): Promise<UserEntity> {
+  const phone = normalizeIranianPhone(rawPhone);
+  const user = await (await getDataSource()).getRepository(UserSchema).findOneBy({ phone, role: "customer" });
+  if (!user) throw new ApiError(404, "Customer user not found");
+  return user;
+}
+
+export async function findOrCreateCustomerByPhone(rawPhone: string): Promise<UserEntity> {
+  const phone = normalizeIranianPhone(rawPhone);
+  const dataSource = await getDataSource();
+
+  return dataSource.transaction(async (manager) => {
+    await manager.query("select pg_advisory_xact_lock(hashtext($1))", [phone]);
+    const repo = manager.getRepository(UserSchema);
+    const existing = await repo.findOneBy({ phone });
+    if (existing) {
+      if (existing.role !== "customer") {
+        throw new ApiError(409, "This phone number belongs to a staff account");
+      }
+      return existing;
+    }
+
+    return repo.save({
+      id: randomUUID(),
+      phone,
+      full_name: null,
+      email: null,
+      username: null,
+      password_hash: null,
+      role: "customer",
+      is_verified: false,
+      admin_followup_status: "new",
+      admin_note: "",
+      utm_source: null,
+      reset_token_hash: null,
+      reset_token_expires_at: null
+    });
+  });
 }

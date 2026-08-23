@@ -33,6 +33,7 @@ const statements = [
   `create table if not exists orders (
     id varchar(36) primary key,
     user_id varchar(36) not null references users(id) on delete cascade,
+    created_by_user_id varchar(36) references users(id) on delete set null,
     status varchar(32) not null default 'submitted',
     payment_status varchar(32) not null default 'not_paid',
     moarref_payment_status varchar(32) not null default 'not_paid',
@@ -74,6 +75,8 @@ const statements = [
     updated_at timestamptz not null default now()
   )`,
   `create index if not exists ix_orders_created_at on orders(created_at)`,
+  `alter table orders add column if not exists created_by_user_id varchar(36) references users(id) on delete set null`,
+  `create index if not exists ix_orders_created_by_user_id on orders(created_by_user_id)`,
   `create index if not exists ix_orders_status on orders(status)`,
   `alter table orders add column if not exists student_name varchar(255)`,
   `alter table orders add column if not exists student_number varchar(80)`,

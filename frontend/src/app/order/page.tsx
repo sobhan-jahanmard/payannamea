@@ -261,6 +261,8 @@ function FileSummary({ files, onRemove }: { files: File[]; onRemove: (index: num
 function OrderForm() {
   const { user } = useAuth();
   const router = useRouter();
+  const isStaff = user?.role === "operator" || user?.role === "admin";
+  const [customerPhone, setCustomerPhone] = useState("");
   const [step, setStep] = useState(0);
   const [maxVisitedStep, setMaxVisitedStep] = useState(0);
   const [guidelineFiles, setGuidelineFiles] = useState<File[]>([]);
@@ -408,8 +410,13 @@ function OrderForm() {
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
     setCreatedOrder(null);
+    if (isStaff && !customerPhone.trim()) {
+      setSubmitError("شماره موبایل مشتری را وارد کنید.");
+      return;
+    }
 
     const payload: OrderCreatePayload = {
+      ...(isStaff ? { customer_phone: customerPhone.trim() } : {}),
       correspondence_email: values.correspondence_email.trim(),
       degree: values.degree,
       university: values.university,
@@ -483,9 +490,26 @@ function OrderForm() {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-normal">ثبت سفارش خدمات دانشگاهی</h1>
+            <h1 className="text-2xl font-semibold tracking-normal">{isStaff ? "ثبت سفارش برای مشتری" : "ثبت سفارش خدمات دانشگاهی"}</h1>
             <p className="mt-1 text-sm text-muted-foreground">ابتدا نوع سفارش را انتخاب کنید، سپس مشخصات دانشگاهی، فایل‌ها و منابع لازم را وارد کنید تا سفارش برای بررسی مدیر ارسال شود.</p>
-            {user ? (
+            {isStaff ? (
+              <div className="mt-3 max-w-sm space-y-2">
+                <Label htmlFor="customer-phone">شماره موبایل مشتری</Label>
+                <Input
+                  id="customer-phone"
+                  className="ltr text-left"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  maxLength={40}
+                  placeholder="09123456789"
+                  value={customerPhone}
+                  onChange={(event) => setCustomerPhone(event.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">سفارش در پنل همین مشتری ثبت می‌شود و فقط در فهرست سفارش‌های ثبت‌شدهٔ شما نمایش داده خواهد شد.</p>
+              </div>
+            ) : user ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 سفارش با حساب <span className="ltr inline-block">{user.phone}</span> ثبت می‌شود.
               </p>

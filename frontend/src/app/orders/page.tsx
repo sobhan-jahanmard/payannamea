@@ -37,9 +37,11 @@ function OrdersList() {
     <main className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal">سفارش‌های من</h1>
+          <h1 className="text-2xl font-semibold tracking-normal">{user?.role === "customer" ? "سفارش‌های من" : "سفارش‌های ثبت‌شده توسط من"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            همه سفارش‌های ثبت‌شده با شماره <span className="ltr inline-block">{user?.phone}</span> در این صفحه دیده می‌شود.
+            {user?.role === "customer"
+              ? <>همه سفارش‌های ثبت‌شده با شماره <span className="ltr inline-block">{user.phone}</span> در این صفحه دیده می‌شود.</>
+              : "در این صفحه فقط سفارش‌هایی را می‌بینید که خودتان برای مشتریان ثبت کرده‌اید."}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">

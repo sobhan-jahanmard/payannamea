@@ -400,7 +400,10 @@ export async function getOrderOr404(orderId: string, manager?: EntityManager): P
 
 export async function getOrderForUserOr404(orderId: string, user: UserEntity): Promise<OrderEntity> {
   const order = await getOrderOr404(orderId);
-  if (user.role !== "admin" && order.user_id !== user.id) {
+  const canAccess = user.role === "admin"
+    || (user.role === "operator" && order.created_by_user_id === user.id)
+    || (user.role === "customer" && order.user_id === user.id);
+  if (!canAccess) {
     throw new ApiError(404, "Order not found");
   }
   return order;
@@ -440,7 +443,7 @@ export async function setOrderStatus(
   });
 }
 
-export async function createCustomerOrder(user: UserEntity, rawPayload: unknown): Promise<OrderEntity> {
+export async function createCustomerOrder(user: UserEntity, rawPayload: unknown, createdBy?: UserEntity): Promise<OrderEntity> {
   const payload = orderCreateSchema.parse(rawPayload);
   const dataSource = await getDataSource();
   const orderId = randomUUID();
@@ -449,6 +452,7 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
     const order = manager.getRepository(OrderSchema).create({
       id: orderId,
       user_id: user.id,
+      created_by_user_id: createdBy?.id ?? null,
       status: "submitted",
       payment_status: "not_paid",
       moarref_payment_status: "not_paid",
@@ -501,8 +505,8 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown)
       order_id: order.id,
       from_status: null,
       to_status: "submitted",
-      actor: "customer",
-      notes: "سفارش ثبت شد و برای بررسی مدیر ارسال شد."
+      actor: createdBy?.role ?? "customer",
+      notes: createdBy ? "سفارش توسط کارکنان ثبت شد و برای بررسی مدیر ارسال شد." : "سفارش ثبت شد و برای بررسی مدیر ارسال شد."
     });
   });
 
@@ -581,7 +585,7 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
 export async function listCustomerOrders(user: UserEntity): Promise<OrderEntity[]> {
   const dataSource = await getDataSource();
   return dataSource.getRepository(OrderSchema).find({
-    where: { user_id: user.id },
+    where: user.role === "customer" ? { user_id: user.id } : { created_by_user_id: user.id },
     relations: { customer: true },
     order: { created_at: "DESC" }
   });

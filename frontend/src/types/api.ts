@@ -203,6 +203,7 @@ export interface ReferenceInput {
 }
 
 export interface OrderCreatePayload {
+  customer_phone?: string;
   correspondence_email: string;
   degree: string;
   university: string;
@@ -233,7 +234,7 @@ export interface OrderCreatePayload {
   references: ReferenceInput[];
 }
 
-export type OrderUpdatePayload = OrderCreatePayload;
+export type OrderUpdatePayload = Omit<OrderCreatePayload, "customer_phone">;
 
 export interface AnalyticsEventRecord {
   id: string;

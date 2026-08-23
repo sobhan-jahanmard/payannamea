@@ -22,14 +22,14 @@ export function TopNav() {
   const pathname = usePathname() ?? "/";
   const { user, isAdmin, canFollowUp, logout } = useAuth();
   const isCustomer = user?.role === "customer";
-  const canUseCustomerPages = Boolean(user && user.role !== "admin");
+  const canUseCustomerPages = Boolean(user);
   const navItems = [
     { href: "/", label: "خانه", icon: Home },
     ...(!user || canUseCustomerPages
-      ? [{ href: "/order", label: "ثبت سفارش", icon: ClipboardList }]
+      ? [{ href: "/order", label: user && !isCustomer ? "ثبت سفارش برای مشتری" : "ثبت سفارش", icon: ClipboardList }]
       : []),
     ...(canUseCustomerPages
-      ? [{ href: "/orders", label: "سفارش‌های من", icon: ListOrdered }]
+      ? [{ href: "/orders", label: user && !isCustomer ? "سفارش‌های ثبت‌شده" : "سفارش‌های من", icon: ListOrdered }]
       : []),
     ...(canFollowUp ? [{ href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck }] : []),
     ...(isAdmin

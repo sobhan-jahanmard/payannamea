@@ -39,6 +39,7 @@ export interface UserEntity {
 export interface OrderEntity {
   id: string;
   user_id: string;
+  created_by_user_id: string | null;
   status: OrderStatus;
   payment_status: PaymentStatus;
   moarref_payment_status: PaymentStatus;
@@ -259,6 +260,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
   columns: {
     id: idColumn,
     user_id: { type: String, length: 36 },
+    created_by_user_id: { type: String, length: 36, nullable: true },
     status: { type: String, length: 32, default: "submitted" },
     payment_status: { type: String, length: 32, default: "not_paid" },
     moarref_payment_status: { type: String, length: 32, default: "not_paid" },
