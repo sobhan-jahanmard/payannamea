@@ -499,7 +499,7 @@ function OrderForm() {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-normal">{isStaff ? "ثبت سفارش برای مشتری" : "ثبت سفارش خدمات دانشگاهی"}</h1>
+            <h1 className="text-2xl font-semibold tracking-normal">{isStaff ? "ثبت سفارش برای مشتری" : "ثبت سفارش در دانشیار"}</h1>
             <p className="mt-1 text-sm text-muted-foreground">ابتدا نوع سفارش را انتخاب کنید، سپس مشخصات دانشگاهی، فایل‌ها و منابع لازم را وارد کنید تا سفارش برای بررسی مدیر ارسال شود.</p>
             {user && !isStaff ? (
               <p className="mt-2 text-xs text-muted-foreground">

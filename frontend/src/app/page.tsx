@@ -15,7 +15,7 @@ import {
 import { Button } from "../components/ui/button";
 import { FreeConsultationForm } from "../components/landing/FreeConsultationForm";
 
-const ORDER_DISCOUNT_PERCENT: number = 30;
+const ORDER_DISCOUNT_PERCENT: number = 0;
 const ORDER_DISCOUNT_LABEL = ORDER_DISCOUNT_PERCENT.toLocaleString("fa-IR");
 
 const steps = [
@@ -122,6 +122,21 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.28),transparent_30%)]" />
         <div className="relative mx-auto grid min-h-[calc(100svh-64px)] w-full max-w-7xl items-center gap-6 px-4 pb-24 pt-16 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
           <div className="max-w-2xl rounded-lg border border-white/16 bg-slate-950/62 p-5 text-white shadow-2xl shadow-slate-950/35 backdrop-blur-[32px] hero-text-shadow sm:p-7">
+            <div className="mb-5 flex items-center gap-3">
+              <Image
+                src="/images/daneshyar-logo.png"
+                alt="لوگوی دانشیار"
+                width={56}
+                height={56}
+                className="h-14 w-14 rounded-lg bg-white/95 object-contain p-1"
+              />
+              <div>
+                <p className="text-xl font-bold">دانشیار</p>
+                <p className="text-sm text-slate-200">
+                  همراه مسیر دانشگاهی شما
+                </p>
+              </div>
+            </div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-amber-200/70 bg-amber-300 px-3 py-2 text-sm font-medium text-slate-950 shadow-sm">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />
               پایان‌نامه کارشناسی، ارشد، رساله، پروپوزال، تحقیق و ارائه

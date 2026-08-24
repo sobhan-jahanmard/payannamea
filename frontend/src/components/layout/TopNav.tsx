@@ -12,6 +12,7 @@ import {
   SearchCheck,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -49,13 +50,17 @@ export function TopNav() {
           className="flex items-center gap-3"
           data-analytics-event="nav_brand_clicked"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <ClipboardList className="h-5 w-5" aria-hidden="true" />
-          </div>
+          <Image
+            src="/images/daneshyar-logo.png"
+            alt="لوگوی دانشیار"
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-md object-contain"
+          />
           <div>
-            <p className="text-base font-semibold leading-5">خدمات دانشگاهی</p>
+            <p className="text-base font-semibold leading-5">دانشیار</p>
             <p className="text-xs text-muted-foreground">
-              ثبت، انجام و پیگیری سفارش
+              خدمات دانشگاهی
             </p>
           </div>
         </Link>

@@ -7,8 +7,12 @@ import { TopNav } from "../components/layout/TopNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "سامانه خدمات دانشگاهی",
-  description: "ثبت، پیگیری و مدیریت سفارش پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه",
+  title: "دانشیار | خدمات دانشگاهی",
+  description: "دانشیار؛ ثبت، پیگیری و مدیریت سفارش پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه",
+  icons: {
+    icon: "/images/daneshyar-logo.png",
+    apple: "/images/daneshyar-logo.png",
+  },
 };
 
 export default function RootLayout({

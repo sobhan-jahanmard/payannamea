@@ -102,7 +102,7 @@ class Email {
   }
 
   async sendNewUserSignup(phone: string): Promise<boolean> {
-    const subject = `New user signup on Payanname Website}`;
+    const subject = "New user signup on Daneshyar Website";
     return this.send(
       subject,
       `A new user signed up with phone number ${phone}`,
@@ -117,7 +117,7 @@ class Email {
     university: string;
     customer?: { phone: string | null };
   }): Promise<boolean> {
-    const subject = `New order on Payanname Website}`;
+    const subject = "New order on Daneshyar Website";
     return this.send(
       subject,
       `Order ID: ${order.id}`,
@@ -133,7 +133,7 @@ class Email {
     phone: string,
     repeated: boolean,
   ): Promise<boolean> {
-    const subject = `Free consultation request on Payanname Website}`;
+    const subject = "Free consultation request on Daneshyar Website";
     return this.send(
       subject,
       `Phone: ${phone}`,
@@ -148,7 +148,7 @@ class Email {
     html: string,
     count: number,
   ): Promise<boolean> {
-    const subject = `New follow-up candidates on Payanname Website (${count}) - ${formatIranDate(new Date())}}`;
+    const subject = `New follow-up candidates on Daneshyar Website (${count}) - ${formatIranDate(new Date())}`;
     return this.sendHtml(subject, text, html);
   }
 
@@ -157,7 +157,7 @@ class Email {
     html: string,
     count: number,
   ): Promise<boolean> {
-    const subject = `Contacted follow-up candidates on Payanname Website (${count}) - ${formatIranDate(new Date())}`;
+    const subject = `Contacted follow-up candidates on Daneshyar Website (${count}) - ${formatIranDate(new Date())}`;
     return this.sendHtml(subject, text, html);
   }
 }
