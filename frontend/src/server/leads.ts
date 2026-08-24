@@ -24,11 +24,12 @@ export async function createConsultationUser(rawInput: unknown) {
     const existing = await repo.findOneBy({ phone });
     if (existing) {
       if (!existing.utm_source && input.utm_source) existing.utm_source = input.utm_source;
-      if (existing.role === "customer" && !existing.is_verified) {
+      const notify = existing.role === "customer" && existing.admin_followup_status !== "new";
+      if (existing.role === "customer") {
         existing.admin_followup_status = "new";
       }
       await repo.save(existing);
-      return { user: existing, repeated: true, notify: false };
+      return { user: existing, repeated: true, notify };
     }
 
     const user = await repo.save({

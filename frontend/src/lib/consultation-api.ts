@@ -1,17 +1,20 @@
 import { captureUtmSource, clearCapturedUtmSource } from "./analytics";
+import { getStoredToken } from "./api";
 
 interface ConsultationResponse {
   id: string;
   message: string;
 }
 
-export async function requestFreeConsultation(phone: string): Promise<ConsultationResponse> {
+export async function requestFreeConsultation(): Promise<ConsultationResponse> {
+  const token = getStoredToken();
   const response = await fetch("/api/leads", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ phone, source: "landing_page", utm_source: captureUtmSource() }),
+    body: JSON.stringify({ source: "landing_page", utm_source: captureUtmSource() }),
   });
 
   const body = (await response.json().catch(() => null)) as

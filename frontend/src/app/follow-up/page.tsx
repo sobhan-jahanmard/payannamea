@@ -100,8 +100,8 @@ function FollowUpPanel() {
       <div>
         <h1 className="text-2xl font-semibold">پیگیری شماره تلفن</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          شماره را جست‌وجو کنید تا درخواست‌های مشاورهٔ تأییدنشده نمایش داده
-          شوند.
+          شماره را جست‌وجو کنید تا درخواست مشاوره و وضعیت پیگیری آن نمایش داده
+          شود.
         </p>
       </div>
       <section className="tool-surface grid gap-4 p-5 sm:grid-cols-[1fr_auto] sm:items-end">

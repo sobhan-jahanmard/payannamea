@@ -28,7 +28,7 @@ export async function findPhoneFollowup(rawQuery: unknown) {
       .leftJoin("orders", "order", "order.user_id = user.id")
       .select(["user.id", "user.full_name", "user.email", "user.phone", "user.role", "user.admin_followup_status", "user.admin_note", "user.created_at"])
       .addSelect("count(order.id)", "order_count")
-      .where("user.phone = :phone and user.role = 'customer' and user.is_verified = false", { phone })
+      .where("user.phone = :phone and user.role = 'customer'", { phone })
       .groupBy("user.id")
       .getRawAndEntities();
 
@@ -44,7 +44,7 @@ export async function updatePhoneFollowup(rawInput: unknown) {
   const repo = (await getDataSource()).getRepository(UserSchema);
   const user = await repo.findOneBy({ id: input.id });
   if (!user) throw new ApiError(404, "User not found");
-  if (user.role !== "customer" || user.is_verified) throw new ApiError(403, "Only unverified customer users can be followed up");
+  if (user.role !== "customer") throw new ApiError(403, "Only customer users can be followed up");
   return updateAdminUser({
     id: input.id,
     admin_followup_status: input.admin_followup_status,
