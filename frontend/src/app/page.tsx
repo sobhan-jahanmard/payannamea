@@ -16,7 +16,7 @@ import { Button } from "../components/ui/button";
 
 import { FreeConsultationForm } from "../components/landing/FreeConsultationForm";
 
-const ORDER_DISCOUNT_PERCENT: number = 0;
+const ORDER_DISCOUNT_PERCENT: number = 20;
 const ORDER_DISCOUNT_LABEL = ORDER_DISCOUNT_PERCENT.toLocaleString("fa-IR");
 
 const steps = [
