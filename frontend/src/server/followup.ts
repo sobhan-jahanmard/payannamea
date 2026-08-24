@@ -26,7 +26,7 @@ export async function findPhoneFollowup(rawQuery: unknown) {
   const user = await dataSource.getRepository(UserSchema)
       .createQueryBuilder("user")
       .leftJoin("orders", "order", "order.user_id = user.id")
-      .select(["user.id", "user.full_name", "user.email", "user.phone", "user.role", "user.admin_followup_status", "user.admin_note", "user.created_at"])
+      .select(["user.id", "user.full_name", "user.email", "user.phone", "user.role", "user.admin_followup_status", "user.admin_note", "user.created_at", "user.updated_at"])
       .addSelect("count(order.id)", "order_count")
       .where("user.phone = :phone and user.role = 'customer'", { phone })
       .groupBy("user.id")

@@ -20,6 +20,7 @@ export interface User {
   is_verified: boolean;
   username?: string | null;
   created_at: string;
+  updated_at?: string | null;
 }
 
 export interface AdminUser extends User {

@@ -33,6 +33,7 @@ export interface UserEntity {
   reset_token_hash: string | null;
   reset_token_expires_at: Date | null;
   created_at: Date;
+  updated_at: Date;
   orders?: OrderEntity[];
 }
 
@@ -239,7 +240,8 @@ export const UserSchema = new EntitySchema<UserEntity>({
     utm_source: { type: String, length: 100, nullable: true },
     reset_token_hash: { type: String, length: 128, nullable: true },
     reset_token_expires_at: { type: "timestamptz", nullable: true },
-    created_at: createdAtColumn
+    created_at: createdAtColumn,
+    updated_at: { type: "timestamptz", updateDate: true }
   },
   indices: [
     { name: "ix_users_role", columns: ["role"] },

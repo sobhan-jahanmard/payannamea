@@ -39,7 +39,7 @@ export const adminUserUpdateSchema = z.object({
 
 type AdminUserRow = Pick<
   UserEntity,
-  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "utm_source" | "created_at"
+  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "utm_source" | "created_at" | "updated_at"
 > & {
   order_count: number;
 };
@@ -61,7 +61,8 @@ export function serializeAdminUser(user: AdminUserRow) {
     admin_note: user.admin_note ?? "",
     utm_source: user.utm_source ?? null,
     order_count: Number(user.order_count ?? 0),
-    created_at: iso(user.created_at)
+    created_at: iso(user.created_at),
+    updated_at: iso(user.updated_at)
   };
 }
 
@@ -88,13 +89,13 @@ export async function listAdminUsers(rawQuery: unknown) {
 
   const [users, countRows, statusRows] = await Promise.all([
     dataSource.query(
-      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.utm_source, u.created_at,
+      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.utm_source, u.created_at, u.updated_at,
         count(o.id)::int as order_count
        from users u
        left join orders o on o.user_id = u.id
        ${where}
        group by u.id
-       order by u.created_at desc
+       order by u.updated_at desc, u.id desc
        limit $${values.length + 1} offset $${values.length + 2}`,
       [...values, query.limit, offset]
     ),

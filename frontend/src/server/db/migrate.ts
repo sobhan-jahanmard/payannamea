@@ -16,7 +16,8 @@ const statements = [
     admin_note text not null default '',
     reset_token_hash varchar(128),
     reset_token_expires_at timestamptz,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
   )`,
   `create index if not exists ix_users_role on users(role)`,
   `alter table users add column if not exists is_verified boolean not null default true`,
@@ -26,6 +27,8 @@ const statements = [
   `alter table users add column if not exists admin_followup_status varchar(32) not null default 'new'`,
   `alter table users add column if not exists admin_note text not null default ''`,
   `alter table users add column if not exists utm_source varchar(100)`,
+  `alter table users add column if not exists updated_at timestamptz not null default now()`,
+  `create index if not exists ix_users_updated_at on users(updated_at desc)`,
   `create index if not exists ix_users_admin_followup_status on users(admin_followup_status)`,
   `alter table users alter column full_name drop not null`,
   `alter table users alter column email drop not null`,
