@@ -104,12 +104,12 @@
         <h1>پیش‌نمایش بنر افقی</h1>
         <p>
           برای آزمایش لینک، روی بنر کلیک کنید. مقصد، صفحه اصلی دانشیار در
-          payanname.vercel.app است.
+          daneshyar.vercel.app است.
         </p>
         <a
           id="banner-link"
           class="banner-link"
-          href="https://payanname.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=horizontal_banner"
+          href="https://daneshyar.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=horizontal_banner"
           target="_blank"
           rel="noopener noreferrer sponsored"
           aria-label="ثبت سفارش در دانشیار"
@@ -129,18 +129,31 @@
       <section class="panel">
         <h2>کد HTML بنر افقی</h2>
         <p>این کد با آدرس کامل سایت ساخته شده و آماده کپی است.</p>
-        <textarea id="horizontal-embed-code" readonly aria-label="کد HTML بنر افقی"></textarea>
-        <button id="horizontal-copy-button" type="button">کپی کد بنر افقی</button>
-        <span id="horizontal-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+        <textarea
+          id="horizontal-embed-code"
+          readonly
+          aria-label="کد HTML بنر افقی"
+        ></textarea>
+        <button id="horizontal-copy-button" type="button">
+          کپی کد بنر افقی
+        </button>
+        <span
+          id="horizontal-copy-status"
+          class="copy-status"
+          role="status"
+          aria-live="polite"
+        ></span>
       </section>
 
       <section class="panel">
         <h2>پیش‌نمایش بنر عمودی</h2>
-        <p>این نسخه برای ستون کناری، جایگاه‌های عمودی و نمایش موبایل مناسب است.</p>
+        <p>
+          این نسخه برای ستون کناری، جایگاه‌های عمودی و نمایش موبایل مناسب است.
+        </p>
         <a
           id="vertical-banner-link"
           class="banner-link vertical"
-          href="https://payanname.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=vertical_banner"
+          href="https://daneshyar.vercel.app/?utm_source=partner_site&amp;utm_medium=display&amp;utm_campaign=academic_services_banner&amp;utm_content=vertical_banner"
           target="_blank"
           rel="noopener noreferrer sponsored"
           aria-label="ثبت سفارش در دانشیار"
@@ -161,9 +174,20 @@
       <section class="panel">
         <h2>کد HTML بنر عمودی</h2>
         <p>این کد با آدرس کامل سایت ساخته شده و آماده کپی است.</p>
-        <textarea id="vertical-embed-code" readonly aria-label="کد HTML بنر عمودی"></textarea>
-        <button id="vertical-copy-button" type="button">کپی کد بنر عمودی</button>
-        <span id="vertical-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+        <textarea
+          id="vertical-embed-code"
+          readonly
+          aria-label="کد HTML بنر عمودی"
+        ></textarea>
+        <button id="vertical-copy-button" type="button">
+          کپی کد بنر عمودی
+        </button>
+        <span
+          id="vertical-copy-status"
+          class="copy-status"
+          role="status"
+          aria-live="polite"
+        ></span>
       </section>
     </main>
 
@@ -174,7 +198,7 @@
         "https://ibfcwcbmnkgigkybluiu.supabase.co/storage/v1/object/public/public-assets/academic-services-ad-banner-vertical.webp";
 
       function campaignUrl(content) {
-        const url = new URL("https://payanname.vercel.app/");
+        const url = new URL("https://daneshyar.vercel.app/");
         url.searchParams.set("utm_source", "partner_site");
         url.searchParams.set("utm_medium", "display");
         url.searchParams.set("utm_campaign", "academic_services_banner");
@@ -220,28 +244,42 @@
         maxWidth: 512,
       });
 
-      document.getElementById("horizontal-embed-code").value = horizontalEmbedCode;
+      document.getElementById("horizontal-embed-code").value =
+        horizontalEmbedCode;
       document.getElementById("vertical-embed-code").value = verticalEmbedCode;
       document.getElementById("banner-link").href = horizontalDestination.href;
-      document.getElementById("vertical-banner-link").href = verticalDestination.href;
+      document.getElementById("vertical-banner-link").href =
+        verticalDestination.href;
 
       function enableCopy(buttonId, fieldId, statusId, code) {
         const field = document.getElementById(fieldId);
         const status = document.getElementById(statusId);
-        document.getElementById(buttonId).addEventListener("click", async () => {
-          try {
-            await navigator.clipboard.writeText(code);
-            status.textContent = "کپی شد.";
-          } catch {
-            field.select();
-            document.execCommand("copy");
-            status.textContent = "کپی شد.";
-          }
-        });
+        document
+          .getElementById(buttonId)
+          .addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(code);
+              status.textContent = "کپی شد.";
+            } catch {
+              field.select();
+              document.execCommand("copy");
+              status.textContent = "کپی شد.";
+            }
+          });
       }
 
-      enableCopy("horizontal-copy-button", "horizontal-embed-code", "horizontal-copy-status", horizontalEmbedCode);
-      enableCopy("vertical-copy-button", "vertical-embed-code", "vertical-copy-status", verticalEmbedCode);
+      enableCopy(
+        "horizontal-copy-button",
+        "horizontal-embed-code",
+        "horizontal-copy-status",
+        horizontalEmbedCode,
+      );
+      enableCopy(
+        "vertical-copy-button",
+        "vertical-embed-code",
+        "vertical-copy-status",
+        verticalEmbedCode,
+      );
     </script>
   </body>
 </html>
