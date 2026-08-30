@@ -32,7 +32,12 @@ export function TopNav() {
     ...(canUseCustomerPages
       ? [{ href: "/orders", label: isAdmin ? "همه سفارش‌ها" : user && !isCustomer ? "سفارش‌های ثبت‌شده" : "سفارش‌های من", icon: ListOrdered }]
       : []),
-    ...(canFollowUp ? [{ href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck }] : []),
+    ...(canFollowUp
+      ? [
+          { href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck },
+          { href: "/follow-up/list", label: "لیست پیگیری‌ها", icon: ClipboardList },
+        ]
+      : []),
     ...(isAdmin
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },

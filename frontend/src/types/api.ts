@@ -64,6 +64,11 @@ export interface PhoneFollowupResponse {
   user: AdminUser | null;
 }
 
+export interface NewFollowupsResponse {
+  users: AdminUser[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: "bearer";

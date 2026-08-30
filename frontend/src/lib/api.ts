@@ -18,7 +18,8 @@ import type {
   ReviewNote,
   User,
   UserFollowupStatus,
-  PhoneFollowupResponse
+  PhoneFollowupResponse,
+  NewFollowupsResponse
 } from "../types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -142,6 +143,16 @@ export async function getMe(): Promise<User> {
 
 export async function findPhoneFollowup(phone: string): Promise<PhoneFollowupResponse> {
   return request<PhoneFollowupResponse>(`/api/follow-up?phone=${encodeURIComponent(phone)}`);
+}
+
+export async function listNewFollowups(params: {
+  page?: number;
+  limit?: number;
+} = {}): Promise<NewFollowupsResponse> {
+  const query = new URLSearchParams({ list: "new" });
+  if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
+  return request<NewFollowupsResponse>(`/api/follow-up?${query.toString()}`);
 }
 
 export async function updatePhoneFollowup(payload:
