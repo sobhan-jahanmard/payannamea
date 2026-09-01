@@ -30,6 +30,7 @@ export interface UserEntity {
   admin_followup_status: UserFollowupStatus;
   admin_note: string;
   utm_source: string | null;
+  signup_ip: string | null;
   reset_token_hash: string | null;
   reset_token_expires_at: Date | null;
   created_at: Date;
@@ -238,6 +239,7 @@ export const UserSchema = new EntitySchema<UserEntity>({
     admin_followup_status: { type: String, length: 32, default: "new" },
     admin_note: { type: "text", default: "" },
     utm_source: { type: String, length: 100, nullable: true },
+    signup_ip: { type: String, length: 45, nullable: true },
     reset_token_hash: { type: String, length: 128, nullable: true },
     reset_token_expires_at: { type: "timestamptz", nullable: true },
     created_at: createdAtColumn,

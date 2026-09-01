@@ -118,12 +118,13 @@ function FollowupsListPanel() {
           <span>تعداد موارد جدید: {data?.pagination.total.toLocaleString("fa-IR") ?? "-"}</span>
           {loading ? <span>در حال بارگذاری...</span> : null}
         </div>
-        <table className="w-full min-w-[1250px] text-right text-sm">
+        <table className="w-full min-w-[1400px] text-right text-sm">
           <thead className="border-b border-border text-xs text-muted-foreground">
             <tr>
               <th className="p-3">شماره موبایل</th>
               <th className="w-48 p-3">نام</th>
               <th className="p-3">منبع</th>
+              <th className="p-3">IP ثبت‌نام</th>
               <th className="p-3">زمان ثبت</th>
               <th className="p-3">سفارش‌ها</th>
               <th className="w-48 p-3">وضعیت پیگیری</th>
@@ -143,6 +144,7 @@ function FollowupsListPanel() {
                   <td className="ltr whitespace-nowrap p-3 text-left">{user.phone ?? "-"}</td>
                   <td className="p-3">{user.full_name ?? "بدون نام"}</td>
                   <td className="p-3">{user.is_verified ? "کاربر تأییدشده" : "درخواست مشاوره (تأییدنشده)"}</td>
+                  <td className="ltr whitespace-nowrap p-3 text-left">{user.signup_ip ?? "-"}</td>
                   <td className="whitespace-nowrap p-3">{formatDateTime(user.created_at)}</td>
                   <td className="p-3">{user.order_count.toLocaleString("fa-IR")}</td>
                   <td className="p-3">
@@ -186,7 +188,7 @@ function FollowupsListPanel() {
               );
             })}
             {!loading && users.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">مورد جدیدی برای پیگیری وجود ندارد.</td></tr>
+              <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">مورد جدیدی برای پیگیری وجود ندارد.</td></tr>
             ) : null}
           </tbody>
         </table>

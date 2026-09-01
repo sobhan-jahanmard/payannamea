@@ -1,4 +1,5 @@
 import crypto, { randomUUID } from "node:crypto";
+import { isIP } from "node:net";
 
 import { MoreThan } from "typeorm";
 
@@ -30,6 +31,24 @@ export function normalizeIranianPhone(input: string): string {
     throw new ApiError(422, "شماره موبایل معتبر نیست");
   }
   return value;
+}
+
+export function getRequestIp(request: Request): string | null {
+  // These headers are populated by the reverse proxy. Only accept syntactically
+  // valid IPs, so arbitrary header content is never persisted.
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const candidates = [
+    request.headers.get("cf-connecting-ip")?.trim(),
+    request.headers.get("x-real-ip")?.trim(),
+    forwardedFor
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && isIP(candidate) !== 0) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function hashOtp(challengeId: string, phone: string, code: string): string {
@@ -120,7 +139,13 @@ export async function requestOtp(rawPhone: string): Promise<{ challenge_id: stri
   };
 }
 
-export async function verifyOtp(rawPhone: string, challengeId: string, code: string, rawUtmSource?: string | null) {
+export async function verifyOtp(
+  rawPhone: string,
+  challengeId: string,
+  code: string,
+  rawUtmSource?: string | null,
+  signupIp?: string | null
+) {
   const phone = normalizeIranianPhone(rawPhone);
   const utmSource = rawUtmSource?.trim().slice(0, 100) || null;
   const dataSource = await getDataSource();
@@ -165,12 +190,14 @@ export async function verifyOtp(rawPhone: string, challengeId: string, code: str
         is_verified: true,
         reset_token_hash: null,
         reset_token_expires_at: null,
-        utm_source: utmSource
+        utm_source: utmSource,
+        signup_ip: signupIp ?? null
       });
       isNewUser = true;
     } else if (!user.is_verified) {
       user.is_verified = true;
       if (!user.utm_source && utmSource) user.utm_source = utmSource;
+      if (!user.signup_ip && signupIp) user.signup_ip = signupIp;
       user = await userRepo.save(user);
     } else if (!user.utm_source && utmSource) {
       user.utm_source = utmSource;

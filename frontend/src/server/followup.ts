@@ -31,7 +31,7 @@ export async function findPhoneFollowup(rawQuery: unknown) {
   const user = await dataSource.getRepository(UserSchema)
       .createQueryBuilder("user")
       .leftJoin("orders", "order", "order.user_id = user.id")
-      .select(["user.id", "user.full_name", "user.email", "user.phone", "user.role", "user.admin_followup_status", "user.admin_note", "user.created_at", "user.updated_at"])
+      .select(["user.id", "user.full_name", "user.email", "user.phone", "user.role", "user.admin_followup_status", "user.admin_note", "user.signup_ip", "user.created_at", "user.updated_at"])
       .addSelect("count(order.id)", "order_count")
       .where("user.phone = :phone and user.role = 'customer'", { phone })
       .groupBy("user.id")
@@ -56,7 +56,7 @@ export async function listNewFollowups(rawQuery: unknown) {
   const [users, countRows] = await Promise.all([
     dataSource.query(
       `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified,
-              u.admin_followup_status, u.admin_note, u.utm_source,
+              u.admin_followup_status, u.admin_note, u.utm_source, u.signup_ip,
               u.created_at, u.updated_at, count(o.id)::int as order_count
          from users u
          left join orders o on o.user_id = u.id

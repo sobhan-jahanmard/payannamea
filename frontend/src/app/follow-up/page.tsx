@@ -141,7 +141,7 @@ function FollowUpPanel() {
             exists={Boolean(data.user)}
             meta={
               data.user
-                ? `${data.user.full_name ?? "بدون نام"} · ${data.user.order_count.toLocaleString("fa-IR")} سفارش · ثبت درخواست ${formatDateTime(data.user.created_at)}`
+                ? `${data.user.full_name ?? "بدون نام"} · ${data.user.order_count.toLocaleString("fa-IR")} سفارش · ثبت درخواست ${formatDateTime(data.user.created_at)} · IP ثبت‌نام ${data.user.signup_ip ?? "-"}`
                 : undefined
             }
             draft={userDraft}

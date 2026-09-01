@@ -39,7 +39,7 @@ export const adminUserUpdateSchema = z.object({
 
 type AdminUserRow = Pick<
   UserEntity,
-  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "utm_source" | "created_at" | "updated_at"
+  "id" | "full_name" | "email" | "phone" | "role" | "is_verified" | "admin_followup_status" | "admin_note" | "utm_source" | "signup_ip" | "created_at" | "updated_at"
 > & {
   order_count: number;
 };
@@ -60,6 +60,7 @@ export function serializeAdminUser(user: AdminUserRow) {
     admin_followup_status: user.admin_followup_status,
     admin_note: user.admin_note ?? "",
     utm_source: user.utm_source ?? null,
+    signup_ip: user.signup_ip ?? null,
     order_count: Number(user.order_count ?? 0),
     created_at: iso(user.created_at),
     updated_at: iso(user.updated_at)
@@ -89,7 +90,7 @@ export async function listAdminUsers(rawQuery: unknown) {
 
   const [users, countRows, statusRows] = await Promise.all([
     dataSource.query(
-      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.utm_source, u.created_at, u.updated_at,
+      `select u.id, u.full_name, u.email, u.phone, u.role, u.is_verified, u.admin_followup_status, u.admin_note, u.utm_source, u.signup_ip, u.created_at, u.updated_at,
         count(o.id)::int as order_count
        from users u
        left join orders o on o.user_id = u.id

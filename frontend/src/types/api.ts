@@ -30,6 +30,7 @@ export interface AdminUser extends User {
   admin_note: string;
   order_count: number;
   utm_source: string | null;
+  signup_ip: string | null;
 }
 
 export interface AdminUsersResponse {
