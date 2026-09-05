@@ -71,12 +71,12 @@ export function FreeConsultationForm() {
   }
 
   return (
-    <aside className="rounded-lg border border-white/45 bg-white/82 p-5 text-slate-950 shadow-2xl shadow-slate-950/25 backdrop-blur-[32px] sm:p-6">
+    <aside className="rounded-lg border border-white/60 bg-white/95 p-5 text-slate-950 shadow-2xl shadow-slate-950/25 backdrop-blur-[32px] sm:p-6">
       <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-teal-100 text-teal-800">
         <Headphones className="h-5 w-5" aria-hidden="true" />
       </div>
       <h2 className="text-xl font-semibold">درخواست مشاوره رایگان</h2>
-      <p className="mt-2 text-sm leading-7 text-slate-600">
+      <p className="mt-2 text-sm leading-7 text-slate-800">
         اگر درباره انتخاب خدمت، مراحل انجام، زمان یا هزینه سؤال دارید، شماره
         موبایل خود را وارد کنید. کارشناسان ما برای بررسی اولیه و راهنمایی با شما
         تماس می‌گیرند.

@@ -96,6 +96,16 @@ function FollowupsListPanel() {
 
   return (
     <main className="mx-auto grid w-full max-w-9xl gap-5 px-4 py-6 lg:px-8">
+      <div>
+        <h2 className="mb-2 text-base font-semibold">شیوه نامه تماس</h2>
+        <section className="tool-surface border-teal-200 bg-teal-50/80 p-4 text-sm leading-8 text-teal-950 sm:p-5">
+        <p>سلام وقتتون بخیر</p>
+        <p>از سایت دانش یار تماس می‌گیرم خدمتتون</p>
+        <p>در زمینه انجام کارهای دانشگاهی فعالیت داریم مثل پایان نامه و تحقیق و ارایه</p>
+        <p>در سایت ما ثبت نام داشتید</p>
+        <p>اگر کمکی از دستمون برمیاد در خدمتم</p>
+        </section>
+      </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">لیست پیگیری‌ها</h1>

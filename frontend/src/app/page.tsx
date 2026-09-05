@@ -118,11 +118,11 @@ export default function LandingPage() {
           sizes="100vw"
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-slate-950/26" />
-        <div className="absolute inset-0 bg-gradient-to-l from-teal-950/88 via-slate-950/58 to-slate-900/18" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.28),transparent_30%)]" />
+        <div className="absolute inset-0 bg-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-l from-teal-950/95 via-slate-950/68 to-slate-900/28" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_30%)]" />
         <div className="relative mx-auto grid min-h-[calc(100svh-64px)] w-full max-w-7xl items-center gap-6 px-4 pb-24 pt-16 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
-          <div className="max-w-2xl rounded-lg border border-white/16 bg-slate-950/62 p-5 text-white shadow-2xl shadow-slate-950/35 backdrop-blur-[32px] hero-text-shadow sm:p-7">
+          <div className="max-w-2xl rounded-lg border border-white/25 bg-slate-950/72 p-5 text-white shadow-2xl shadow-slate-950/45 backdrop-blur-[32px] hero-text-shadow sm:p-7">
             <div className="mb-5 flex items-center gap-3">
               <Image
                 src="/images/daneshyar-logo.png"
@@ -145,7 +145,7 @@ export default function LandingPage() {
             <h1 className="text-4xl font-semibold leading-tight tracking-normal sm:text-5xl lg:text-6xl">
               خدمات دانشگاهی از ایده تا تحویل
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-white sm:text-lg">
+            <p className="mt-5 max-w-xl text-base leading-8 text-slate-100 sm:text-lg">
               سفارش پژوهشی خود را با جزئیات ثبت کنید، مسیر انجام را شفاف ببینید
               و خروجی نهایی را در زمان توافق‌شده دریافت کنید.
             </p>
@@ -198,9 +198,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-12 lg:px-8">
+      <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-16 lg:px-8">
         <div>
-          <h2 className="text-2xl font-semibold">چه کارهایی انجام می‌شود؟</h2>
+          <p className="mb-2 text-sm font-bold text-primary">خدمات دانشیار</p>
+          <h2 className="text-2xl font-semibold tracking-tight">چه کارهایی انجام می‌شود؟</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
             این سامانه برای سفارش‌های دانشگاهی طراحی شده است؛ از کارهای پژوهشی
             بلندمدت تا تحقیق و ارائه کلاسی. قبل از شروع، سفارش توسط مدیر بررسی
@@ -217,10 +218,9 @@ export default function LandingPage() {
                 data-analytics-impression={`landing_service_${service.analyticsKey}_viewed`}
                 data-analytics-label={service.analyticsKey}
               >
-                <Icon
-                  className="mb-4 h-6 w-6 text-primary"
-                  aria-hidden="true"
-                />
+                <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-teal-50 text-primary">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
                 <h3 className="text-base font-semibold">{service.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   {service.body}
@@ -244,10 +244,9 @@ export default function LandingPage() {
             const Icon = feature.icon;
             return (
               <article key={feature.title} className="tool-surface p-5">
-                <Icon
-                  className="mb-4 h-6 w-6 text-primary"
-                  aria-hidden="true"
-                />
+                <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-teal-50 text-primary">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
                 <h3 className="text-base font-semibold">{feature.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   {feature.body}
