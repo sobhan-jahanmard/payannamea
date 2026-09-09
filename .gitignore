@@ -19,6 +19,10 @@ frontend/storage/
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+frontend/vite.config.d.ts
+frontend/.next/
+frontend/.next-repro/
+frontend/node_modules/
 worker/.env
 worker/.venv/
 worker/workspace/*

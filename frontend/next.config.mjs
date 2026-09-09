@@ -7,7 +7,7 @@ const appDir = dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: appDir,
-  serverExternalPackages: ["typeorm", "pg", "reflect-metadata"]
+  serverExternalPackages: ["typeorm", "pg", "reflect-metadata"],
 };
 
 export default nextConfig;

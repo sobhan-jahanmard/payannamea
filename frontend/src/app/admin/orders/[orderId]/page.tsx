@@ -35,7 +35,7 @@ import {
   statusLabel,
 } from "../../../../lib/format";
 import { quantityLabel } from "../../../../lib/order-options";
-import type { Order, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus } from "../../../../types/api";
+import type { Order, OrderFile, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus } from "../../../../types/api";
 
 type ToastState = {
   type: "success" | "error";
@@ -387,6 +387,8 @@ function AdminOrderDetail() {
               </div>
             </dl>
 
+            <OrderFilesSection files={order.files} />
+
             <div className="grid gap-3 rounded-md border border-border bg-white p-4">
               <h3 className="font-semibold">بررسی و تغییر وضعیت</h3>
               <div className="grid gap-3 sm:grid-cols-[220px_1fr_auto] sm:items-end">
@@ -558,6 +560,55 @@ function AdminOrderDetail() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function OrderFilesSection({ files }: { files?: OrderFile[] }) {
+  const groups = [
+    { type: "university_guideline", label: "شیوه‌نامه و قالب" },
+    { type: "reference_file", label: "منابع و مقالات" },
+    { type: "supporting_material", label: "فایل‌های تکمیلی" }
+  ].map((group) => ({
+    ...group,
+    files: files?.filter((file) => file.file_type === group.type) ?? []
+  }));
+  const otherFiles = files?.filter((file) => !groups.some((group) => group.files.includes(file))) ?? [];
+  const visibleGroups = otherFiles.length
+    ? [...groups, { type: "other", label: "سایر فایل‌ها", files: otherFiles }]
+    : groups;
+
+  return (
+    <div className="grid gap-4 rounded-md border border-border bg-white p-4">
+      <div>
+        <h3 className="font-semibold">فایل‌های پروژه</h3>
+        <p className="mt-1 text-sm text-muted-foreground">فایل‌های ارسال‌شده توسط مشتری، دسته‌بندی‌شده بر اساس کاربرد.</p>
+      </div>
+      {files?.length ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {visibleGroups.map((group) => (
+            <div key={group.type} className="grid content-start gap-2 rounded-md border border-border p-3">
+              <h4 className="text-sm font-semibold">{group.label}</h4>
+              {group.files.length ? group.files.map((file) => (
+                <a
+                  key={file.id}
+                  href={absoluteUrl(file.url)}
+                  download={file.original_name}
+                  className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm hover:bg-teal-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{file.original_name}</span>
+                    <span className="ltr block text-left text-xs text-muted-foreground">{formatBytes(file.size_bytes)}</span>
+                  </span>
+                  <Download className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                </a>
+              )) : <p className="text-xs text-muted-foreground">فایلی ثبت نشده است.</p>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">هنوز فایلی برای این پروژه ثبت نشده است.</div>
+      )}
+    </div>
   );
 }
 

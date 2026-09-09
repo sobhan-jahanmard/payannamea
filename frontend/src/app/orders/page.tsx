@@ -1,20 +1,26 @@
 "use client";
 
-import { ClipboardList, ExternalLink, RefreshCcw } from "lucide-react";
+import { ClipboardList, ExternalLink, RefreshCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AuthGate, useAuth } from "../../components/auth/AuthProvider";
 import { StatusBadge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { listMyOrders } from "../../lib/api";
-import { formatDate, formatDateTime, paymentStatusLabel, statusLabel } from "../../lib/format";
+import { deleteOrder, listMyOrders } from "../../lib/api";
+import {
+  formatDate,
+  formatDateTime,
+  paymentStatusLabel,
+  statusLabel,
+} from "../../lib/format";
 import type { Order } from "../../types/api";
 
 function OrdersList() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function loadOrders() {
@@ -23,7 +29,11 @@ function OrdersList() {
     try {
       setOrders(await listMyOrders());
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "بارگذاری سفارش‌ها ناموفق بود");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "بارگذاری سفارش‌ها ناموفق بود",
+      );
     } finally {
       setLoading(false);
     }
@@ -33,21 +43,61 @@ function OrdersList() {
     void loadOrders();
   }, []);
 
+  async function removeOrder(orderId: string) {
+    if (
+      !window.confirm(
+        "این سفارش و اطلاعات وابسته به آن حذف شود؟ این عملیات قابل بازگشت نیست.",
+      )
+    )
+      return;
+    setDeletingOrderId(orderId);
+    setError(null);
+    try {
+      await deleteOrder(orderId);
+      setOrders((current) => current.filter((order) => order.id !== orderId));
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "حذف سفارش ناموفق بود",
+      );
+    } finally {
+      setDeletingOrderId(null);
+    }
+  }
+
   return (
     <main className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal">{user?.role === "admin" ? "همه سفارش‌ها" : user?.role === "customer" ? "سفارش‌های من" : "سفارش‌های ثبت‌شده توسط من"}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-normal">
             {user?.role === "admin"
-              ? "همه سفارش‌های ثبت‌شده در سایت در این صفحه دیده می‌شوند."
+              ? "همه سفارش‌ها"
               : user?.role === "customer"
-              ? <>همه سفارش‌های ثبت‌شده با شماره <span className="ltr inline-block">{user.phone}</span> در این صفحه دیده می‌شود.</>
-              : "در این صفحه فقط سفارش‌هایی را می‌بینید که خودتان برای مشتریان ثبت کرده‌اید."}
+                ? "سفارش‌های من"
+                : "سفارش‌های ثبت‌شده توسط من"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {user?.role === "admin" ? (
+              "همه سفارش‌های ثبت‌شده در سایت در این صفحه دیده می‌شوند."
+            ) : user?.role === "customer" ? (
+              <>
+                همه سفارش‌های ثبت‌شده با شماره{" "}
+                <span className="ltr inline-block">{user.phone}</span> در این
+                صفحه دیده می‌شود.
+              </>
+            ) : (
+              "در این صفحه فقط سفارش‌هایی را می‌بینید که خودتان برای مشتریان ثبت کرده‌اید."
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="outline" onClick={() => void loadOrders()} loading={loading}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void loadOrders()}
+            loading={loading}
+          >
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
             تازه‌سازی
           </Button>
@@ -60,42 +110,83 @@ function OrdersList() {
         </div>
       </div>
 
-      {error ? <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{error}</div> : null}
+      {error ? (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {error}
+        </div>
+      ) : null}
 
       <section className="tool-surface p-5">
         {orders.length ? (
           <div className="grid gap-3">
             {orders.map((order) => (
-              <Link
+              <div
                 key={order.id}
-                href={user?.role === "admin" ? `/admin/orders/${encodeURIComponent(order.id)}` : `/status?order=${encodeURIComponent(order.id)}`}
                 className="grid gap-3 rounded-md border border-border bg-white p-4 transition hover:bg-muted lg:grid-cols-[1fr_auto]"
               >
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatusBadge status={order.status} />
-                    <span className="text-xs text-muted-foreground">{statusLabel(order.status)}</span>
-                    <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                      {paymentStatusLabel(order.payment_status)}
+                <Link
+                  href={
+                    user?.role === "admin"
+                      ? `/admin/orders/${encodeURIComponent(order.id)}`
+                      : `/status?order=${encodeURIComponent(order.id)}`
+                  }
+                  className="grid min-w-0 gap-3 lg:grid-cols-[1fr_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <StatusBadge status={order.status} />
+                      <span className="text-xs text-muted-foreground">
+                        {statusLabel(order.status)}
+                      </span>
+                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                        {paymentStatusLabel(order.payment_status)}
+                      </span>
+                    </div>
+                    <h2 className="line-clamp-2 text-base font-semibold">
+                      {order.title}
+                    </h2>
+                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
+                      <span>{order.order_type ?? "سفارش دانشگاهی"}</span>
+                      <span>{order.degree}</span>
+                      <span>{order.university}</span>
+                      <span>مهلت: {formatDate(order.deadline)}</span>
+                    </div>
+                    {user?.role === "admin" &&
+                    order.created_by?.role === "operator" ? (
+                      <p className="mt-2 text-xs text-primary">
+                        ثبت‌شده توسط اپراتور:{" "}
+                        {order.created_by.full_name ??
+                          order.created_by.username ??
+                          order.created_by.email ??
+                          "بدون نام"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-end justify-between gap-3 lg:flex-col lg:items-end">
+                    <span className="text-sm text-muted-foreground">
+                      {formatDateTime(order.created_at)}
+                    </span>
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                      مشاهده
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
                     </span>
                   </div>
-                  <h2 className="line-clamp-2 text-base font-semibold">{order.title}</h2>
-                  <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
-                    <span>{order.order_type ?? "سفارش دانشگاهی"}</span>
-                    <span>{order.degree}</span>
-                    <span>{order.university}</span>
-                    <span>مهلت: {formatDate(order.deadline)}</span>
-                  </div>
-                  {user?.role === "admin" && order.created_by?.role === "operator" ? <p className="mt-2 text-xs text-primary">ثبت‌شده توسط اپراتور: {order.created_by.full_name ?? order.created_by.username ?? order.created_by.email ?? "بدون نام"}</p> : null}
-                </div>
-                <div className="flex items-end justify-between gap-3 lg:flex-col lg:items-end">
-                  <span className="text-sm text-muted-foreground">{formatDateTime(order.created_at)}</span>
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
-                    مشاهده
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                </div>
-              </Link>
+                </Link>
+                {user?.role === "admin" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void removeOrder(order.id)}
+                    loading={deletingOrderId === order.id}
+                  >
+                    <Trash2
+                      className="h-4 w-4 stroke-red-600"
+                      aria-hidden="true"
+                    />
+                  </Button>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : (

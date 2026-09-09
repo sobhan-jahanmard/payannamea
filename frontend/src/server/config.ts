@@ -55,6 +55,18 @@ export function storageDir(): string {
   return path.isAbsolute(configured) ? configured : path.join(process.cwd(), configured);
 }
 
+export function supabaseStorageUrl(): string | null {
+  return process.env.SUPABASE_URL?.trim().replace(/\/$/, "") || null;
+}
+
+export function supabaseServiceRoleKey(): string | null {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
+}
+
+export function supabaseStorageBucket(): string {
+  return process.env.SUPABASE_STORAGE_BUCKET?.trim() || "uploads";
+}
+
 export function appEnvironment(): string {
   return process.env.NODE_ENV || "development";
 }

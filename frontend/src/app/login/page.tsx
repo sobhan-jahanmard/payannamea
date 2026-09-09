@@ -72,9 +72,9 @@ export default function LoginPage() {
   async function submitAdmin(values: AdminValues) {
     setError(null);
     try {
-      const loggedInUser = await login({ username: values.username.trim(), password: values.password });
+      await login({ username: values.username.trim(), password: values.password });
       trackAnalyticsEvent("staff_login_completed");
-      router.push(loggedInUser.role === "admin" ? "/admin" : "/follow-up");
+      router.push("/orders");
     } catch (loginError) {
       trackAnalyticsEvent("admin_login_failed");
       setError(loginError instanceof Error ? loginError.message : "ورود ناموفق بود");

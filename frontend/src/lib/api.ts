@@ -222,6 +222,10 @@ export async function getOrder(orderId: string): Promise<Order> {
   return request<Order>(`/api/orders/${orderId}`);
 }
 
+export async function deleteOrder(orderId: string): Promise<void> {
+  await request<unknown>(`/api/orders/${orderId}`, { method: "DELETE" });
+}
+
 export async function updateOrder(orderId: string, payload: OrderUpdatePayload): Promise<Order> {
   return request<Order>(`/api/orders/${orderId}`, {
     method: "PATCH",

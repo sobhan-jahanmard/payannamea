@@ -411,6 +411,18 @@ export async function getOrderForUserOr404(orderId: string, user: UserEntity): P
   return order;
 }
 
+export async function deleteOrder(orderId: string): Promise<void> {
+  const order = await getOrderOr404(orderId);
+  const storedUploads = [
+    ...(order.files ?? []).map((file) => file.storage_path),
+    ...(order.final_outputs ?? []).map((output) => output.storage_path),
+    ...(order.payment_notes ?? []).map((note) => note.storage_path)
+  ];
+  const dataSource = await getDataSource();
+  await dataSource.getRepository(OrderSchema).delete({ id: order.id });
+  await Promise.all(storedUploads.map((storagePath) => deleteStoredUpload(storagePath)));
+}
+
 export async function setOrderStatus(
   manager: EntityManager,
   order: OrderEntity,
