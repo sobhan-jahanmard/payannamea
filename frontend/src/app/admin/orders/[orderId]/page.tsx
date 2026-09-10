@@ -3,6 +3,7 @@
 import {
   ArrowRight,
   Download,
+  Edit3,
   FileUp,
   MessageSquarePlus,
   RefreshCcw,
@@ -261,7 +262,17 @@ function AdminOrderDetail() {
               <div>
                 <h2 className="text-lg font-semibold">{order.title}</h2>
               </div>
-              <StatusBadge status={order.status} />
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {order.status === "submitted" ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/status?order=${encodeURIComponent(order.id)}&edit=1`}>
+                      <Edit3 className="h-4 w-4" aria-hidden="true" />
+                      ویرایش پروژه و فایل‌ها
+                    </Link>
+                  </Button>
+                ) : null}
+                <StatusBadge status={order.status} />
+              </div>
             </div>
 
             <dl className="grid gap-3 text-sm sm:grid-cols-2">

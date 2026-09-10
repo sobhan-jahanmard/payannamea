@@ -313,6 +313,7 @@ function StatusContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const orderId = params?.get("order")?.trim() ?? "";
+  const shouldOpenEditor = params?.get("edit") === "1";
 
   const {
     register,
@@ -375,6 +376,7 @@ function StatusContent() {
   function setLoadedOrder(nextOrder: Order) {
     setOrder(nextOrder);
     reset(valuesFromOrder(nextOrder));
+    setEditing(shouldOpenEditor && nextOrder.status === "submitted");
   }
 
   async function loadOrder(id: string) {
