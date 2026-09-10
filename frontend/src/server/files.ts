@@ -16,6 +16,12 @@ export function safeFilename(filename: string): string {
   return name || "upload.bin";
 }
 
+function uniqueStoredName(filename: string): string {
+  const sanitized = safeFilename(filename);
+  const extension = sanitized.includes(".") ? sanitized.slice(sanitized.lastIndexOf(".")) : "";
+  return `${randomUUID()}${extension}`;
+}
+
 function storageConfig(): { url: string; key: string } {
   const url = supabaseStorageUrl();
   const key = supabaseServiceRoleKey();
@@ -27,7 +33,7 @@ function storageConfig(): { url: string; key: string } {
 
 export async function saveUpload(file: File, directory: string): Promise<StoredUpload> {
   const originalName = file.name || "upload.bin";
-  const storedName = `${randomUUID()}-${safeFilename(originalName)}`;
+  const storedName = uniqueStoredName(originalName);
   const relativePath = `${directory.replace(/\/+$/, "")}/${storedName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const maxBytes = maxUploadSizeMb() * 1024 * 1024;
