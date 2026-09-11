@@ -161,7 +161,8 @@ const detailRelations = {
   final_outputs: true,
   review_notes: true,
   worker_lock: true,
-  payment_notes: true
+  payment_notes: true,
+  worker_submissions: true
 } as const;
 
 function iso(value: Date | string | null | undefined): string | null {

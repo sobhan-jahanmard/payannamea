@@ -2,7 +2,7 @@ from typing import Any
 from utils.api import submit_sample, submit_final
 from utils.helpers import archive_workspace, write_text
 
-TITLE = "Validate and publish — اعتبارسنجی و انتشار"
+TITLE = "Validate and publish"
 
 def run(context: dict[str, Any], services: Any) -> None:
     docx = services.workspace / context["artifacts"]["docx"]

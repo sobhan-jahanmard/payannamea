@@ -4,9 +4,11 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,6 +43,8 @@ class Services:
         self.token_usage = {"inputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
 
     def run_codex(self, prompt: str, target: Path) -> None:
+        if target.exists() and target.read_text(encoding="utf-8").strip():
+            return
         if self.args.dry_run:
             write_text(target, "# خروجی آزمایشی\n\nاین خروجی فقط برای dry-run ساخته شده است.\n")
             return
@@ -48,9 +52,11 @@ class Services:
             self.config.codex_bin, "exec", "--model", self.config.codex_model,
             "--json",
             "--skip-git-repo-check", "--sandbox",
-            self.config.codex_sandbox, "-C", str(self.workspace), prompt,
+            self.config.codex_sandbox, "-C", str(self.workspace), "-",
         ]
-        result = subprocess.run(command, cwd=str(self.workspace), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+        if os.name == "nt":
+            command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
+        result = subprocess.run(command, cwd=str(self.workspace), input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
         print(result.stdout, end="", flush=True)
         for line in result.stdout.splitlines():
             try: event = json.loads(line)
@@ -62,6 +68,12 @@ class Services:
             if isinstance(detail.get("reasoning_tokens"), int): self.token_usage["reasoningTokens"] = max(self.token_usage["reasoningTokens"], detail["reasoning_tokens"])
         if result.returncode:
             raise RuntimeError(f"Codex exited with code {result.returncode}")
+        deadline = time.monotonic() + 1800
+        while time.monotonic() < deadline:
+            if target.exists() and target.read_text(encoding="utf-8").strip():
+                return
+            time.sleep(5)
+        raise RuntimeError(f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes")
 
     def write_docx(self, source: Path, output: Path, title: str) -> None:
         try:
@@ -100,11 +112,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def header(index: int, title: str, context: dict[str, Any]) -> None:
     clean_title = re.sub(r"\s+", " ", title)
-    print("─" * 64, flush=True)
-    print("Worker Plus | پایان‌نامه کارشناسی", flush=True)
+    print("-" * 64, flush=True)
+    print("Worker Plus | Bachelor Thesis", flush=True)
     print(f"Order: {context.get('order_id') or 'pending'} | Mode: {context['mode']}", flush=True)
     print(f"Step {index:02}/11: {clean_title}", flush=True)
-    print("─" * 64, flush=True)
+    print("-" * 64, flush=True)
 
 
 def main() -> None:

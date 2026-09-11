@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_text
 
-TITLE = "Review content — بررسی متن و citation"
+TITLE = "Review content"
 
 def run(context: dict[str, Any], services: Any) -> None:
     source = services.workspace / context["artifacts"]["source"]

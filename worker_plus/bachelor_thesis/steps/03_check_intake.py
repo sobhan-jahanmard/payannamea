@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_text
 
-TITLE = "Check intake — بررسی اولیه اطلاعات سفارش"
+TITLE = "Check intake"
 
 def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]

@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_json
 
-TITLE = "Extract university rules — استخراج قوانین دانشگاه"
+TITLE = "Extract university rules"
 
 def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]

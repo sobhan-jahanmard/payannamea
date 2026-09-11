@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_text
 
-TITLE = "Generate content — تولید متن"
+TITLE = "Generate content"
 
 def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]

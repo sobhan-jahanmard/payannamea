@@ -1,7 +1,7 @@
 from typing import Any
 from utils.api import claim_oldest, heartbeat
 
-TITLE = "Fetch order — دریافت قدیمی‌ترین سفارش آماده"
+TITLE = "Fetch order"
 
 def run(context: dict[str, Any], services: Any) -> None:
     if services.args.offline:

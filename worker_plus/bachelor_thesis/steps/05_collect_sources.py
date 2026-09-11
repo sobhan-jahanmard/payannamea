@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_json, write_text
 
-TITLE = "Collect sources — ثبت منابع و تصاویر مجاز"
+TITLE = "Collect sources"
 
 def run(context: dict[str, Any], services: Any) -> None:
     references = context["order"].get("references", [])

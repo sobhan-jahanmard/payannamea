@@ -4,7 +4,7 @@ from typing import Any
 from utils.api import download_file
 from utils.helpers import write_json, write_text
 
-TITLE = "Prepare workspace — آماده‌سازی فضای کاری"
+TITLE = "Prepare workspace"
 
 def run(context: dict[str, Any], services: Any) -> None:
     workspace = services.workspace

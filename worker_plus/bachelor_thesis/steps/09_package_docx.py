@@ -1,6 +1,6 @@
 from typing import Any
 
-TITLE = "Package DOCX — ساخت فایل Word"
+TITLE = "Package DOCX"
 
 def run(context: dict[str, Any], services: Any) -> None:
     source = services.workspace / context["artifacts"]["source"]

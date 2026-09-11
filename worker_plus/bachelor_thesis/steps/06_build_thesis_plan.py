@@ -1,7 +1,7 @@
 from typing import Any
 from utils.helpers import write_text
 
-TITLE = "Build thesis plan — ساخت طرح پایان‌نامه"
+TITLE = "Build thesis plan"
 
 def run(context: dict[str, Any], services: Any) -> None:
     title = context["order"].get("title") or "پایان‌نامه کارشناسی"

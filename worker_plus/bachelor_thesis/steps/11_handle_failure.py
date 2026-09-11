@@ -1,7 +1,7 @@
 from typing import Any
 from utils.api import fail_order
 
-TITLE = "Handle failure — ثبت خطا"
+TITLE = "Handle failure"
 
 def run(context: dict[str, Any], services: Any) -> None:
     reason = context["errors"][-1] if context.get("errors") else "Unknown worker failure"
