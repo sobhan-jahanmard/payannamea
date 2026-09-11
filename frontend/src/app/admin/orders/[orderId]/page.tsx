@@ -36,7 +36,7 @@ import {
   statusLabel,
 } from "../../../../lib/format";
 import { quantityLabel } from "../../../../lib/order-options";
-import type { Order, OrderFile, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus } from "../../../../types/api";
+import type { Order, OrderFile, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus, WorkerRun } from "../../../../types/api";
 
 type ToastState = {
   type: "success" | "error";
@@ -507,6 +507,8 @@ function AdminOrderDetail() {
               )}
             </div>
 
+            <WorkerRunHistory runs={order.worker_submissions ?? []} />
+
             <div className="grid gap-3 rounded-md border border-border bg-white p-4">
               <h3 className="font-semibold">یادداشت داخلی مدیر</h3>
               <div className="grid gap-3 sm:grid-cols-[180px_1fr_auto] sm:items-end">
@@ -572,6 +574,16 @@ function AdminOrderDetail() {
       ) : null}
     </main>
   );
+}
+
+function WorkerRunHistory({ runs }: { runs: WorkerRun[] }) {
+  return <div className="grid gap-3 rounded-md border border-border bg-white p-4">
+    <h3 className="font-semibold">تاریخچه اجرای Worker و مصرف مدل</h3>
+    {runs.length ? <div className="grid gap-2">{runs.map((run) => <div key={run.id} className="rounded-md bg-muted p-3 text-sm">
+      <div className="flex flex-wrap justify-between gap-2"><span>{run.model ?? "-"} · {run.mode ?? "-"} · {run.run_status ?? "-"}</span><span className="text-muted-foreground">{formatDateTime(run.finished_at ?? run.created_at)}</span></div>
+      <div className="mt-1 text-muted-foreground">Input: {(run.input_tokens ?? 0).toLocaleString("fa-IR")} · Output: {(run.output_tokens ?? 0).toLocaleString("fa-IR")} · Reasoning: {(run.reasoning_tokens ?? 0).toLocaleString("fa-IR")} · Total: {(run.total_tokens ?? 0).toLocaleString("fa-IR")}</div>
+    </div>)}</div> : <p className="text-sm text-muted-foreground">هنوز اجرایی ثبت نشده است.</p>}
+  </div>;
 }
 
 function OrderFilesSection({ files }: { files?: OrderFile[] }) {

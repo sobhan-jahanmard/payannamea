@@ -26,6 +26,7 @@ import {
   ReviewNoteEntity,
   ReviewNoteSchema,
   UserEntity,
+  WorkerSubmissionEntity,
   WorkerLockSchema
 } from "./db/entities";
 import { ApiError, compact } from "./http";
@@ -240,6 +241,15 @@ function serializeStatusLog(log: OrderStatusLogEntity) {
   };
 }
 
+function serializeWorkerRun(run: WorkerSubmissionEntity) {
+  return {
+    id: run.id, model: run.model, mode: run.mode, input_tokens: run.input_tokens,
+    output_tokens: run.output_tokens, reasoning_tokens: run.reasoning_tokens,
+    total_tokens: run.total_tokens, run_status: run.run_status,
+    created_at: iso(run.created_at), finished_at: iso(run.finished_at)
+  };
+}
+
 export function serializeFinalOutput(output: FinalOutputEntity) {
   return {
     id: output.id,
@@ -257,7 +267,7 @@ export function serializeFinalOutput(output: FinalOutputEntity) {
   };
 }
 
-const CUSTOMER_OUTPUT_PRIORITY = ["pptx", "docx", "pdf", "deliverable_source"];
+const CUSTOMER_OUTPUT_PRIORITY = ["sample", "pptx", "docx", "pdf", "deliverable_source"];
 
 export function customerVisibleFinalOutputs(outputs: FinalOutputEntity[] | undefined): FinalOutputEntity[] {
   if (!outputs?.length) {
@@ -381,12 +391,15 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     status_logs: audience === "admin" ? byDate(order.status_logs).map(serializeStatusLog) : [],
     final_outputs:
       audience === "customer"
-        ? order.status === "completed"
+        ? ["completed", "sample_pending_customer_approval", "sample_revision_required"].includes(order.status)
           ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
           : []
         : byDate(order.final_outputs).map(serializeFinalOutput),
     review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : [],
     payment_notes: audience === "admin" ? byDate(order.payment_notes).map(serializePaymentNote) : []
+    ,worker_submissions: audience === "admin"
+      ? byDate(order.worker_submissions).filter((item) => item.submission_type === "run").map(serializeWorkerRun)
+      : []
   };
 }
 

@@ -18,15 +18,19 @@ export async function GET(request: Request, context: Context) {
   try {
     const { orderId, outputId } = await context.params;
     const user = await getCurrentUser(request);
+    let customerOrder: Awaited<ReturnType<typeof getOrderForUserOr404>> | null = null;
     if (user.role === "admin") {
       await getOrderOr404(orderId);
     } else {
-      const order = await getOrderForUserOr404(orderId, user);
-      if (order.status !== "completed") {
-        throw new ApiError(403, "Final output downloads are available only after the order is completed");
+      customerOrder = await getOrderForUserOr404(orderId, user);
+      if (!["completed", "sample_pending_customer_approval", "sample_revision_required"].includes(customerOrder.status)) {
+        throw new ApiError(403, "This output is not available at the current order stage");
       }
     }
     const output = await findFinalOutput(orderId, outputId);
+    if (customerOrder && customerOrder.status !== "completed" && output.output_type !== "sample") {
+      throw new ApiError(403, "Only the sample output is available before completion");
+    }
     const stored = await readStoredUpload(output.storage_path);
     if (!stored) {
       throw new ApiError(404, "Stored file not found");

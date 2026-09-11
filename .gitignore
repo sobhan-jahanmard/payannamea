@@ -27,6 +27,10 @@ worker/.env
 worker/.venv/
 worker/workspace/*
 !worker/workspace/.gitkeep
+worker_plus/.env
+worker_plus/.venv/
+worker_plus/workspace/*
+!worker_plus/workspace/.gitkeep
 
 */.env
 */.env.local/

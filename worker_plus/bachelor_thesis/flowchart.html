@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>جریان Worker Plus پایان‌نامه کارشناسی</title>
+    <style>
+      body { margin: 0; padding: 32px; font-family: Tahoma, Arial, sans-serif; background: #f7f9fc; color: #182230; }
+      h1 { text-align: center; }
+      .mermaid { display: flex; justify-content: center; }
+    </style>
+  </head>
+  <body>
+    <h1>جریان Worker Plus برای پایان‌نامه کارشناسی</h1>
+    <pre class="mermaid">
+flowchart TD
+    A[شروع Worker Plus] --> B[بررسی اطلاعات و فایل‌های سفارش]
+    B --> C[استخراج قوانین دانشگاه و قالب]
+    C --> D[بررسی منابع مشتری]
+    D --> E[بررسی منابع و تصاویر مجاز]
+    E --> F[ساخت طرح پایان‌نامه و فصل‌بندی]
+    F --> G[بررسی و تأیید طرح]
+    G --> H{طرح قابل اجرا است؟}
+    H -- خیر --> I[ثبت نیاز به اطلاعات یا بررسی انسانی]
+    I --> J[اصلاح طرح]
+    J --> G
+    H -- بله --> K[تولید متن کمکی فصل‌ها]
+    K --> L[ویرایش علمی و بررسی citation]
+    L --> M{متن و منابع درست‌اند؟}
+    M -- خیر --> K
+    M -- بله --> N[ساخت DOCX با فرمت دانشگاه]
+    N --> O[کنترل فرمت، ظاهر، تصاویر و محرمانگی]
+    O --> P{بسته نهایی قبول است؟}
+    P -- خیر --> Q[اصلاح متن یا Word]
+    Q --> N
+    P -- بله --> R[تولید گزارش تطبیق و checklist]
+    R --> S[آپلود خروجی نهایی]
+    S --> T[worker_done_pending_approval]
+    </pre>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "default" });
+    </script>
+  </body>
+</html>

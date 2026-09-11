@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>جریان کلی Worker</title>
+    <style>
+      body { margin: 0; padding: 32px; font-family: Tahoma, Arial, sans-serif; background: #f7f9fc; color: #182230; }
+      h1 { text-align: center; }
+      .mermaid { display: flex; justify-content: center; }
+    </style>
+  </head>
+  <body>
+    <h1>جریان کلی Worker</h1>
+    <pre class="mermaid">
+flowchart TD
+    A[سفارش جدید] --> B{وضعیت approved است؟}
+    B -- خیر --> Z[در صف یا خارج از جریان Worker]
+    B -- بله --> C[برداشتن قدیمی‌ترین سفارش]
+    C --> D[قفل سفارش برای یک Worker]
+    D --> E[تغییر وضعیت به in_progress]
+    E --> F[ساخت workspace و دریافت اطلاعات و فایل‌ها]
+    F --> G[بررسی اولیه اطلاعات سفارش]
+    G --> H{اطلاعات مانع انجام کار است؟}
+    H -- بله --> I[ثبت مورد در human review checklist]
+    I --> J[اجرای workflow مناسب]
+    H -- خیر --> J
+    J --> K[تولید خروجی]
+    K --> L[کنترل کیفیت و اعتبارسنجی]
+    L --> M{خروجی تأیید شد؟}
+    M -- خیر، قابل اصلاح --> N[اصلاح هدفمند]
+    N --> L
+    M -- خیر، غیرقابل انجام --> O[ثبت علت خطا]
+    O --> P[تغییر وضعیت به failed]
+    M -- بله --> Q[آپلود package نهایی]
+    Q --> R[تغییر وضعیت به worker_done_pending_approval]
+    R --> S{تأیید مدیر؟}
+    S -- بله --> T[تغییر وضعیت به completed]
+    S -- نیاز به اصلاح --> U[تغییر وضعیت به admin_review]
+    U --> J
+    </pre>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "default" });
+    </script>
+  </body>
+</html>

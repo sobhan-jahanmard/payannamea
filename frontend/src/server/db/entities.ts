@@ -4,6 +4,9 @@ export const ORDER_STATUSES = [
   "submitted",
   "approved",
   "in_progress",
+  "sample_pending_customer_approval",
+  "sample_revision_required",
+  "full_approved",
   "worker_done_pending_approval",
   "admin_review",
   "completed",
@@ -158,6 +161,14 @@ export interface WorkerSubmissionEntity {
   worker_id: string;
   submission_type: string;
   notes: string | null;
+  model: string | null;
+  mode: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  reasoning_tokens: number | null;
+  total_tokens: number | null;
+  run_status: string | null;
+  finished_at: Date | null;
   created_at: Date;
   order?: OrderEntity;
   outputs?: FinalOutputEntity[];
@@ -464,6 +475,14 @@ export const WorkerSubmissionSchema = new EntitySchema<WorkerSubmissionEntity>({
     worker_id: { type: String, length: 255 },
     submission_type: { type: String, length: 80 },
     notes: { type: "text", nullable: true },
+    model: { type: String, length: 120, nullable: true },
+    mode: { type: String, length: 32, nullable: true },
+    input_tokens: { type: Number, nullable: true },
+    output_tokens: { type: Number, nullable: true },
+    reasoning_tokens: { type: Number, nullable: true },
+    total_tokens: { type: Number, nullable: true },
+    run_status: { type: String, length: 32, nullable: true },
+    finished_at: { type: "timestamptz", nullable: true },
     created_at: createdAtColumn
   },
   indices: [{ name: "ix_worker_submissions_order_id", columns: ["order_id"] }],

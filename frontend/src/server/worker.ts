@@ -22,6 +22,29 @@ export const workerActionSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
+const workerRunSchema = workerActionSchema.extend({
+  model: z.string().min(1).max(120), mode: z.enum(["full", "sample"]),
+  inputTokens: z.number().int().min(0).optional(), outputTokens: z.number().int().min(0).optional(),
+  reasoningTokens: z.number().int().min(0).optional(), totalTokens: z.number().int().min(0).optional(),
+  status: z.enum(["completed", "failed"])
+});
+
+export async function recordWorkerRun(orderId: string, raw: unknown): Promise<OrderEntity> {
+  const payload = workerRunSchema.parse(raw);
+  const dataSource = await getDataSource();
+  await dataSource.transaction(async (manager) => {
+    const order = await getOrderOr404(orderId, manager);
+    await manager.getRepository(WorkerSubmissionSchema).save({
+      id: randomUUID(), order_id: order.id, worker_id: payload.workerId, submission_type: "run",
+      notes: payload.notes ?? null, model: payload.model, mode: payload.mode,
+      input_tokens: payload.inputTokens ?? null, output_tokens: payload.outputTokens ?? null,
+      reasoning_tokens: payload.reasoningTokens ?? null, total_tokens: payload.totalTokens ?? null,
+      run_status: payload.status, finished_at: utcNow()
+    });
+  });
+  return getOrderOr404(orderId);
+}
+
 const baseFinalOutputTypes = [
   "deliverable_source",
   "docx",
@@ -138,7 +161,7 @@ export async function claimOldest(workerId: string) {
 
 export async function claimById(workerId: string, orderId: string, options: { redo?: boolean } = {}) {
   const allowedStatuses = options.redo
-    ? ["approved", "failed", "in_progress", "worker_done_pending_approval", "admin_review"]
+    ? ["approved", "failed", "in_progress", "sample_pending_customer_approval", "sample_revision_required", "full_approved", "worker_done_pending_approval", "admin_review"]
     : ["approved", "failed"];
   const dataSource = await getDataSource();
   let claimedId: string | null = null;
@@ -225,7 +248,8 @@ export async function submitDraft(
     storage_path: string;
     content_type: string | null;
     size_bytes: number;
-  }
+  },
+  options: { status?: "in_progress" | "sample_pending_customer_approval"; outputType?: string } = {}
 ): Promise<OrderEntity> {
   const dataSource = await getDataSource();
   await dataSource.transaction(async (manager) => {
@@ -245,7 +269,7 @@ export async function submitDraft(
         id: randomUUID(),
         order_id: order.id,
         worker_submission_id: submission.id,
-        output_type: "draft",
+        output_type: options.outputType ?? "draft",
         original_name: storedDraft.original_name,
         stored_name: storedDraft.stored_name,
         storage_path: storedDraft.storage_path,
@@ -255,9 +279,27 @@ export async function submitDraft(
       });
     }
 
-    await setOrderStatus(manager, order, "in_progress", workerId, notes || "Draft submitted for human review.");
+    await setOrderStatus(manager, order, options.status ?? "in_progress", workerId, notes || "Draft submitted for human review.");
   });
   return getOrderOr404(orderId);
+}
+
+export async function submitSample(
+  orderId: string,
+  workerId: string,
+  notes: string | null,
+  storedSample?: {
+    original_name: string;
+    stored_name: string;
+    storage_path: string;
+    content_type: string | null;
+    size_bytes: number;
+  }
+): Promise<OrderEntity> {
+  return submitDraft(orderId, workerId, notes, storedSample, {
+    status: "sample_pending_customer_approval",
+    outputType: "sample"
+  });
 }
 
 function isPresentationOrder(order: Pick<OrderEntity, "order_type" | "quantity_type">): boolean {

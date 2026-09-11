@@ -2,6 +2,9 @@ export type OrderStatus =
   | "submitted"
   | "approved"
   | "in_progress"
+  | "sample_pending_customer_approval"
+  | "sample_revision_required"
+  | "full_approved"
   | "worker_done_pending_approval"
   | "admin_review"
   | "completed"
@@ -155,6 +158,11 @@ export interface PaymentNote {
   created_at: string;
   url?: string | null;
 }
+export interface WorkerRun {
+  id: string; model?: string | null; mode?: string | null; input_tokens?: number | null;
+  output_tokens?: number | null; reasoning_tokens?: number | null; total_tokens?: number | null;
+  run_status?: string | null; created_at: string; finished_at?: string | null;
+}
 
 export interface Order {
   id: string;
@@ -198,6 +206,7 @@ export interface Order {
   final_outputs?: FinalOutput[];
   review_notes?: ReviewNote[];
   payment_notes?: PaymentNote[];
+  worker_submissions?: WorkerRun[];
 }
 
 export interface ReferenceInput {

@@ -170,6 +170,14 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_worker_submissions_order_id on worker_submissions(order_id)`,
+  `alter table worker_submissions add column if not exists model varchar(120)`,
+  `alter table worker_submissions add column if not exists mode varchar(32)`,
+  `alter table worker_submissions add column if not exists input_tokens integer`,
+  `alter table worker_submissions add column if not exists output_tokens integer`,
+  `alter table worker_submissions add column if not exists reasoning_tokens integer`,
+  `alter table worker_submissions add column if not exists total_tokens integer`,
+  `alter table worker_submissions add column if not exists run_status varchar(32)`,
+  `alter table worker_submissions add column if not exists finished_at timestamptz`,
   `create table if not exists final_outputs (
     id varchar(36) primary key,
     order_id varchar(36) not null references orders(id) on delete cascade,
