@@ -164,9 +164,14 @@ export interface WorkerSubmissionEntity {
   model: string | null;
   mode: string | null;
   input_tokens: number | null;
+  cached_input_tokens: number | null;
   output_tokens: number | null;
   reasoning_tokens: number | null;
   total_tokens: number | null;
+  input_price_per_million_usd: number | null;
+  cached_input_price_per_million_usd: number | null;
+  output_price_per_million_usd: number | null;
+  estimated_cost_usd: number | null;
   run_status: string | null;
   finished_at: Date | null;
   created_at: Date;
@@ -478,9 +483,14 @@ export const WorkerSubmissionSchema = new EntitySchema<WorkerSubmissionEntity>({
     model: { type: String, length: 120, nullable: true },
     mode: { type: String, length: 32, nullable: true },
     input_tokens: { type: Number, nullable: true },
+    cached_input_tokens: { type: Number, nullable: true },
     output_tokens: { type: Number, nullable: true },
     reasoning_tokens: { type: Number, nullable: true },
     total_tokens: { type: Number, nullable: true },
+    input_price_per_million_usd: { type: "decimal", precision: 12, scale: 6, nullable: true },
+    cached_input_price_per_million_usd: { type: "decimal", precision: 12, scale: 6, nullable: true },
+    output_price_per_million_usd: { type: "decimal", precision: 12, scale: 6, nullable: true },
+    estimated_cost_usd: { type: "decimal", precision: 16, scale: 8, nullable: true },
     run_status: { type: String, length: 32, nullable: true },
     finished_at: { type: "timestamptz", nullable: true },
     created_at: createdAtColumn

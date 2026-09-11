@@ -243,10 +243,13 @@ function serializeStatusLog(log: OrderStatusLogEntity) {
 }
 
 function serializeWorkerRun(run: WorkerSubmissionEntity) {
+  const numberOrNull = (value: number | null) => value == null ? null : Number(value);
   return {
-    id: run.id, model: run.model, mode: run.mode, input_tokens: run.input_tokens,
+    id: run.id, model: run.model, mode: run.mode, input_tokens: run.input_tokens, cached_input_tokens: run.cached_input_tokens,
     output_tokens: run.output_tokens, reasoning_tokens: run.reasoning_tokens,
-    total_tokens: run.total_tokens, run_status: run.run_status,
+    total_tokens: run.total_tokens, input_price_per_million_usd: numberOrNull(run.input_price_per_million_usd),
+    cached_input_price_per_million_usd: numberOrNull(run.cached_input_price_per_million_usd), output_price_per_million_usd: numberOrNull(run.output_price_per_million_usd),
+    estimated_cost_usd: numberOrNull(run.estimated_cost_usd), run_status: run.run_status,
     created_at: iso(run.created_at), finished_at: iso(run.finished_at)
   };
 }

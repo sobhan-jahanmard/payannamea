@@ -15,6 +15,7 @@ import {
 } from "./db/entities";
 import { deleteStoredUpload } from "./files";
 import { ApiError, compact } from "./http";
+import { estimateOpenAiTextCost } from "./openai-pricing";
 import { deleteWorkerLock, getOrderOr404, serializeOrder, setOrderStatus } from "./orders";
 
 export const workerActionSchema = z.object({
@@ -25,12 +26,14 @@ export const workerActionSchema = z.object({
 const workerRunSchema = workerActionSchema.extend({
   model: z.string().min(1).max(120), mode: z.enum(["full", "sample"]),
   inputTokens: z.number().int().min(0).optional(), outputTokens: z.number().int().min(0).optional(),
+  cachedInputTokens: z.number().int().min(0).optional(),
   reasoningTokens: z.number().int().min(0).optional(), totalTokens: z.number().int().min(0).optional(),
   status: z.enum(["completed", "failed"])
 });
 
 export async function recordWorkerRun(orderId: string, raw: unknown): Promise<OrderEntity> {
   const payload = workerRunSchema.parse(raw);
+  const estimate = estimateOpenAiTextCost(payload.model, payload.inputTokens, payload.cachedInputTokens, payload.outputTokens);
   const dataSource = await getDataSource();
   await dataSource.transaction(async (manager) => {
     const order = await getOrderOr404(orderId, manager);
@@ -38,7 +41,12 @@ export async function recordWorkerRun(orderId: string, raw: unknown): Promise<Or
       id: randomUUID(), order_id: order.id, worker_id: payload.workerId, submission_type: "run",
       notes: payload.notes ?? null, model: payload.model, mode: payload.mode,
       input_tokens: payload.inputTokens ?? null, output_tokens: payload.outputTokens ?? null,
+      cached_input_tokens: payload.cachedInputTokens ?? null,
       reasoning_tokens: payload.reasoningTokens ?? null, total_tokens: payload.totalTokens ?? null,
+      input_price_per_million_usd: estimate?.pricing.inputPerMillionUsd ?? null,
+      cached_input_price_per_million_usd: estimate?.pricing.cachedInputPerMillionUsd ?? null,
+      output_price_per_million_usd: estimate?.pricing.outputPerMillionUsd ?? null,
+      estimated_cost_usd: estimate?.costUsd ?? null,
       run_status: payload.status, finished_at: utcNow()
     });
   });

@@ -40,7 +40,7 @@ class Services:
     token_usage: dict[str, int] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
-        self.token_usage = {"inputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
+        self.token_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
 
     def run_codex(self, prompt: str, target: Path) -> None:
         if target.exists() and target.read_text(encoding="utf-8").strip():
@@ -62,9 +62,11 @@ class Services:
             try: event = json.loads(line)
             except json.JSONDecodeError: continue
             usage = event.get("usage") or event.get("data", {}).get("usage") or {}
-            for key, target in (("input_tokens", "inputTokens"), ("output_tokens", "outputTokens"), ("total_tokens", "totalTokens")):
-                if isinstance(usage.get(key), int): self.token_usage[target] = max(self.token_usage[target], usage[key])
+            for key, usage_field in (("input_tokens", "inputTokens"), ("output_tokens", "outputTokens"), ("total_tokens", "totalTokens")):
+                if isinstance(usage.get(key), int): self.token_usage[usage_field] = max(self.token_usage[usage_field], usage[key])
             detail = usage.get("output_tokens_details") or {}
+            input_detail = usage.get("input_tokens_details") or {}
+            if isinstance(input_detail.get("cached_tokens"), int): self.token_usage["cachedInputTokens"] = max(self.token_usage["cachedInputTokens"], input_detail["cached_tokens"])
             if isinstance(detail.get("reasoning_tokens"), int): self.token_usage["reasoningTokens"] = max(self.token_usage["reasoningTokens"], detail["reasoning_tokens"])
         if result.returncode:
             raise RuntimeError(f"Codex exited with code {result.returncode}")
@@ -158,7 +160,8 @@ def main() -> None:
     finally:
         if context.get("order_id") and not args.offline:
             try:
-                record_run(config, context["order_id"], {"workerId": config.worker_id, "model": config.codex_model, "mode": context["mode"], "status": "completed" if not context.get("errors") else "failed", "notes": context.get("errors", [None])[-1], **services.token_usage})
+                errors = context.get("errors") or []
+                record_run(config, context["order_id"], {"workerId": config.worker_id, "model": config.codex_model, "mode": context["mode"], "status": "completed" if not errors else "failed", "notes": errors[-1] if errors else None, **services.token_usage})
             except Exception as record_error:
                 print(f"Could not record worker run usage: {record_error}", file=sys.stderr)
 

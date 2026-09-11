@@ -160,7 +160,10 @@ export interface PaymentNote {
 }
 export interface WorkerRun {
   id: string; model?: string | null; mode?: string | null; input_tokens?: number | null;
+  cached_input_tokens?: number | null;
   output_tokens?: number | null; reasoning_tokens?: number | null; total_tokens?: number | null;
+  input_price_per_million_usd?: number | null; cached_input_price_per_million_usd?: number | null;
+  output_price_per_million_usd?: number | null; estimated_cost_usd?: number | null;
   run_status?: string | null; created_at: string; finished_at?: string | null;
 }
 

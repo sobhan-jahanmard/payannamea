@@ -577,12 +577,31 @@ function AdminOrderDetail() {
 }
 
 function WorkerRunHistory({ runs }: { runs: WorkerRun[] }) {
+  const totalCost = runs.reduce((sum, run) => sum + Number(run.estimated_cost_usd ?? 0), 0);
+  const totalTokens = runs.reduce((sum, run) => sum + Number(run.total_tokens ?? 0), 0);
+  const byModel = Object.values(runs.reduce<Record<string, { model: string; runs: number; tokens: number; cost: number }>>((result, run) => {
+    const model = run.model ?? "مدل نامشخص";
+    const row = result[model] ?? { model, runs: 0, tokens: 0, cost: 0 };
+    row.runs += 1;
+    row.tokens += Number(run.total_tokens ?? 0);
+    row.cost += Number(run.estimated_cost_usd ?? 0);
+    result[model] = row;
+    return result;
+  }, {}));
+  const usd = (amount: number | null | undefined) => amount == null ? "نرخ نامشخص" : `$${Number(amount).toFixed(6)}`;
   return <div className="grid gap-3 rounded-md border border-border bg-white p-4">
     <h3 className="font-semibold">تاریخچه اجرای Worker و مصرف مدل</h3>
-    {runs.length ? <div className="grid gap-2">{runs.map((run) => <div key={run.id} className="rounded-md bg-muted p-3 text-sm">
+    {runs.length ? <><div className="grid gap-2 rounded-md border border-teal-100 bg-teal-50 p-3 text-sm sm:grid-cols-2">
+      <div><div className="text-muted-foreground">هزینه تخمینی کل</div><div className="mt-1 text-base font-semibold">{usd(totalCost)}</div></div>
+      <div><div className="text-muted-foreground">مجموع توکن همه اجراها</div><div className="mt-1 text-base font-semibold">{totalTokens.toLocaleString("fa-IR")}</div></div>
+    </div>
+    <div className="overflow-x-auto rounded-md border border-border"><table className="w-full min-w-[420px] text-right text-sm"><thead className="bg-muted text-muted-foreground"><tr><th className="p-2">مدل</th><th className="p-2">اجرا</th><th className="p-2">توکن</th><th className="p-2">هزینه تخمینی</th></tr></thead><tbody>{byModel.map((row) => <tr key={row.model} className="border-t border-border"><td className="p-2 ltr text-left">{row.model}</td><td className="p-2">{row.runs.toLocaleString("fa-IR")}</td><td className="p-2">{row.tokens.toLocaleString("fa-IR")}</td><td className="p-2">{usd(row.cost)}</td></tr>)}</tbody></table></div>
+    <p className="text-xs text-muted-foreground">هزینه‌ها با نرخ snapshot شده‌ی OpenAI برای هر اجرا محاسبه می‌شوند؛ هزینه‌ی ابزارها و سرویس‌های جانبی در این عدد نیست.</p>
+    <div className="grid gap-2">{runs.map((run) => <div key={run.id} className="rounded-md bg-muted p-3 text-sm">
       <div className="flex flex-wrap justify-between gap-2"><span>{run.model ?? "-"} · {run.mode ?? "-"} · {run.run_status ?? "-"}</span><span className="text-muted-foreground">{formatDateTime(run.finished_at ?? run.created_at)}</span></div>
-      <div className="mt-1 text-muted-foreground">Input: {(run.input_tokens ?? 0).toLocaleString("fa-IR")} · Output: {(run.output_tokens ?? 0).toLocaleString("fa-IR")} · Reasoning: {(run.reasoning_tokens ?? 0).toLocaleString("fa-IR")} · Total: {(run.total_tokens ?? 0).toLocaleString("fa-IR")}</div>
-    </div>)}</div> : <p className="text-sm text-muted-foreground">هنوز اجرایی ثبت نشده است.</p>}
+      <div className="mt-1 text-muted-foreground">Input: {(run.input_tokens ?? 0).toLocaleString("fa-IR")} · Cached: {(run.cached_input_tokens ?? 0).toLocaleString("fa-IR")} · Output: {(run.output_tokens ?? 0).toLocaleString("fa-IR")} · Reasoning: {(run.reasoning_tokens ?? 0).toLocaleString("fa-IR")} · Total: {(run.total_tokens ?? 0).toLocaleString("fa-IR")}</div>
+      <div className="mt-1 font-medium">هزینه تخمینی: {usd(run.estimated_cost_usd)}</div>
+    </div>)}</div></> : <p className="text-sm text-muted-foreground">هنوز اجرایی ثبت نشده است.</p>}
   </div>;
 }
 

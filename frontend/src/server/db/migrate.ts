@@ -173,9 +173,25 @@ const statements = [
   `alter table worker_submissions add column if not exists model varchar(120)`,
   `alter table worker_submissions add column if not exists mode varchar(32)`,
   `alter table worker_submissions add column if not exists input_tokens integer`,
+  `alter table worker_submissions add column if not exists cached_input_tokens integer`,
   `alter table worker_submissions add column if not exists output_tokens integer`,
   `alter table worker_submissions add column if not exists reasoning_tokens integer`,
   `alter table worker_submissions add column if not exists total_tokens integer`,
+  `alter table worker_submissions add column if not exists input_price_per_million_usd numeric(12,6)`,
+  `alter table worker_submissions add column if not exists cached_input_price_per_million_usd numeric(12,6)`,
+  `alter table worker_submissions add column if not exists output_price_per_million_usd numeric(12,6)`,
+  `alter table worker_submissions add column if not exists estimated_cost_usd numeric(16,8)`,
+  `update worker_submissions
+     set input_price_per_million_usd = case model when 'gpt-6-astra' then 10 when 'gpt-5.6-sol' then 4 when 'gpt-5.6-terra' then 2 when 'gpt-5.6-luna' then 0.2 end,
+         cached_input_price_per_million_usd = case model when 'gpt-6-astra' then 1 when 'gpt-5.6-sol' then 0.4 when 'gpt-5.6-terra' then 0.2 when 'gpt-5.6-luna' then 0.02 end,
+         output_price_per_million_usd = case model when 'gpt-6-astra' then 50 when 'gpt-5.6-sol' then 20 when 'gpt-5.6-terra' then 12 when 'gpt-5.6-luna' then 1.2 end,
+         estimated_cost_usd = case model
+           when 'gpt-6-astra' then (coalesce(input_tokens, 0) * 10 + coalesce(output_tokens, 0) * 50) / 1000000.0
+           when 'gpt-5.6-sol' then (coalesce(input_tokens, 0) * 4 + coalesce(output_tokens, 0) * 20) / 1000000.0
+           when 'gpt-5.6-terra' then (coalesce(input_tokens, 0) * 2 + coalesce(output_tokens, 0) * 12) / 1000000.0
+           when 'gpt-5.6-luna' then (coalesce(input_tokens, 0) * 0.2 + coalesce(output_tokens, 0) * 1.2) / 1000000.0
+         end
+   where submission_type = 'run' and estimated_cost_usd is null and model in ('gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')`,
   `alter table worker_submissions add column if not exists run_status varchar(32)`,
   `alter table worker_submissions add column if not exists finished_at timestamptz`,
   `create table if not exists final_outputs (
