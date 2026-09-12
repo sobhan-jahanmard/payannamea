@@ -613,7 +613,8 @@ def main() -> None:
         if not context.get("order_id"):
             raise SystemExit("No saved order is available to repackage.")
         if not args.offline:
-            claim_oldest(config, context["order_id"], redo=True)
+            claimed = claim_oldest(config, context["order_id"], redo=True)
+            context["order"] = claimed["customerInput"]
         context["status"] = "in_progress"
         context["errors"] = []
         context["completed_steps"] = STEPS[:8]
@@ -627,7 +628,8 @@ def main() -> None:
             # Re-claiming and heartbeating keep the backend state correct even when
             # the expensive intake/source stages are intentionally skipped.
             if not args.offline:
-                claim_oldest(config, context["order_id"], redo=True)
+                claimed = claim_oldest(config, context["order_id"], redo=True)
+                context["order"] = claimed["customerInput"]
                 heartbeat(config, context["order_id"], f"Worker Plus resumed from step {args.step}.")
             context["status"] = "in_progress"
             context["errors"] = []

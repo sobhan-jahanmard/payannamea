@@ -12,6 +12,7 @@ def run(context: dict[str, Any], services: Any) -> None:
     target = services.workspace / "final" / ("sample_source.md" if is_sample else "deliverable_source.md")
     uploaded_sources = context.get("artifacts", {}).get("customer_sources", "extracted/customer_sources")
     source_contract = context.get("artifacts", {}).get("resolved_source_rules", "extracted/resolved_source_rules.md")
+    admin_rules = context.get("artifacts", {}).get("admin_internal_rules", "extracted/admin_internal_rules.md")
     prompt = f"""برای پایان‌نامه کارشناسی با عنوان «{order.get('title')}»، {scope} آماده کن.
 
 خروجی باید Markdown آماده‌ی تبدیل به Word باشد، نه توضیح درباره‌ی کار. فقط متن نهایی را بده؛ هیچ مقدمه، عذرخواهی، کدبلاک، TODO یا ادعای انجام‌نداده نیاور. از ابزار فایل، shell یا ویرایش فایل استفاده نکن.
@@ -26,7 +27,7 @@ def run(context: dict[str, Any], services: Any) -> None:
 7) {volume_rule}
 
 Worker بر اساس شیوه‌نامه، فونت، صفحه‌آرایی و کنترل کیفیت را اعمال می‌کند و پاسخ تو را در `{target.relative_to(services.workspace)}` ذخیره می‌کند."""
-    prompt += f"""\n\nمنابع آپلودشدهٔ مشتری در `{uploaded_sources}` و قرارداد قواعدِ اجباری آن‌ها در `{source_contract}` قرار دارند. پیش از نوشتن هر دو را بررسی کن، تمام بایدها و نبایدها را رعایت کن و هیچ فایل یا قاعده‌ای را نادیده نگیر. تعارض حل‌نشده را با ادعای ساختگی پنهان نکن."""
+    prompt += f"""\n\nمنابع آپلودشدهٔ مشتری در `{uploaded_sources}`، قرارداد یکپارچهٔ قواعد در `{source_contract}` و یادداشت‌های اجباری مدیر در `{admin_rules}` قرار دارند. پیش از نوشتن همه را بررسی کن، تمام بایدها و نبایدها و تک‌تک یادداشت‌های مدیر را رعایت کن و هیچ فایل یا قاعده‌ای را نادیده نگیر. تعارض حل‌نشده یا دستور ناممکن را با ادعای ساختگی پنهان نکن."""
     services.run_codex(prompt, target)
     # Full theses are often longer than one model response. Extend the body in focused batches
     # while preserving the original verified reference list instead of accepting a short package.

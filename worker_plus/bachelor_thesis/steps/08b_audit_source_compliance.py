@@ -23,6 +23,14 @@ def run(context: dict[str, Any], services: Any) -> None:
     contract_ok = bool(contract_text.strip()) and not any(marker in contract_text for marker in blocked_markers)
     checks.append(("قرارداد منابع قابل‌خواندن و بدون خطای زیرساختی است", "PASS" if contract_ok else "FAIL", str(contract.relative_to(services.workspace))))
 
+    admin_notes = [str(note.get("note") or "").strip() for note in context["order"].get("review_notes", []) if str(note.get("note") or "").strip()]
+    admin_rules_ok = all(note in contract_text for note in admin_notes)
+    checks.append((
+        f"تمام {len(admin_notes)} یادداشت داخلی مدیر در قرارداد اجباری ثبت شده‌اند",
+        "PASS" if admin_rules_ok else "FAIL",
+        context["artifacts"].get("admin_internal_rules", "extracted/admin_internal_rules.md"),
+    ))
+
     minimum_words = 1200 if context.get("mode") == "sample" else 6000
     source_ok = source.exists() and persian_word_count(source_text) >= minimum_words
     checks.append((f"متن خروجی دست‌کم {minimum_words} واژهٔ فارسی دارد", "PASS" if source_ok else "FAIL", str(source.relative_to(services.workspace))))
