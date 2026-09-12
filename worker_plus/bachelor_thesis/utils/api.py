@@ -48,13 +48,13 @@ def download_file(config: Config, url: str, target: Path) -> None:
     target.write_bytes(response.content)
 
 
-def submit_sample(config: Config, order_id: str, path: Path, notes: str) -> dict[str, Any]:
-    with path.open("rb") as handle:
+def submit_sample(config: Config, order_id: str, path: Path, pdf: Path, notes: str) -> dict[str, Any]:
+    with path.open("rb") as handle, pdf.open("rb") as pdf_handle:
         return _json(requests.post(
             f"{config.backend_url}/api/worker/orders/{order_id}/submit-sample",
             headers=_headers(config),
             data={"worker_id": config.worker_id, "notes": notes},
-            files={"sample_file": (path.name, handle, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            files={"sample_file": (path.name, handle, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "sample_pdf_file": (pdf.name, pdf_handle, "application/pdf")},
             timeout=600,
         ))
 

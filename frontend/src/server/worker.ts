@@ -53,14 +53,7 @@ export async function recordWorkerRun(orderId: string, raw: unknown): Promise<Or
   return getOrderOr404(orderId);
 }
 
-const baseFinalOutputTypes = [
-  "deliverable_source",
-  "docx",
-  "compliance_report",
-  "reference_usage_report",
-  "human_review_checklist",
-  "final_readme"
-] as const;
+const baseFinalOutputTypes = ["docx", "pdf"] as const;
 
 const outputTypeLabels: Record<string, string> = {
   deliverable_source: "deliverable source",
@@ -167,7 +160,7 @@ export async function claimOldest(workerId: string) {
   };
 }
 
-export async function claimById(workerId: string, orderId: string, options: { redo?: boolean } = {}) {
+export async function claimById(workerId: string, orderId: string, options: { redo?: boolean; ignoreStatus?: boolean } = {}) {
   const allowedStatuses = options.redo
     ? ["approved", "failed", "in_progress", "sample_pending_customer_approval", "sample_revision_required", "full_approved", "worker_done_pending_approval", "admin_review"]
     : ["approved", "failed"];
@@ -186,7 +179,7 @@ export async function claimById(workerId: string, orderId: string, options: { re
     if (!order) {
       throw new ApiError(404, "Order not found");
     }
-    if (!allowedStatuses.includes(order.status)) {
+    if (!options.ignoreStatus && !allowedStatuses.includes(order.status)) {
       throw new ApiError(
         409,
         `Order with status '${order.status}' cannot be claimed${options.redo ? " for redo" : ""}`
@@ -308,6 +301,25 @@ export async function submitSample(
     status: "sample_pending_customer_approval",
     outputType: "sample"
   });
+}
+
+export async function submitSamplePackage(
+  orderId: string, workerId: string, notes: string | null,
+  uploads: Array<{ output_type: string; original_name: string; stored_name: string; storage_path: string; content_type: string | null; size_bytes: number }>
+): Promise<OrderEntity> {
+  if (uploads.length !== 2 || !new Set(uploads.map((item) => item.output_type)).has("sample") || !new Set(uploads.map((item) => item.output_type)).has("sample_pdf")) {
+    throw new ApiError(422, "Sample package must contain sample.docx and sample.pdf only");
+  }
+  const dataSource = await getDataSource();
+  await dataSource.transaction(async (manager) => {
+    const order = await getOrderOr404(orderId, manager);
+    const lock = await getActiveLock(manager, order.id, workerId);
+    await extendLock(manager, lock);
+    const submission = await manager.getRepository(WorkerSubmissionSchema).save({ id: randomUUID(), order_id: order.id, worker_id: workerId, submission_type: "draft", notes: compact(notes) });
+    for (const upload of uploads) await manager.getRepository(FinalOutputSchema).save({ id: randomUUID(), order_id: order.id, worker_submission_id: submission.id, notes: compact(notes), ...upload });
+    await setOrderStatus(manager, order, "sample_pending_customer_approval", workerId, notes || "Sample package submitted for approval.");
+  });
+  return getOrderOr404(orderId);
 }
 
 function isPresentationOrder(order: Pick<OrderEntity, "order_type" | "quantity_type">): boolean {

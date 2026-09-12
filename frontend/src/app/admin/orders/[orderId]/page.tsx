@@ -8,6 +8,7 @@ import {
   MessageSquarePlus,
   RefreshCcw,
   Save,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -24,7 +25,9 @@ import {
   absoluteUrl,
   addPaymentNote,
   addReviewNote,
+  deleteAdminFinalOutput,
   getAdminOrder,
+  deleteAdminOrderFile,
   updateAdminStatus,
 } from "../../../../lib/api";
 import {
@@ -62,6 +65,7 @@ function AdminOrderDetail() {
   const [approvingOrder, setApprovingOrder] = useState(false);
   const [savingReviewNote, setSavingReviewNote] = useState(false);
   const [savingPaymentNote, setSavingPaymentNote] = useState<PaymentNoteType | null>(null);
+  const [deletingOutputId, setDeletingOutputId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -141,6 +145,29 @@ function AdminOrderDetail() {
       showToast("error", message);
     } finally {
       setSavingReviewNote(false);
+    }
+  }
+
+  async function removeFile(fileId: string) {
+    if (!order || !window.confirm("این فایل حذف شود؟")) return;
+    try {
+      setOrder(await deleteAdminOrderFile(order.id, fileId));
+      showToast("success", "فایل حذف شد.");
+    } catch (removeError) {
+      showToast("error", removeError instanceof Error ? removeError.message : "حذف فایل ناموفق بود");
+    }
+  }
+
+  async function removeFinalOutput(outputId: string, fileName: string) {
+    if (!order || !window.confirm(`خروجی «${fileName}» حذف شود؟ این عمل قابل بازگشت نیست.`)) return;
+    setDeletingOutputId(outputId);
+    try {
+      setOrder(await deleteAdminFinalOutput(order.id, outputId));
+      showToast("success", "خروجی و فایل ذخیره‌شده آن حذف شد.");
+    } catch (removeError) {
+      showToast("error", removeError instanceof Error ? removeError.message : "حذف خروجی ناموفق بود");
+    } finally {
+      setDeletingOutputId(null);
     }
   }
 
@@ -398,7 +425,7 @@ function AdminOrderDetail() {
               </div>
             </dl>
 
-            <OrderFilesSection files={order.files} />
+            <OrderFilesSection files={order.files} onDelete={(fileId) => void removeFile(fileId)} />
 
             <div className="grid gap-3 rounded-md border border-border bg-white p-4">
               <h3 className="font-semibold">بررسی و تغییر وضعیت</h3>
@@ -479,10 +506,10 @@ function AdminOrderDetail() {
               {order.final_outputs?.length ? (
                 <div className="grid gap-2">
                   {order.final_outputs.map((output) => (
+                    <div key={output.id} className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm">
                     <a
-                      key={output.id}
                       href={absoluteUrl(output.url)}
-                      className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2 text-sm hover:bg-teal-50"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 hover:text-primary"
                     >
                       <span className="min-w-0">
                         <span className="block truncate font-medium">
@@ -490,7 +517,7 @@ function AdminOrderDetail() {
                         </span>
                         <span className="ltr block text-left text-xs text-muted-foreground">
                           {output.output_type} ·{" "}
-                          {formatBytes(output.size_bytes)}
+                          {formatBytes(output.size_bytes)} · تاریخ آپلود: {formatDateTime(output.created_at)}
                         </span>
                       </span>
                       <Download
@@ -498,6 +525,19 @@ function AdminOrderDetail() {
                         aria-hidden="true"
                       />
                     </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      loading={deletingOutputId === output.id}
+                      disabled={deletingOutputId !== null && deletingOutputId !== output.id}
+                      onClick={() => void removeFinalOutput(output.id, output.original_name)}
+                      aria-label={`حذف ${output.original_name}`}
+                      title={`حذف ${output.original_name}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
+                    </Button>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -577,13 +617,16 @@ function AdminOrderDetail() {
 }
 
 function WorkerRunHistory({ runs }: { runs: WorkerRun[] }) {
+  const runTotalTokens = (run: WorkerRun) => run.total_tokens && run.total_tokens > 0
+    ? run.total_tokens
+    : Number(run.input_tokens ?? 0) + Number(run.output_tokens ?? 0);
   const totalCost = runs.reduce((sum, run) => sum + Number(run.estimated_cost_usd ?? 0), 0);
-  const totalTokens = runs.reduce((sum, run) => sum + Number(run.total_tokens ?? 0), 0);
+  const totalTokens = runs.reduce((sum, run) => sum + runTotalTokens(run), 0);
   const byModel = Object.values(runs.reduce<Record<string, { model: string; runs: number; tokens: number; cost: number }>>((result, run) => {
     const model = run.model ?? "مدل نامشخص";
     const row = result[model] ?? { model, runs: 0, tokens: 0, cost: 0 };
     row.runs += 1;
-    row.tokens += Number(run.total_tokens ?? 0);
+    row.tokens += runTotalTokens(run);
     row.cost += Number(run.estimated_cost_usd ?? 0);
     result[model] = row;
     return result;
@@ -599,13 +642,13 @@ function WorkerRunHistory({ runs }: { runs: WorkerRun[] }) {
     <p className="text-xs text-muted-foreground">هزینه‌ها با نرخ snapshot شده‌ی OpenAI برای هر اجرا محاسبه می‌شوند؛ هزینه‌ی ابزارها و سرویس‌های جانبی در این عدد نیست.</p>
     <div className="grid gap-2">{runs.map((run) => <div key={run.id} className="rounded-md bg-muted p-3 text-sm">
       <div className="flex flex-wrap justify-between gap-2"><span>{run.model ?? "-"} · {run.mode ?? "-"} · {run.run_status ?? "-"}</span><span className="text-muted-foreground">{formatDateTime(run.finished_at ?? run.created_at)}</span></div>
-      <div className="mt-1 text-muted-foreground">Input: {(run.input_tokens ?? 0).toLocaleString("fa-IR")} · Cached: {(run.cached_input_tokens ?? 0).toLocaleString("fa-IR")} · Output: {(run.output_tokens ?? 0).toLocaleString("fa-IR")} · Reasoning: {(run.reasoning_tokens ?? 0).toLocaleString("fa-IR")} · Total: {(run.total_tokens ?? 0).toLocaleString("fa-IR")}</div>
+      <div className="mt-1 text-muted-foreground">Input: {(run.input_tokens ?? 0).toLocaleString("fa-IR")} · Cached: {(run.cached_input_tokens ?? 0).toLocaleString("fa-IR")} · Output: {(run.output_tokens ?? 0).toLocaleString("fa-IR")} · Reasoning: {(run.reasoning_tokens ?? 0).toLocaleString("fa-IR")} · Total: {runTotalTokens(run).toLocaleString("fa-IR")}</div>
       <div className="mt-1 font-medium">هزینه تخمینی: {usd(run.estimated_cost_usd)}</div>
     </div>)}</div></> : <p className="text-sm text-muted-foreground">هنوز اجرایی ثبت نشده است.</p>}
   </div>;
 }
 
-function OrderFilesSection({ files }: { files?: OrderFile[] }) {
+function OrderFilesSection({ files, onDelete }: { files?: OrderFile[]; onDelete: (fileId: string) => void }) {
   const groups = [
     { type: "university_guideline", label: "شیوه‌نامه و قالب" },
     { type: "reference_file", label: "منابع و مقالات" },
@@ -631,18 +674,16 @@ function OrderFilesSection({ files }: { files?: OrderFile[] }) {
             <div key={group.type} className="grid content-start gap-2 rounded-md border border-border p-3">
               <h4 className="text-sm font-semibold">{group.label}</h4>
               {group.files.length ? group.files.map((file) => (
-                <a
-                  key={file.id}
-                  href={absoluteUrl(file.url)}
-                  download={file.original_name}
-                  className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm hover:bg-teal-50"
-                >
+                <div key={file.id} className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm">
+                <a href={absoluteUrl(file.url)} download={file.original_name} className="flex min-w-0 flex-1 items-center justify-between gap-2 hover:text-primary">
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{file.original_name}</span>
                     <span className="ltr block text-left text-xs text-muted-foreground">{formatBytes(file.size_bytes)}</span>
                   </span>
                   <Download className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 </a>
+                <Button type="button" size="sm" variant="ghost" onClick={() => onDelete(file.id)} aria-label={`حذف ${file.original_name}`}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                </div>
               )) : <p className="text-xs text-muted-foreground">فایلی ثبت نشده است.</p>}
             </div>
           ))}

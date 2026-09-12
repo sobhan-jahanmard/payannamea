@@ -287,6 +287,14 @@ export async function getAdminOrder(orderId: string): Promise<Order> {
   return request<Order>(`/api/admin/orders/${orderId}`);
 }
 
+export async function deleteAdminOrderFile(orderId: string, fileId: string): Promise<Order> {
+  return request<Order>(`/api/admin/orders/${orderId}?file_id=${encodeURIComponent(fileId)}`, { method: "DELETE" });
+}
+
+export async function deleteAdminFinalOutput(orderId: string, outputId: string): Promise<Order> {
+  return request<Order>(`/api/admin/orders/${orderId}?output_id=${encodeURIComponent(outputId)}`, { method: "DELETE" });
+}
+
 export async function updateAdminStatus(
   orderId: string,
   status: OrderStatus,

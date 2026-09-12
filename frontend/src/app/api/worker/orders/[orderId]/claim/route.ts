@@ -20,7 +20,9 @@ export async function POST(request: Request, context: Context) {
     bearerWorkerAuth(request, workerApiKey());
     const payload = claimSpecificSchema.parse(await request.json());
     const { orderId } = await context.params;
-    return json(await claimById(payload.workerId, orderId, { redo: payload.redo }));
+    // A worker explicitly targeting an order is an operator override: it may
+    // reclaim that order regardless of its current lifecycle status.
+    return json(await claimById(payload.workerId, orderId, { redo: payload.redo, ignoreStatus: true }));
   } catch (error) {
     return errorResponse(error);
   }

@@ -18,7 +18,7 @@ python run.py --order_id 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85
 
 - اجرای عادی: تهیهٔ کامل پایان‌نامه و ارسال package برای بررسی مدیر.
 - اجرای `--sample`: تهیهٔ نمونه، ارسال آن برای مشتری و توقف در وضعیت `sample_pending_customer_approval`.
-- اجرای `--order_id`: سفارش مشخص‌شده را force-claim می‌کند، حتی اگر `in_progress` باشد، و workspace فعال را از نو می‌سازد.
+- اجرای `--order_id`: سفارش مشخص‌شده را بدون توجه به وضعیت فعلی آن force-claim می‌کند و workspace فعال را از نو می‌سازد.
 
 ## ساختار هدف
 

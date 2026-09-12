@@ -182,6 +182,9 @@ const statements = [
   `alter table worker_submissions add column if not exists output_price_per_million_usd numeric(12,6)`,
   `alter table worker_submissions add column if not exists estimated_cost_usd numeric(16,8)`,
   `update worker_submissions
+     set total_tokens = coalesce(input_tokens, 0) + coalesce(output_tokens, 0)
+   where submission_type = 'run' and coalesce(total_tokens, 0) = 0 and (coalesce(input_tokens, 0) > 0 or coalesce(output_tokens, 0) > 0)`,
+  `update worker_submissions
      set input_price_per_million_usd = case model when 'gpt-6-astra' then 10 when 'gpt-5.6-sol' then 4 when 'gpt-5.6-terra' then 2 when 'gpt-5.6-luna' then 0.2 end,
          cached_input_price_per_million_usd = case model when 'gpt-6-astra' then 1 when 'gpt-5.6-sol' then 0.4 when 'gpt-5.6-terra' then 0.2 when 'gpt-5.6-luna' then 0.02 end,
          output_price_per_million_usd = case model when 'gpt-6-astra' then 50 when 'gpt-5.6-sol' then 20 when 'gpt-5.6-terra' then 12 when 'gpt-5.6-luna' then 1.2 end,

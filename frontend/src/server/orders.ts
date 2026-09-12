@@ -173,7 +173,7 @@ function iso(value: Date | string | null | undefined): string | null {
 }
 
 function byDate<T extends { created_at: Date }>(items: T[] | undefined): T[] {
-  return [...(items ?? [])].sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+  return [...(items ?? [])].sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 }
 
 function parseDeadline(value?: string | null): Date | null {
@@ -271,7 +271,7 @@ export function serializeFinalOutput(output: FinalOutputEntity) {
   };
 }
 
-const CUSTOMER_OUTPUT_PRIORITY = ["sample", "pptx", "docx", "pdf", "deliverable_source"];
+const CUSTOMER_OUTPUT_PRIORITY = ["sample", "sample_pdf", "docx", "pdf"];
 
 export function customerVisibleFinalOutputs(outputs: FinalOutputEntity[] | undefined): FinalOutputEntity[] {
   if (!outputs?.length) {
@@ -286,8 +286,8 @@ export function customerVisibleFinalOutputs(outputs: FinalOutputEntity[] | undef
       return normalizedLeft - normalizedRight;
     }
     return right.created_at.getTime() - left.created_at.getTime();
-  })[0];
-  return selected ? [selected] : [];
+  });
+  return selected.filter((output) => ["sample", "sample_pdf", "docx", "pdf"].includes(output.output_type));
 }
 
 export function customerOutputFileName(orderId: string, output: FinalOutputEntity): string {
@@ -295,6 +295,7 @@ export function customerOutputFileName(orderId: string, output: FinalOutputEntit
     pptx: "pptx",
     docx: "docx",
     pdf: "pdf",
+    sample_pdf: "pdf",
     deliverable_source: "md"
   };
   const extension = extensionByType[output.output_type] || pathExtension(output.original_name) || "dat";
@@ -649,6 +650,27 @@ export async function deleteOrderFile(order: OrderEntity, fileId: string): Promi
   await repository.delete({ id: file.id });
   await deleteStoredUpload(file.storage_path);
   return getOrderOr404(order.id);
+}
+
+export async function deleteOrderFileAsAdmin(orderId: string, fileId: string): Promise<OrderEntity> {
+  const dataSource = await getDataSource();
+  const repository = dataSource.getRepository(OrderFileSchema);
+  const file = await repository.findOneBy({ id: fileId, order_id: orderId });
+  if (!file) throw new ApiError(404, "Order file not found");
+  await repository.delete({ id: file.id });
+  await deleteStoredUpload(file.storage_path);
+  return getOrderOr404(orderId);
+}
+
+export async function deleteFinalOutputAsAdmin(orderId: string, outputId: string): Promise<OrderEntity> {
+  const dataSource = await getDataSource();
+  const repository = dataSource.getRepository(FinalOutputSchema);
+  const output = await repository.findOneBy({ id: outputId, order_id: orderId });
+  if (!output) throw new ApiError(404, "Final output not found");
+
+  await deleteStoredUpload(output.storage_path);
+  await repository.delete({ id: output.id });
+  return getOrderOr404(orderId);
 }
 
 export async function addOrderReference(order: OrderEntity, rawPayload: unknown): Promise<OrderReferenceEntity> {
