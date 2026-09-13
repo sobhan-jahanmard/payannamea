@@ -76,10 +76,11 @@ class StepRunner:
     total: int
     current: int = 0
 
-    def run(self, label: str, action: Any) -> Any:
+    def run(self, label: str, action: Any, *, uses_ai: bool = False) -> Any:
         self.current += 1
         step = self.current
-        print(colorize(f"{step}/{self.total} ... {label}", COLOR_BLUE), flush=True)
+        displayed_label = f"[AI] {label}" if uses_ai else label
+        print(colorize(f"{step}/{self.total} ... {displayed_label}", COLOR_BLUE), flush=True)
         try:
             result = action()
         except StepFailure as exc:
@@ -87,18 +88,18 @@ class StepRunner:
                 exc.step = step
                 exc.total = self.total
                 exc.label = label
-                print(colorize(f"{step}/{self.total} failed: {label}: {exc.reason}", COLOR_RED), flush=True)
+                print(colorize(f"{step}/{self.total} failed: {displayed_label}: {exc.reason}", COLOR_RED), flush=True)
             raise
         except SystemExit as exc:
             reason = str(exc) if str(exc) else f"exited with code {exc.code}"
             code = exc.code if isinstance(exc.code, int) else 1
-            print(colorize(f"{step}/{self.total} failed: {label}: {reason}", COLOR_RED), flush=True)
+            print(colorize(f"{step}/{self.total} failed: {displayed_label}: {reason}", COLOR_RED), flush=True)
             raise StepFailure(step, self.total, label, reason, code) from exc
         except Exception as exc:
             reason = str(exc) or exc.__class__.__name__
-            print(colorize(f"{step}/{self.total} failed: {label}: {reason}", COLOR_RED), flush=True)
+            print(colorize(f"{step}/{self.total} failed: {displayed_label}: {reason}", COLOR_RED), flush=True)
             raise StepFailure(step, self.total, label, reason) from exc
-        print(colorize(f"{step}/{self.total} ✓ {label}", COLOR_GREEN), flush=True)
+        print(colorize(f"{step}/{self.total} ✓ {displayed_label}", COLOR_GREEN), flush=True)
         return result
 
 
@@ -249,7 +250,7 @@ def validate_or_repair_final_package(args: argparse.Namespace, workspace: Path) 
 
     validation_output = result.stdout.strip() or f"validate-final exited with code {result.returncode}"
     for attempt in range(1, attempts + 1):
-        print(colorize(f"Final package validation failed; running Codex repair pass {attempt}/{attempts}.", COLOR_BLUE), flush=True)
+        print(colorize(f"[AI] Final package validation failed; running Codex repair pass {attempt}/{attempts}.", COLOR_BLUE), flush=True)
         repair_prompt = FINAL_REPAIR_PROMPT + validation_output
         run_codex(args, workspace, prompt=repair_prompt)
         package_existing(args, workspace)
@@ -450,7 +451,7 @@ def main() -> None:
 
         steps.run("Select Codex prompt", select_prompt)
         print(f"Running Codex in {workspace}", flush=True)
-        steps.run("Run Codex process", lambda: run_codex(args, workspace))
+        steps.run("Run Codex process", lambda: run_codex(args, workspace), uses_ai=True)
         steps.run("Validate final package and repair if needed", lambda: (verify_generated_package(workspace), validate_or_repair_final_package(args, workspace)))
         if args.no_submit_final:
             steps.run("Skip final submission by request", lambda: None)
