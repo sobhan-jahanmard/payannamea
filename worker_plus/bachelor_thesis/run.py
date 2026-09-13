@@ -567,11 +567,46 @@ class Services:
     def export_pdf(self, docx: Path, pdf: Path) -> None:
         if os.name != "nt":
             raise RuntimeError("PDF export requires the Windows Word runtime")
+        script = Path(__file__).resolve().parent / "utils" / "export_pdf.ps1"
+        last_output = ""
+        for attempt in range(1, 3):
+            self.release_docx_lock(docx)
+            self.release_docx_lock(pdf)
+            if pdf.exists():
+                pdf.unlink()
+            process = subprocess.Popen(
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+            )
+            try:
+                output, _ = process.communicate(timeout=180)
+            except subprocess.TimeoutExpired:
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                output, _ = process.communicate()
+                last_output = output or "Word PDF export timed out"
+                self.release_docx_lock(docx)
+                if attempt == 1:
+                    continue
+                raise RuntimeError("Word PDF export timed out after retry")
+            last_output = output
+            if process.returncode == 0 and pdf.exists() and pdf.stat().st_size:
+                return
+            self.release_docx_lock(docx)
+        raise RuntimeError("Word PDF export failed: " + last_output[-500:])
+
+    def create_first_half_sample(self, docx: Path, sample_docx: Path) -> tuple[int, int]:
+        """Save the actual first half of rendered Word pages as a separate DOCX."""
         self.release_docx_lock(docx)
-        command = f"$w=New-Object -ComObject Word.Application;$w.Visible=$false;$w.DisplayAlerts=0;$d=$w.Documents.Open('{docx}', $false, $true);$d.Fields.Update();$d.ExportAsFixedFormat('{pdf}',17);$d.Close($false);$w.Quit()"
-        result = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-Command", command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=300, check=False)
-        if result.returncode or not pdf.exists() or not pdf.stat().st_size:
-            raise RuntimeError("Word PDF export failed: " + result.stdout[-500:])
+        self.release_docx_lock(sample_docx)
+        script = Path(__file__).resolve().parent / "utils" / "create_first_half_sample.ps1"
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(sample_docx)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=300, check=False,
+        )
+        counts = re.findall(r"^\s*(\d+)\s*,\s*(\d+)\s*$", result.stdout, re.M)
+        if result.returncode or not sample_docx.exists() or not sample_docx.stat().st_size or not counts:
+            raise RuntimeError("Word first-half sample creation failed: " + result.stdout[-500:])
+        return tuple(map(int, counts[-1]))
 
     def validate_docx(self, source: Path, docx: Path, rules: dict[str, Any], report: Path, mode: str, order: dict[str, Any]) -> None:
         from docx import Document
@@ -588,7 +623,9 @@ class Services:
         document = Document(docx)
         errors: list[str] = []
         warnings: list[str] = []
-        min_words = rules["quality"]["min_sample_words"] if mode == "sample" else rules["quality"]["min_full_words"]
+        # `--sample` controls submission status only; every run generates the
+        # same complete package and its first-half excerpt.
+        min_words = rules["quality"]["min_full_words"]
         if len(re.findall(r"[آ-یA-Za-z]{2,}", text)) < min_words: errors.append(f"content below minimum word target ({min_words})")
         if not re.search(r"^# .*?(منابع|References)", text, re.M | re.I): errors.append("missing references section")
         citations = set(re.findall(r"\[([0-9۰-۹]+)\]", text))
@@ -617,7 +654,7 @@ class Services:
             errors.append("table of contents has no clickable entries")
         elif any(anchor not in bookmarks for anchor in toc_links):
             errors.append("table of contents contains a broken internal link")
-        required_pages = int(order.get("quantity_value") or 0) if mode != "sample" and order.get("quantity_type") == "pages" else 0
+        required_pages = int(order.get("quantity_value") or 0) if order.get("quantity_type") == "pages" else 0
         actual_pages = self.count_docx_pages(docx)
         if required_pages and actual_pages < required_pages:
             errors.append(f"page count below order requirement ({actual_pages}/{required_pages})")
@@ -742,7 +779,7 @@ class Services:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Worker Plus: bachelor thesis workflow")
-    parser.add_argument("--sample", action="store_true", help="Generate and publish a customer sample only")
+    parser.add_argument("--sample", action="store_true", help="Set the final order status to customer-sample approval; output generation remains complete")
     parser.add_argument("--order-id", "--order_id", dest="order_id", help="Force-claim this order and start from a fresh workspace")
     parser.add_argument("--redo", action="store_true", help="Allow reclaiming a specific order (implicit with --order-id)")
     parser.add_argument("--resume", action="store_true", help="Resume workspace/in_progress from its saved context")

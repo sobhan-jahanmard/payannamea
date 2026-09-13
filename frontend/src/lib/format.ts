@@ -1,17 +1,7 @@
 import type { OrderStatus, PaymentStatus } from "../types/api";
+import { ORDER_STATUSES, getOrderStatusDefinition } from "./order-status";
 
-export const orderStatuses: OrderStatus[] = [
-  "submitted",
-  "approved",
-  "in_progress",
-  "sample_pending_customer_approval",
-  "sample_revision_required",
-  "full_approved",
-  "worker_done_pending_approval",
-  "admin_review",
-  "completed",
-  "failed"
-];
+export const orderStatuses: OrderStatus[] = ORDER_STATUSES;
 
 export function formatDateTime(value?: string | null): string {
   if (!value) {
@@ -46,19 +36,7 @@ export function formatBytes(size: number): string {
 }
 
 export function statusLabel(status: OrderStatus): string {
-  const labels: Record<OrderStatus, string> = {
-    submitted: "در انتظار تأیید مدیر",
-    approved: "تأیید شده",
-    in_progress: "در حال انجام",
-    sample_pending_customer_approval: "نمونه آماده تأیید مشتری",
-    sample_revision_required: "نمونه نیازمند اصلاح",
-    full_approved: "نمونه تأیید شد؛ آماده انجام کامل",
-    worker_done_pending_approval: "انجام شده، در انتظار تأیید",
-    admin_review: "در انتظار بررسی مدیر",
-    completed: "انجام شده و تمام",
-    failed: "ناموفق"
-  };
-  return labels[status];
+  return getOrderStatusDefinition(status).label;
 }
 
 export const paymentStatuses: PaymentStatus[] = ["fully_paid", "partially_paid", "not_paid", "refunded"];

@@ -11,7 +11,7 @@ interface Context {
   params: Promise<{ orderId: string }>;
 }
 
-const uploadFields = [["docx", "docx_file"], ["pdf", "pdf_file"], ["image_sources", "image_sources_file"]] as const;
+const uploadFields = [["docx", "docx_file"], ["pdf", "pdf_file"], ["sample", "sample_file"], ["sample_pdf", "sample_pdf_file"]] as const;
 
 export async function POST(request: Request, context: Context) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request, context: Context) {
     const { orderId } = await context.params;
     const form = await request.formData();
     for (const key of form.keys()) {
-      if (["worker_id", "notes", "replace_existing", "docx_file", "pdf_file", "image_sources_file"].includes(key)) continue;
+      if (["worker_id", "notes", "replace_existing", "sample_status", "docx_file", "pdf_file", "sample_file", "sample_pdf_file"].includes(key)) continue;
       throw new ApiError(422, `Unsupported final upload field: ${key}`);
     }
     const workerId = form.get("worker_id");
@@ -33,7 +33,7 @@ export async function POST(request: Request, context: Context) {
     for (const [outputType, fieldName] of uploadFields) {
       const file = form.get(fieldName);
       if (file instanceof File) {
-        const canonicalName = outputType === "docx" ? "final.docx" : outputType === "pdf" ? "final.pdf" : file.name;
+      const canonicalName = outputType === "docx" ? "final.docx" : outputType === "pdf" ? "final.pdf" : outputType === "sample" ? "sample.docx" : "sample.pdf";
         const canonicalFile = canonicalName === file.name ? file : new File([file], canonicalName, { type: file.type });
         uploads.push({
           output_type: outputType,
@@ -42,7 +42,7 @@ export async function POST(request: Request, context: Context) {
       }
     }
 
-    const order = await submitFinal(orderId, workerId, notes, uploads, { replaceExisting });
+    const order = await submitFinal(orderId, workerId, notes, uploads, { replaceExisting, sampleStatus: form.get("sample_status") === "true" });
     return json(serializeOrder(order));
   } catch (error) {
     return errorResponse(error);

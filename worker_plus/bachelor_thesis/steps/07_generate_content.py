@@ -6,10 +6,9 @@ TITLE = "Generate content"
 
 def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]
-    is_sample = context["mode"] == "sample"
-    scope = "یک نمونهٔ چندصفحه‌ای شامل چکیده، فهرست و بخش‌هایی از فصل اول و یک فصل محتوایی" if is_sample else "بستهٔ کامل منطبق با طرح مصوب"
-    volume_rule = "حداقل ۱٬۲۰۰ واژهٔ محتوای فارسی تولید کن." if is_sample else "حداقل ۶٬۰۰۰ واژهٔ محتوای فارسی تولید کن. به‌دلیل محدودیت طول پاسخ، متن را فشرده یا خلاصه نکن؛ هر فصل باید چند بخش فرعی و پاراگراف‌های تحلیلی کامل داشته باشد."
-    target = services.workspace / "final" / ("sample_source.md" if is_sample else "deliverable_source.md")
+    scope = "بستهٔ کامل منطبق با طرح مصوب"
+    volume_rule = "حداقل ۶٬۰۰۰ واژهٔ محتوای فارسی تولید کن. به‌دلیل محدودیت طول پاسخ، متن را فشرده یا خلاصه نکن؛ هر فصل باید چند بخش فرعی و پاراگراف‌های تحلیلی کامل داشته باشد."
+    target = services.workspace / "final" / "deliverable_source.md"
     uploaded_sources = context.get("artifacts", {}).get("customer_sources", "extracted/customer_sources")
     source_contract = context.get("artifacts", {}).get("resolved_source_rules", "extracted/resolved_source_rules.md")
     admin_rules = context.get("artifacts", {}).get("admin_internal_rules", "extracted/admin_internal_rules.md")
@@ -31,7 +30,7 @@ Worker بر اساس شیوه‌نامه، فونت، صفحه‌آرایی و �
     services.run_codex(prompt, target)
     # Full theses are often longer than one model response. Extend the body in focused batches
     # while preserving the original verified reference list instead of accepting a short package.
-    if not is_sample:
+    if target.exists():
         requested_pages = int(order.get("quantity_value") or 0) if order.get("quantity_type") == "pages" else 0
         # 360 words/page is deliberately conservative for 14pt, 1.5-line Persian A4 text.
         minimum_words = max(5200, requested_pages * 360)

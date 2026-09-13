@@ -23,7 +23,7 @@ export async function GET(request: Request, context: Context) {
       await getOrderOr404(orderId);
     } else {
       customerOrder = await getOrderForUserOr404(orderId, user);
-      if (!["completed", "sample_pending_customer_approval", "sample_revision_required"].includes(customerOrder.status)) {
+      if (!["completed", "sample_pending_customer_approval"].includes(customerOrder.status)) {
         throw new ApiError(403, "This output is not available at the current order stage");
       }
     }

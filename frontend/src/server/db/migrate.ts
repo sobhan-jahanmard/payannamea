@@ -33,6 +33,8 @@ const statements = [
   `create index if not exists ix_users_admin_followup_status on users(admin_followup_status)`,
   `alter table users alter column full_name drop not null`,
   `alter table users alter column email drop not null`,
+  `update orders set status = 'sample_pending_customer_approval' where status = 'sample_revision_required'`,
+  `update orders set status = 'approved_pending_for_final_execution' where status = 'full_approved'`,
   `create unique index if not exists uq_users_phone on users(phone) where phone is not null`,
   `create table if not exists orders (
     id varchar(36) primary key,

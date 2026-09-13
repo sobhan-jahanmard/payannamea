@@ -396,7 +396,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     status_logs: audience === "admin" ? byDate(order.status_logs).map(serializeStatusLog) : [],
     final_outputs:
       audience === "customer"
-        ? ["completed", "sample_pending_customer_approval", "sample_revision_required"].includes(order.status)
+        ? ["completed", "sample_pending_customer_approval"].includes(order.status)
           ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
           : []
         : byDate(order.final_outputs).map(serializeFinalOutput),

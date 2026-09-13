@@ -162,7 +162,7 @@ export async function claimOldest(workerId: string) {
 
 export async function claimById(workerId: string, orderId: string, options: { redo?: boolean; ignoreStatus?: boolean } = {}) {
   const allowedStatuses = options.redo
-    ? ["approved", "failed", "in_progress", "sample_pending_customer_approval", "sample_revision_required", "full_approved", "worker_done_pending_approval", "admin_review"]
+    ? ["approved", "failed", "in_progress", "sample_pending_customer_approval", "approved_pending_for_final_execution", "worker_done_pending_approval", "admin_review"]
     : ["approved", "failed"];
   const dataSource = await getDataSource();
   let claimedId: string | null = null;
@@ -327,45 +327,10 @@ function isPresentationOrder(order: Pick<OrderEntity, "order_type" | "quantity_t
   return order.quantity_type === "slides" || orderType.includes("پاورپوینت") || orderType.includes("ارائه");
 }
 
-function requestedOrDefaultImageCount(
-  order: Pick<OrderEntity, "image_count" | "quantity_type" | "quantity_value" | "order_type">
-): number {
-  if (typeof order.image_count === "number") {
-    return Math.max(Math.trunc(order.image_count), 0);
-  }
-
-  const quantityValue = typeof order.quantity_value === "number" ? Math.trunc(order.quantity_value) : 0;
-  const orderType = compact(order.order_type) ?? "";
-  if (order.quantity_type === "slides" && quantityValue > 0) {
-    return Math.min(Math.max(Math.ceil(quantityValue / 4), 1), 6);
-  }
-  if (order.quantity_type === "pages" && quantityValue > 0) {
-    return Math.min(Math.max(Math.ceil(quantityValue / 3), 1), 4);
-  }
-  if (order.quantity_type === "words" && quantityValue > 0) {
-    return Math.min(Math.max(Math.ceil(quantityValue / 1200), 1), 4);
-  }
-  if (orderType.includes("پایان") || orderType.includes("رساله") || orderType.includes("پروپوزال")) {
-    return 3;
-  }
-  return 1;
-}
-
-function requiredImageSourceCount(order: OrderEntity): number {
-  const expectedCount = requestedOrDefaultImageCount(order);
-  if (isPresentationOrder(order)) {
-    return Math.max(expectedCount, 1);
-  }
-  return expectedCount;
-}
-
 function requiredFinalOutputTypes(order: OrderEntity): string[] {
   const required = new Set<string>(baseFinalOutputTypes);
   if (isPresentationOrder(order)) {
     required.add("pptx");
-  }
-  if (requiredImageSourceCount(order) > 0) {
-    required.add("image_sources");
   }
   return [...required];
 }
@@ -421,7 +386,7 @@ export async function submitFinal(
     content_type: string | null;
     size_bytes: number;
   }>,
-  options: { replaceExisting?: boolean } = {}
+  options: { replaceExisting?: boolean; sampleStatus?: boolean } = {}
 ): Promise<OrderEntity> {
   if (uploads.length === 0) {
     throw new ApiError(422, "At least one final output file is required");
@@ -505,7 +470,11 @@ export async function submitFinal(
     }
 
     if (order.status !== "admin_review") {
-      await setOrderStatus(manager, order, "worker_done_pending_approval", workerId, notes || "Worker completed the review package; awaiting admin approval.");
+      const targetStatus = options.sampleStatus ? "sample_pending_customer_approval" : "worker_done_pending_approval";
+      const defaultNote = options.sampleStatus
+        ? "Worker generated the review package; awaiting customer approval."
+        : "Worker completed the review package; awaiting admin approval.";
+      await setOrderStatus(manager, order, targetStatus, workerId, notes || defaultNote);
     }
     if (lock) {
       await deleteWorkerLock(manager, order.id);

@@ -1,19 +1,9 @@
 import { EntitySchema } from "typeorm";
+import { ORDER_STATUSES } from "../../lib/order-status";
+import type { OrderStatus } from "../../lib/order-status";
 
-export const ORDER_STATUSES = [
-  "submitted",
-  "approved",
-  "in_progress",
-  "sample_pending_customer_approval",
-  "sample_revision_required",
-  "full_approved",
-  "worker_done_pending_approval",
-  "admin_review",
-  "completed",
-  "failed"
-] as const;
-
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export { ORDER_STATUSES };
+export type { OrderStatus };
 export const PAYMENT_STATUSES = ["fully_paid", "partially_paid", "not_paid", "refunded"] as const;
 export const PAYMENT_NOTE_TYPES = ["payment", "moarref_payment"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];

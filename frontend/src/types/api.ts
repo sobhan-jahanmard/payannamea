@@ -1,14 +1,5 @@
-export type OrderStatus =
-  | "submitted"
-  | "approved"
-  | "in_progress"
-  | "sample_pending_customer_approval"
-  | "sample_revision_required"
-  | "full_approved"
-  | "worker_done_pending_approval"
-  | "admin_review"
-  | "completed"
-  | "failed";
+import type { OrderStatus } from "../lib/order-status";
+export type { OrderStatus };
 
 export type PaymentStatus = "fully_paid" | "partially_paid" | "not_paid" | "refunded";
 export type PaymentNoteType = "payment" | "moarref_payment";

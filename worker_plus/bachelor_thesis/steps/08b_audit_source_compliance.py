@@ -31,7 +31,7 @@ def run(context: dict[str, Any], services: Any) -> None:
         context["artifacts"].get("admin_internal_rules", "extracted/admin_internal_rules.md"),
     ))
 
-    minimum_words = 1200 if context.get("mode") == "sample" else 6000
+    minimum_words = 6000
     source_ok = source.exists() and persian_word_count(source_text) >= minimum_words
     checks.append((f"متن خروجی دست‌کم {minimum_words} واژهٔ فارسی دارد", "PASS" if source_ok else "FAIL", str(source.relative_to(services.workspace))))
 

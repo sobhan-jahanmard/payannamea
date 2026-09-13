@@ -1,7 +1,7 @@
 import importlib
 import json
 from typing import Any
-from utils.api import submit_sample, submit_final
+from utils.api import submit_final
 from utils.helpers import archive_workspace, write_json, write_text
 
 TITLE = "Validate and publish"
@@ -48,7 +48,7 @@ def complete_page_target(context: dict[str, Any], services: Any, source: Any, do
     its rendered page count.
     """
     order = context["order"]
-    if context["mode"] == "sample" or order.get("quantity_type") != "pages":
+    if order.get("quantity_type") != "pages":
         return None
     required_pages = int(order.get("quantity_value") or 0)
     if required_pages <= 0:
@@ -112,29 +112,36 @@ def run(context: dict[str, Any], services: Any) -> None:
         raise RuntimeError("DOCX quality validation did not complete")
     write_json(services.workspace / "reports" / "stage_checks" / "docx_quality_repair.json", {"passed": True, "attempts": repair_attempts})
     order_id = context["order_id"]
-    pdf = services.workspace / "final" / ("sample.pdf" if context["mode"] == "sample" else "final.pdf")
-    word_name = services.workspace / "final" / ("sample.docx" if context["mode"] == "sample" else "final.docx")
+    pdf = services.workspace / "final" / "final.pdf"
+    word_name = services.workspace / "final" / "final.docx"
     if docx != word_name:
         word_name.write_bytes(docx.read_bytes())
     services.export_pdf(word_name, pdf)
+    sample_docx = services.workspace / "final" / "sample.docx"
+    sample_pdf = services.workspace / "final" / "sample.pdf"
+    full_pages, sample_pages = services.create_first_half_sample(word_name, sample_docx)
+    services.export_pdf(sample_docx, sample_pdf)
+    context["artifacts"].update({
+        "final_docx": str(word_name.relative_to(services.workspace)),
+        "final_pdf": str(pdf.relative_to(services.workspace)),
+        "sample_docx": str(sample_docx.relative_to(services.workspace)),
+        "sample_pdf": str(sample_pdf.relative_to(services.workspace)),
+    })
+    write_json(services.workspace / "reports" / "stage_checks" / "sample_excerpt.json", {
+        "full_pages": full_pages, "sample_pages": sample_pages, "source": "first half of rendered final.docx pages",
+    })
     if services.args.offline:
         context["status"] = "dry_run_complete"
         context["artifacts"]["archive"] = str(archive_workspace(services.workspace, order_id))
         return
-    if context["mode"] == "sample":
-        submit_sample(services.config, order_id, word_name, pdf, "Worker Plus sample generated; awaiting customer approval.")
-        context["status"] = "sample_pending_customer_approval"
-    else:
-        # The backend requires a provenance manifest whenever an order expects
-        # visuals. This document contains no embedded figures, so keep that
-        # fact explicit instead of fabricating image sources.
-        image_sources = services.workspace / "final" / "figures" / "image_sources.json"
-        write_json(image_sources, {
-            "included_figure_count": 0,
-            "figures": [],
-            "note": "No external or generated figures are embedded in this DOCX; no figure provenance is claimed."
-        })
-        files = {"docx_file": word_name, "pdf_file": pdf, "image_sources_file": image_sources}
-        submit_final(services.config, order_id, files, "Worker Plus completed the review package.")
-        context["status"] = "worker_done_pending_approval"
+    is_sample_status = context["mode"] == "sample"
+    files = {"docx_file": word_name, "pdf_file": pdf, "sample_file": sample_docx, "sample_pdf_file": sample_pdf}
+    submit_final(
+        services.config,
+        order_id,
+        files,
+        "Worker generated the full and first-half sample review package.",
+        sample_status=is_sample_status,
+    )
+    context["status"] = "sample_pending_customer_approval" if is_sample_status else "worker_done_pending_approval"
     context["artifacts"]["archive"] = str(archive_workspace(services.workspace, order_id))
