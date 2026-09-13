@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ClipboardList,
+  Download,
   FileCheck2,
   FileText,
   Gauge,
@@ -179,6 +180,40 @@ export default function LandingPage() {
             </div>
           </div>
           <FreeConsultationForm />
+        </div>
+      </section>
+
+      <section className="relative z-10 mx-auto -mt-28 w-full max-w-7xl px-4 pb-10 lg:px-8">
+        <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-l from-teal-950 via-teal-800 to-cyan-800 p-1 shadow-xl shadow-teal-950/15">
+          <div className="flex flex-col items-start gap-5 rounded-[0.7rem] bg-slate-950/15 px-5 py-6 text-white backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div className="flex items-start gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-amber-300 text-slate-950 shadow-lg shadow-slate-950/20">
+                <FileText className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-amber-200">نمونه‌کار واقعی</p>
+                <h2 className="mt-1 text-xl font-semibold">نمونه‌ای از خروجی انجام‌شده را ببینید</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-teal-50/90">
+                  یک نمونه از فایل نهایی آماده‌شده را دانلود کنید و با کیفیت ساختار و نگارش آن آشنا شوید.
+                </p>
+              </div>
+            </div>
+            <Button
+              asChild
+              className="w-full shrink-0 border border-amber-200 bg-amber-300 text-slate-950 shadow-md hover:bg-amber-200 sm:w-auto"
+            >
+              <a
+                href="/api/sample-download"
+                download
+                target="_blank"
+                rel="noreferrer"
+                data-analytics-event="landing_sample_download_clicked"
+              >
+                دانلود نمونه‌کار
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </a>
+            </Button>
+          </div>
         </div>
       </section>
 

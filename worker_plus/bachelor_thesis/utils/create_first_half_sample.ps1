@@ -16,25 +16,24 @@ try {
   $pages = [int]$source.ComputeStatistics(2) # wdStatisticPages
   if ($pages -lt 2) { throw "A first-half sample requires at least two pages." }
   $samplePages = [math]::Ceiling($pages / 2.0)
-  $start = $source.GoTo(1, 1, 1).Start # wdGoToPage, wdGoToAbsolute
   $end = if ($samplePages -ge $pages) { $source.Content.End } else { $source.GoTo(1, 1, $samplePages + 1).Start }
-  $sample = $word.Documents.Add()
-  $sourceRange = $source.Range($start, $end)
-  $sample.Range(0, 0).FormattedText = $sourceRange.FormattedText
 
-  # Retain the thesis page geometry and footer/header behavior for the excerpt.
-  $from = $source.Sections.Item(1)
-  $to = $sample.Sections.Item(1)
-  $to.PageSetup.TopMargin = $from.PageSetup.TopMargin
-  $to.PageSetup.BottomMargin = $from.PageSetup.BottomMargin
-  $to.PageSetup.LeftMargin = $from.PageSetup.LeftMargin
-  $to.PageSetup.RightMargin = $from.PageSetup.RightMargin
-  $to.PageSetup.HeaderDistance = $from.PageSetup.HeaderDistance
-  $to.PageSetup.FooterDistance = $from.PageSetup.FooterDistance
-  $to.Headers.Item(1).Range.FormattedText = $from.Headers.Item(1).Range.FormattedText
-  $to.Footers.Item(1).Range.FormattedText = $from.Footers.Item(1).Range.FormattedText
+  # Do not paste the excerpt into a blank LTR Word document. A blank document
+  # loses the source's styles, section settings, RTL defaults, headers, footers,
+  # numbering, and document-level layout. Start with an exact Word copy, then
+  # remove only the content after the selected excerpt.
+  if (Test-Path -LiteralPath $OutputPath) { Remove-Item -LiteralPath $OutputPath -Force }
+  # SaveCopyAs fails on some customer documents with Word COM error 0x800A1704.
+  # A filesystem copy is byte-for-byte identical and avoids that unsupported
+  # save path; Word is only needed to trim the copied document afterward.
+  Copy-Item -LiteralPath $Path -Destination $OutputPath -Force
+  $sample = $word.Documents.Open($OutputPath, $false, $false, $false)
+  if ($end -lt $sample.Content.End) {
+    $sample.Range($end, $sample.Content.End).Delete()
+  }
+  $sample.Repaginate()
   $sample.Fields.Update()
-  $sample.SaveAs2($OutputPath, 16) # wdFormatDocumentDefault (.docx)
+  $sample.Save()
   Write-Output "$pages,$samplePages"
 }
 finally {

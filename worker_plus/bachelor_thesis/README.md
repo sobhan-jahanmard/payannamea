@@ -41,10 +41,16 @@ worker_plus/
         ├── 03_check_intake.py
         ├── 04_extract_university_rules.py
         ├── 05_collect_sources.py
+        ├── 05a_analyze_customer_sources.py
+        ├── 05b_resolve_source_rules.py
         ├── 06_build_thesis_plan.py
         ├── 07_generate_content.py
         ├── 08_review_content.py
+        ├── 08b_audit_source_compliance.py
         ├── 09_package_docx.py
+        ├── 09b_polish_cover.py
+        ├── 10b_finalize_persian_pagination.py
+        ├── 10c_verify_persian_pagination.py
         ├── 10_validate_and_publish.py
         └── 11_handle_failure.py
 ```
@@ -88,12 +94,18 @@ worker_plus/workspace/in_progress/order_context.json
 3. **Check intake** — کامل‌بودن اطلاعات ضروری سفارش را بررسی می‌کند.
 4. **Extract university rules** — قوانین و قالب دانشگاه را استخراج می‌کند.
 5. **Collect sources** — منابع مشتری و تصویرهای مجاز را ثبت می‌کند.
-6. **Build thesis plan** — فهرست و طرح فصل‌های پایان‌نامه را می‌سازد.
-7. **Generate content** — متن کامل، یا در حالت Sample متن چندصفحه‌ای نماینده، را تولید می‌کند.
-8. **Review content** — متن، citation و موارد نیازمند بررسی انسانی را کنترل می‌کند.
-9. **Package DOCX** — فایل DOCX کامل یا `sample.docx` را با قالب دانشگاه ایجاد می‌کند.
-10. **Validate and publish** — خروجی را اعتبارسنجی و منتشر می‌کند.
-11. **Handle failure** — فقط در خطا اجرا می‌شود؛ علت را ثبت و سفارش را `failed` می‌کند.
+6. **Analyze customer sources** — فایل‌ها و منابع ارسالی مشتری را تحلیل می‌کند.
+7. **Resolve source rules** — محدودیت‌ها و قواعد قابل‌استفادهٔ منابع را تعیین می‌کند.
+8. **Build thesis plan** — فهرست و طرح فصل‌های پایان‌نامه را می‌سازد.
+9. **Generate content** — متن کامل، یا در حالت Sample متن چندصفحه‌ای نماینده، را تولید می‌کند.
+10. **Review content** — متن، citation و موارد نیازمند بررسی انسانی را کنترل می‌کند.
+11. **Audit source compliance** — انطباق محتوا با منابع و محدودیت‌ها را کنترل می‌کند.
+12. **Package DOCX** — `final.docx` را از متن تأییدشده می‌سازد.
+13. **Polish cover** — صفحهٔ عنوان را اصلاح و کنترل می‌کند.
+14. **Finalize Persian pagination** — شماره‌گذاری و صفحه‌بندی فارسی را نهایی می‌کند.
+15. **Verify Persian pagination** — صفحه‌بندی فارسی را صفحه‌به‌صفحه کنترل می‌کند.
+16. **Validate and publish** — خروجی را اعتبارسنجی می‌کند، `sample.docx` و `sample.pdf` را از `final.docx` می‌سازد، سپس آن‌ها را منتشر می‌کند.
+17. **Handle failure** — فقط در خطا اجرا می‌شود؛ علت را ثبت و سفارش را `failed` می‌کند.
 
 ## نمایش پیشرفت در Terminal
 
@@ -103,7 +115,7 @@ worker_plus/workspace/in_progress/order_context.json
 ────────────────────────────────────────────────────────
 Worker Plus | پایان‌نامه کارشناسی
 Order: 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85 | Mode: full
-Step 03/11: Check intake — بررسی اولیه اطلاعات سفارش
+Step 03/17: Check intake — بررسی اولیه اطلاعات سفارش
 ────────────────────────────────────────────────────────
 ```
 
@@ -115,7 +127,15 @@ Result: SKIPPED (already completed)
 Result: FAIL — <reason>
 ```
 
-در حالت Sample، header همچنان شمارش `01/11` تا `10/11` را دارد و فقط عنوان/رفتار stepهای ۷، ۹ و ۱۰ به حالت نمونه تغییر می‌کند.
+در حالت Sample، شمارش terminal همان `01/17` تا `16/17` است. Step 16 فایل‌های `sample.docx` و `sample.pdf` را از `final.docx` می‌سازد و برای تأیید مشتری ارسال می‌کند.
+
+برای اجرای دوبارهٔ sample از DOCX فعلی، بدون بازتولید محتوا یا بسته‌بندی Word، از workspace ذخیره‌شده اجرا کنید:
+
+```text
+python run.py --step 16
+```
+
+`--step` از شماره‌های terminal در فهرست بالا استفاده می‌کند. `--repackage` از Step 12 شروع می‌شود؛ یعنی DOCX را از source ذخیره‌شده دوباره می‌سازد و سپس Stepهای 13 تا 16 را اجرا می‌کند.
 
 ## قرارداد هر Step
 
@@ -125,6 +145,6 @@ Result: FAIL — <reason>
 2. فقط مسئول همان step باشد.
 3. artifactها و نتیجهٔ خود را در context ثبت کند.
 4. در موفقیت، شمارهٔ خود را به `completed_steps` اضافه کند.
-5. در خطا، خطای قابل‌فهم برگرداند تا `run.py` مرحلهٔ ۱۱ را اجرا کند.
+5. در خطا، خطای قابل‌فهم برگرداند تا `run.py` مرحلهٔ ۱۷ را اجرا کند.
 
 `run.py` تنها مسئول انتخاب ترتیب stepها، نمایش header در terminal، ذخیرهٔ context و مدیریت خطا است.

@@ -45,13 +45,52 @@ function Close-PreviousDocumentInstance([string]$DocumentPath) {
   }
 }
 
+function Set-DocumentDigitLanguageToPersian($Document) {
+  # This is the Word UI equivalent of Home > Replace > Special > Any Digit,
+  # then Replace formatting > Language > Persian > Replace All. It changes only
+  # the language formatting of digit characters, leaving PAGE fields dynamic.
+  # Document.Content intentionally covers every text range, just like Select All.
+  $find = $Document.Content.Duplicate.Find
+  $find.ClearFormatting()
+  $find.Replacement.ClearFormatting()
+  $find.Text = '^#' # Word's "Any Digit" special-find token
+  # Empty "Replace with" plus a replacement format is Word's formatting-only
+  # Replace All mode (the exact setting used in the Word dialog).
+  $find.Replacement.Text = ''
+  $find.Replacement.LanguageID = 1065 # Persian (fa-IR)
+  $find.Forward = $true
+  $find.Wrap = 1 # wdFindContinue: search the entire document
+  $find.Format = $true
+  $find.MatchWildcards = $false
+  [void]$find.Execute($null, $null, $null, $null, $null, $null, $true, 0, $false, $null, 2) # wdReplaceAll
+}
+
+function Set-PageFieldFont($Document, [string]$FontName) {
+  # PAGE updates restore MERGEFORMAT's original B Nazanin font. Apply the
+  # digit-substitution font only after the final update, so ASCII PAGE values
+  # are painted with Persian glyphs in both DOCX and PDF.
+  foreach ($section in $Document.Sections) {
+    foreach ($footer in @($section.Footers(1), $section.Footers(2), $section.Footers(3))) {
+      foreach ($field in @($footer.Range.Fields | Where-Object { $_.Type -eq 33 })) {
+        $field.Result.Font.Name = $FontName
+        $field.Result.Font.NameBi = $FontName
+        $field.Result.Font.Size = 12
+        $field.Result.Font.SizeBi = 12
+      }
+    }
+  }
+}
+
 Close-PreviousDocumentInstance $Path
 
 $word = $null; $document = $null
 try {
   $word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0
   $word.ScreenUpdating = $false
-  $word.Options.ArabicNumeral = 2
+  # Use contextual numerals only after assigning fa-IR directly to the rebuilt
+  # footer and PAGE range below. This preserves Persian glyphs without changing
+  # Latin numbers in a DOI/URL elsewhere in the document.
+  $word.Options.ArabicNumeral = 2 # wdNumeralContext
   $word.Options.UpdateFieldsAtPrint = $true
   # Word stays invisible at the application level. The targeted ROT cleanup
   # above removes only a prior instance of this document before opening it.
@@ -66,20 +105,35 @@ try {
   # Vercel's function payload limit. Keep the document portable while embedding
   # only the glyphs that the generated thesis actually uses.
   $document.SaveSubsetFonts = $true
+  $pageNumberFont = 'Persian Pager Number'
+  # Word chooses the shape of a PAGE result from its character style, not
+  # reliably from direct font formatting alone. This mirrors the manual Word
+  # fix: make a character style whose Latin and complex-script fonts are both
+  # Persian, then assign it to every PAGE field.
+  $pageNumberStyleName = 'Persian Page Number'
+  try { $pageNumberStyle = $document.Styles.Item($pageNumberStyleName) }
+  catch { $pageNumberStyle = $document.Styles.Add($pageNumberStyleName, 2) } # wdStyleTypeCharacter
+  $pageNumberStyle.Font.Name = $pageNumberFont
+  $pageNumberStyle.Font.NameBi = $pageNumberFont
   foreach ($section in $document.Sections) {
     foreach ($footer in @($section.Footers(1), $section.Footers(2), $section.Footers(3))) {
       $footer.LinkToPrevious = $false
       $range = $footer.Range; $range.Text = ''
       $insertAt = $footer.Range.Duplicate; $insertAt.SetRange($footer.Range.End - 1, $footer.Range.End - 1)
       $pageField = $insertAt.Fields.Add($insertAt, 33) # wdFieldPage
-      $pageField.ShowCodes = $false
-      $pageField.Result.Font.Name = $FontName; $pageField.Result.Font.NameBi = $FontName
+      $pageField.Result.Style = $pageNumberStyleName
+      $pageField.Result.Font.Name = $pageNumberFont; $pageField.Result.Font.NameBi = $pageNumberFont
       $pageField.Result.Font.Size = 12; $pageField.Result.Font.SizeBi = 12
+      $pageField.Result.LanguageID = 1065 # Persian (fa-IR)
       $footer.Range.Font.Name = $FontName; $footer.Range.Font.NameBi = $FontName
+      $footer.Range.LanguageID = 1065 # Persian (fa-IR)
       $footer.Range.ParagraphFormat.ReadingOrder = 0; $footer.Range.ParagraphFormat.Alignment = 1
+      $pageField.ShowCodes = $false
     }
   }
   $document.Fields.Update(); $document.Repaginate()
+  Set-DocumentDigitLanguageToPersian $document
+  Set-PageFieldFont $document $pageNumberFont
   foreach ($field in $document.Fields) { $field.ShowCodes = $false }
   $document.Save()
   [Console]::WriteLine("pages=$($document.ComputeStatistics(2));sections=$($document.Sections.Count);mode=dynamic_persian_page_field")

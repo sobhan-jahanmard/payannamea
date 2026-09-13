@@ -14,8 +14,9 @@ try {
     $pageField = @($footer.Range.Fields | Where-Object { $_.Type -eq 33 }) | Select-Object -First 1
     if ($null -eq $pageField) { $errors += "section $($section.Index) has no dynamic PAGE field"; continue }
     if ($pageField.ShowCodes) { $errors += "section $($section.Index) PAGE field displays its code instead of its result" }
-    if ($pageField.Result.Font.Name -ne $FontName -or $pageField.Result.Font.NameBi -ne $FontName) {
-      $errors += "section $($section.Index) PAGE field does not use the required document font '$FontName'"
+    $allowedPageFonts = @($FontName, 'Persian Pager Number')
+    if ($pageField.Result.Font.Name -notin $allowedPageFonts -or $pageField.Result.Font.NameBi -notin $allowedPageFonts) {
+      $errors += "section $($section.Index) PAGE field does not use an approved page-number font"
     }
     if ($footer.Range.ParagraphFormat.ReadingOrder -ne 0 -or $footer.Range.ParagraphFormat.Alignment -ne 1) {
       $errors += "section $($section.Index) footer is not centred RTL"

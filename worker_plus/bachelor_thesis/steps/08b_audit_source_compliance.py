@@ -7,6 +7,13 @@ from utils.helpers import write_text
 
 TITLE = "Audit source-rule compliance"
 
+_DIGIT_TO_ASCII = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def canonical_number(value: str) -> str:
+    """Compare citation identifiers independently of their digit glyphs."""
+    return value.translate(_DIGIT_TO_ASCII)
+
 def persian_word_count(text: str) -> int:
     return len(re.findall(r"[آ-ی]{2,}", text))
 
@@ -38,8 +45,8 @@ def run(context: dict[str, Any], services: Any) -> None:
     structure_ok = "# منابع" in source_text and not any(marker in source_text for marker in ("TODO", "TBD", "[NEEDS"))
     checks.append(("ساختار منابع و نبود placeholderها", "PASS" if structure_ok else "FAIL", "# منابع / TODO / TBD / [NEEDS"))
 
-    citations = set(re.findall(r"\[(\d+)\]", source_text))
-    references = source_text.partition("# منابع")[2]
+    citations = {canonical_number(value) for value in re.findall(r"\[([0-9۰-۹٠-٩]+)\]", source_text)}
+    references = source_text.partition("# منابع")[2].translate(_DIGIT_TO_ASCII)
     references_ok = not citations or all(
         re.search(rf"(?:^|\n)\s*(?:\[{re.escape(number)}\]|{re.escape(number)}[.)])", references)
         for number in citations

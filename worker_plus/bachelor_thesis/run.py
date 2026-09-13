@@ -193,6 +193,16 @@ class Services:
 
         def normalize_persian(value: str) -> str:
             value = value.replace("ي", "ی").replace("ك", "ک").replace("ـ", "")
+            # Content generators usually emit ASCII digits even in Persian prose.
+            # Convert them while building the DOCX, so section labels, numbered
+            # citations, captions, tables, and bibliography markers consistently
+            # use Persian glyphs.  Arabic-Indic digits are normalised too because
+            # they are a distinct Unicode digit set from Persian digits. URLs and
+            # DOI identifiers remain machine-readable, because digit conversion
+            # would make a copied source link invalid.
+            digit_map = str.maketrans("0123456789٠١٢٣٤٥٦٧٨٩", "۰۱۲۳۴۵۶۷۸۹۰۱۲۳۴۵۶۷۸۹")
+            protected = re.split(r"((?:https?://|www\.)\S+|\b10\.\d{4,9}/\S+)", value)
+            value = "".join(part if index % 2 else part.translate(digit_map) for index, part in enumerate(protected))
             value = re.sub(r"\s+([،؛؟٪])", r"\1", value)
             value = re.sub(r"([،؛؟])(?=\S)", r"\1 ", value)
             value = re.sub(r"\s+", " ", value).strip()
@@ -785,8 +795,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", action="store_true", help="Resume workspace/in_progress from its saved context")
     parser.add_argument("--dry-run", action="store_true", help="Avoid Codex and create a tiny test source")
     parser.add_argument("--offline", action="store_true", help="Run all steps with a local mock order; no backend changes")
-    parser.add_argument("--repackage", action="store_true", help="Rebuild and publish DOCX from the saved source without invoking Codex")
-    parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume the saved order from this step through validation and publishing")
+    parser.add_argument("--repackage", action="store_true", help="Restart at Step 12 (Package DOCX) using the saved source, without invoking Codex")
+    parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from the terminal step number (1-16); Step 16 regenerates and publishes sample.docx/sample.pdf from final.docx")
     return parser
 
 
@@ -820,7 +830,9 @@ def main() -> None:
             context["order"] = claimed["customerInput"]
         context["status"] = "in_progress"
         context["errors"] = []
-        context["completed_steps"] = STEPS[:8]
+        # The package step is the first step that can safely rebuild Word/PDF
+        # outputs while retaining the reviewed source and all intake artifacts.
+        context["completed_steps"] = STEPS[:STEPS.index("09_package_docx")]
     elif args.step:
         if args.step == 1:
             context = new_context(workspace, "sample" if args.sample else "full")
@@ -828,6 +840,11 @@ def main() -> None:
             context = load(workspace)
             if not context.get("order_id"):
                 raise SystemExit("No saved order is available; start with a normal run before using --step.")
+            # A resumed sample publish must honour an explicit --sample flag.
+            # Previously the saved full-mode context silently won, so
+            # `--step 16 --sample` published as a full run despite the CLI flag.
+            if args.sample:
+                context["mode"] = "sample"
             # Re-claiming and heartbeating keep the backend state correct even when
             # the expensive intake/source stages are intentionally skipped.
             if not args.offline:

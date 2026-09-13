@@ -12,9 +12,9 @@ try {
   $word = New-Object -ComObject Word.Application
   $word.Visible = $false
   $word.DisplayAlerts = 0
-  # Context uses Persian-shaped digits inside an RTL Persian footer while leaving
-  # English content elsewhere in Word unchanged.
-  $word.Options.ArabicNumeral = 2
+  # wdNumeralHindi forces Persian/Arabic-Indic digit glyphs; context mode can
+  # still choose ASCII for dynamic PAGE fields.
+  $word.Options.ArabicNumeral = 1
   $document = $word.Documents.Open($Path, $false, $false)
 
   $right = 0
