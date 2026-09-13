@@ -43,6 +43,47 @@ class Services:
 
     def __post_init__(self) -> None:
         self.token_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
+        self._automation_word_pids_at_start = self.automation_word_pids()
+
+    @staticmethod
+    def automation_word_pids() -> set[int]:
+        """Return only headless Word COM servers, never interactive Word."""
+        if os.name != "nt":
+            return set()
+        command = (
+            "Get-CimInstance Win32_Process -Filter \"Name='WINWORD.EXE'\" | "
+            "Where-Object { $_.CommandLine -match '/Automation\\s+-Embedding' } | "
+            "ForEach-Object { $_.ProcessId }"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", command],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace", timeout=15, check=False,
+        )
+        return {int(value) for value in re.findall(r"^\s*(\d+)\s*$", result.stdout, re.M)}
+
+    def cleanup_run(self) -> dict[str, Any]:
+        """Release worker DOCX locks and remove only COM servers started by this run."""
+        report: dict[str, Any] = {"released_docx_targets": [], "terminated_automation_word_pids": [], "errors": []}
+        if os.name != "nt":
+            return report
+        for path in sorted(self.workspace.rglob("*.docx")):
+            try:
+                self.release_docx_lock(path)
+                report["released_docx_targets"].append(str(path.relative_to(self.workspace)))
+            except Exception as exc:
+                report["errors"].append(f"{path.name}: {exc}")
+        # Word COM processes frequently become children of Explorer, not Python.
+        # Capture the baseline at startup and terminate only new, hidden
+        # `/Automation -Embedding` servers created by this worker run.
+        for pid in sorted(self.automation_word_pids() - self._automation_word_pids_at_start):
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+            )
+            if result.returncode == 0:
+                report["terminated_automation_word_pids"].append(pid)
+        write_json(self.workspace / "reports" / "stage_checks" / "run_cleanup.json", report)
+        return report
 
     def run_codex(self, prompt: str, target: Path) -> None:
         if target.exists() and target.read_text(encoding="utf-8").strip():
@@ -83,6 +124,18 @@ class Services:
                 return
             time.sleep(5)
         raise RuntimeError(f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes")
+
+    def release_docx_lock(self, path: Path) -> None:
+        """Close only a stale Word instance for this worker artifact."""
+        if os.name != "nt" or not path.exists():
+            return
+        script = Path(__file__).resolve().parent / "utils" / "release_docx_lock.ps1"
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(path)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=60, check=False,
+        )
+        if result.returncode:
+            raise RuntimeError("Could not release the previous Word document lock: " + result.stdout.strip()[-500:])
 
     def write_docx(self, source: Path, output: Path, title: str, rules: dict[str, Any], order: dict[str, Any]) -> None:
         try:
@@ -207,8 +260,11 @@ class Services:
         # Keep the cover visually clean: page numbering begins with the body.
         section.different_first_page_header_footer = True
         add_page_border(section)
-        normal = style("Normal", font["body_pt"], align=WD_ALIGN_PARAGRAPH.RIGHT)
+        # Persian prose should be fully justified; headings, covers, and table
+        # cells intentionally use their own alignment.
+        normal = style("Normal", font["body_pt"], align=WD_ALIGN_PARAGRAPH.JUSTIFY)
         normal.paragraph_format.first_line_indent = Cm(paragraph_rules["first_line_cm"])
+        style("TOC Entry", font["body_pt"], align=WD_ALIGN_PARAGRAPH.RIGHT)
         style("Title", font["heading_1_pt"] + 2, True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 1", font["heading_1_pt"], True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 2", font["heading_2_pt"], True, WD_ALIGN_PARAGRAPH.RIGHT)
@@ -271,11 +327,86 @@ class Services:
         lines = source.read_text(encoding="utf-8").splitlines()
         index = 0
         chapter_count = 0
+        redundant_cover_headings = {"عنوان پژوهش", "عنوان پایان نامه", "عنوان پایان‌نامه", "عنوان پروژه"}
+        heading_anchors: dict[int, str] = {}
+        anchor_for_heading: dict[str, str] = {}
+        anchor_number = 1
+        for source_index, source_line in enumerate(lines):
+            candidate = normalize_persian(source_line.strip())
+            prefix = next((value for value in ("### ", "## ", "# ") if candidate.startswith(value)), None)
+            if prefix is None:
+                continue
+            heading_text = normalize_persian(candidate[len(prefix):])
+            if heading_text in redundant_cover_headings or heading_text == "فهرست مطالب":
+                continue
+            anchor = f"toc_{anchor_number}"
+            heading_anchors[source_index] = anchor
+            anchor_for_heading.setdefault(heading_text, anchor)
+            anchor_number += 1
+
+        def add_bookmark(paragraph: Any, anchor: str) -> None:
+            start = OxmlElement("w:bookmarkStart")
+            start.set(qn("w:id"), str(len(heading_anchors) + len(document.paragraphs)))
+            start.set(qn("w:name"), anchor)
+            end = OxmlElement("w:bookmarkEnd")
+            end.set(qn("w:id"), start.get(qn("w:id")))
+            paragraph._p.insert(0, start)
+            paragraph._p.append(end)
+
+        def add_toc_link(paragraph: Any, text: str, anchor: str) -> None:
+            run = paragraph.add_run(text)
+            apply_persian_run(run)
+            hyperlink = OxmlElement("w:hyperlink")
+            hyperlink.set(qn("w:anchor"), anchor)
+            hyperlink.set(qn("w:history"), "1")
+            paragraph._p.remove(run._r)
+            hyperlink.append(run._r)
+            paragraph._p.append(hyperlink)
+
         while index < len(lines):
             raw_line = lines[index]
             line = normalize_persian(raw_line.strip())
             if not line:
                 index += 1
+                continue
+            # The worker builds the cover itself.  A generated Markdown title
+            # block would otherwise become an empty duplicate title page.
+            if line.startswith("# ") and normalize_persian(line[2:]) in redundant_cover_headings:
+                title_line_index = index + 1
+                while title_line_index < len(lines) and not lines[title_line_index].strip():
+                    title_line_index += 1
+                # This is always a redundant Markdown cover block: the official
+                # cover above already carries the order title. Do not compare
+                # strings here, because model output can vary only in diacritics.
+                index = title_line_index + 1 if title_line_index < len(lines) else index + 1
+                continue
+            if line == "# فهرست مطالب":
+                toc_heading = document.add_paragraph("فهرست مطالب", style="Heading 1")
+                toc_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                # Paragraph direction alone is insufficient for the strict RTL
+                # audit: the heading's own Persian run must carry w:rtl too.
+                for toc_run in toc_heading.runs:
+                    apply_persian_run(toc_run)
+                if chapter_count:
+                    toc_heading.paragraph_format.page_break_before = True
+                chapter_count += 1
+                index += 1
+                while index < len(lines):
+                    toc_line = normalize_persian(lines[index].strip())
+                    if toc_line.startswith("# "):
+                        break
+                    item_match = re.match(r"^(?:-|\*)\s+(.+)$", toc_line)
+                    if item_match:
+                        item_text = normalize_persian(item_match.group(1))
+                        anchor = anchor_for_heading.get(item_text)
+                        if anchor:
+                            toc_item = document.add_paragraph(style="TOC Entry")
+                            toc_item.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                            toc_item.paragraph_format.first_line_indent = Cm(0)
+                            toc_item.paragraph_format.right_indent = Cm(0.6 if lines[index].startswith((" ", "\t")) else 0)
+                            bidi(toc_item)
+                            add_toc_link(toc_item, item_text, anchor)
+                    index += 1
                 continue
             if line.startswith("|") and index + 1 < len(lines) and set(lines[index + 1].strip()) <= {"|", "-", ":", " "}:
                 rows: list[list[str]] = []
@@ -307,28 +438,43 @@ class Services:
                 if chapter_count:
                     paragraph.paragraph_format.page_break_before = True
                 chapter_count += 1
+                if index in heading_anchors:
+                    add_bookmark(paragraph, heading_anchors[index])
             elif line.startswith("## "):
                 paragraph = document.add_paragraph(line[3:], style="Heading 2")
+                anchor = anchor_for_heading.get(normalize_persian(line[3:]))
+                if anchor:
+                    add_bookmark(paragraph, anchor)
             elif line.startswith("### "):
                 paragraph = document.add_paragraph(line[4:], style="Heading 3")
+                anchor = anchor_for_heading.get(normalize_persian(line[4:]))
+                if anchor:
+                    add_bookmark(paragraph, anchor)
             elif line.startswith(("- ", "* ")):
                 paragraph = document.add_paragraph(line[2:], style="Normal")
                 paragraph.paragraph_format.first_line_indent = Cm(0)
                 paragraph.paragraph_format.right_indent = Cm(0.6)
             else:
                 paragraph = document.add_paragraph(line, style="Normal")
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT if paragraph.style.name != "Heading 1" else WD_ALIGN_PARAGRAPH.CENTER
+            if paragraph.style.name == "Normal":
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            elif paragraph.style.name == "Heading 1":
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            else:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             paragraph.paragraph_format.widow_control = True
             bidi(paragraph)
             for run in paragraph.runs:
                 apply_persian_run(run)
             index += 1
+        self.release_docx_lock(output)
         output.parent.mkdir(parents=True, exist_ok=True)
         document.save(output)
 
     def word_rtl_audit(self, docx: Path, audit_only: bool = True) -> dict[str, int]:
         if os.name != "nt":
             raise RuntimeError("actual Word RTL audit requires the Windows Worker runtime")
+        self.release_docx_lock(docx)
         script = Path(__file__).resolve().parent / "utils" / "enforce_word_rtl.ps1"
         command = [
             "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx)
@@ -406,6 +552,7 @@ class Services:
     def count_docx_pages(self, docx: Path) -> int:
         if os.name != "nt":
             raise RuntimeError("actual DOCX page counting requires the Windows Worker runtime")
+        self.release_docx_lock(docx)
         script = Path(__file__).resolve().parent / "utils" / "measure_pages.ps1"
         result = subprocess.run([
             "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx)
@@ -420,6 +567,7 @@ class Services:
     def export_pdf(self, docx: Path, pdf: Path) -> None:
         if os.name != "nt":
             raise RuntimeError("PDF export requires the Windows Word runtime")
+        self.release_docx_lock(docx)
         command = f"$w=New-Object -ComObject Word.Application;$w.Visible=$false;$w.DisplayAlerts=0;$d=$w.Documents.Open('{docx}', $false, $true);$d.Fields.Update();$d.ExportAsFixedFormat('{pdf}',17);$d.Close($false);$w.Quit()"
         result = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-Command", command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=300, check=False)
         if result.returncode or not pdf.exists() or not pdf.stat().st_size:
@@ -456,6 +604,19 @@ class Services:
         if len(document.tables) < source_table_count: errors.append("not all Markdown tables were converted to DOCX tables")
         if document.styles["Normal"].font.name != rules["font"]["persian"]: errors.append("default Persian font was not applied")
         if len(document.paragraphs) < 12: errors.append("DOCX contains too few paragraphs")
+        toc_present = any(paragraph.text.strip() == "فهرست مطالب" for paragraph in document.paragraphs)
+        bookmarks = {item.get(qn("w:name")) for item in document._element.iter(qn("w:bookmarkStart"))}
+        toc_links = [
+            item.get(qn("w:anchor"))
+            for item in document._element.iter(qn("w:hyperlink"))
+            if item.get(qn("w:anchor"))
+        ]
+        if not toc_present:
+            errors.append("missing table of contents")
+        elif not toc_links:
+            errors.append("table of contents has no clickable entries")
+        elif any(anchor not in bookmarks for anchor in toc_links):
+            errors.append("table of contents contains a broken internal link")
         required_pages = int(order.get("quantity_value") or 0) if mode != "sample" and order.get("quantity_type") == "pages" else 0
         actual_pages = self.count_docx_pages(docx)
         if required_pages and actual_pages < required_pages:
@@ -464,6 +625,7 @@ class Services:
         wrong_font_runs = 0
         missing_rtl_runs = 0
         bad_direction_paragraphs = 0
+        non_justified_body_paragraphs = 0
 
         def style_property(paragraph: Any, tag: str) -> Any:
             style = paragraph.style
@@ -489,17 +651,17 @@ class Services:
         # Centred text is only legitimate for the cover/chapter title and table
         # headers.  A centred or left-aligned body paragraph is a Word-layout bug.
         paragraphs_to_audit = [
-            (paragraph, paragraph.style.name in ("Title", "Heading 1"))
+            (paragraph, paragraph.style.name in ("Title", "Heading 1"), paragraph.style.name == "Normal")
             for paragraph in document.paragraphs
         ]
         paragraphs_to_audit.extend(
-            (paragraph, row_index == 0)
+            (paragraph, row_index == 0, False)
             for table in document.tables
             for row_index, row in enumerate(table.rows)
             for cell in row.cells
             for paragraph in cell.paragraphs
         )
-        for paragraph, center_allowed in paragraphs_to_audit:
+        for paragraph, center_allowed, justify_required in paragraphs_to_audit:
             contains_persian = any(re.search(r"[آ-ی]", run.text) for run in paragraph.runs)
             if not contains_persian:
                 continue
@@ -512,6 +674,8 @@ class Services:
                 allowed_alignments += (WD_ALIGN_PARAGRAPH.CENTER,)
             if effective_alignment not in allowed_alignments:
                 bad_direction_paragraphs += 1
+            if justify_required and effective_alignment != WD_ALIGN_PARAGRAPH.JUSTIFY:
+                non_justified_body_paragraphs += 1
             for run in paragraph.runs:
                 if not re.search(r"[آ-ی]", run.text):
                     continue
@@ -525,6 +689,8 @@ class Services:
                     missing_rtl_runs += 1
         if wrong_font_runs: errors.append(f"{wrong_font_runs} Persian runs do not use the required font")
         if missing_rtl_runs: errors.append(f"{missing_rtl_runs} Persian runs are missing RTL direction")
+        if non_justified_body_paragraphs:
+            errors.append(f"{non_justified_body_paragraphs} Persian body paragraphs are not justified")
         if word_rtl_audit["invalid_or_left"]:
             errors.append(f"Word reports {word_rtl_audit['invalid_or_left']} Persian paragraphs as LTR or left-aligned")
         elif bad_direction_paragraphs:
@@ -569,7 +735,7 @@ class Services:
         if missing_section_breaks:
             errors.append(f"top-level sections missing required page break ({missing_section_breaks})")
         if rules.get("requires_manual_guideline_review"): warnings.append("uploaded guideline text was unreadable; fallback rules used pending manual/OCR review")
-        result = {"passed": not errors, "errors": errors, "warnings": warnings, "word_target": min_words, "required_pages": required_pages or None, "actual_pages": actual_pages, "paragraphs": len(document.paragraphs), "citations": len(citations), "source_tables": source_table_count, "docx_tables": len(document.tables), "font": rules["font"]["persian"], "rtl_audit": {"persian_runs": persian_runs, "wrong_font_runs": wrong_font_runs, "missing_rtl_runs": missing_rtl_runs, "bad_direction_paragraphs": bad_direction_paragraphs, "word": word_rtl_audit}, "layout_audit": {"cover_paragraphs": len(cover_paragraphs), "cover_spacing_issues": cover_spacing_issues, "cover_font_sizes_pt": cover_sizes, "cover_title_size_pt": title_size, "top_level_sections": len(section_headings), "missing_section_breaks": missing_section_breaks}}
+        result = {"passed": not errors, "errors": errors, "warnings": warnings, "word_target": min_words, "required_pages": required_pages or None, "actual_pages": actual_pages, "paragraphs": len(document.paragraphs), "citations": len(citations), "source_tables": source_table_count, "docx_tables": len(document.tables), "font": rules["font"]["persian"], "toc_audit": {"present": toc_present, "clickable_entries": len(toc_links), "broken_entries": sum(anchor not in bookmarks for anchor in toc_links)}, "rtl_audit": {"persian_runs": persian_runs, "wrong_font_runs": wrong_font_runs, "missing_rtl_runs": missing_rtl_runs, "bad_direction_paragraphs": bad_direction_paragraphs, "non_justified_body_paragraphs": non_justified_body_paragraphs, "word": word_rtl_audit}, "layout_audit": {"cover_paragraphs": len(cover_paragraphs), "cover_spacing_issues": cover_spacing_issues, "cover_font_sizes_pt": cover_sizes, "cover_title_size_pt": title_size, "top_level_sections": len(section_headings), "missing_section_breaks": missing_section_breaks}}
         write_json(report, result)
         if errors: raise RuntimeError("DOCX quality gate failed: " + "; ".join(errors))
 
@@ -678,6 +844,18 @@ def main() -> None:
             print(f"Result: FAIL — {exc}", flush=True)
         raise SystemExit(1) from exc
     finally:
+        try:
+            cleanup = services.cleanup_run()
+            context["cleanup"] = cleanup
+            save(workspace, context)
+            print(
+                "Cleanup: released "
+                f"{len(cleanup['released_docx_targets'])} DOCX target(s); terminated "
+                f"{len(cleanup['terminated_automation_word_pids'])} worker Word automation process(es).",
+                flush=True,
+            )
+        except Exception as cleanup_error:
+            print(f"Could not complete worker cleanup: {cleanup_error}", file=sys.stderr)
         if context.get("order_id") and not args.offline:
             try:
                 errors = context.get("errors") or []

@@ -30,16 +30,17 @@ try {
       Start = $paragraph.Range.Start
       End = $paragraph.Range.End
       Centered = ($paragraph.Alignment -eq 1)
+      Justified = ($paragraph.Alignment -eq 3)
     }
   }
 
   foreach ($saved in $paragraphs) {
-    # Existing centred title/table-header paragraphs stay centred.  Everything
-    # else is made right-aligned.  Word constants: RTL = 0, right = 2.
+    # Existing centred title/table-header paragraphs stay centred and body
+    # prose stays justified. Word constants: RTL = 0, right = 2, justify = 3.
     if (-not $AuditOnly) {
       $range = $document.Range($saved.Start, $saved.End)
       $range.ParagraphFormat.ReadingOrder = 0
-      $range.ParagraphFormat.Alignment = if ($saved.Centered) { 1 } else { 2 }
+      $range.ParagraphFormat.Alignment = if ($saved.Centered) { 1 } elseif ($saved.Justified) { 3 } else { 2 }
     }
   }
   if (-not $AuditOnly) {
@@ -61,12 +62,13 @@ try {
 
   foreach ($saved in $paragraphs) {
     $range = $document.Range($saved.Start, $saved.End)
-    if ($range.ParagraphFormat.Alignment -eq 2 -and $range.ParagraphFormat.ReadingOrder -eq 0) { $right++ }
+    if ($range.ParagraphFormat.Alignment -in @(2, 3) -and $range.ParagraphFormat.ReadingOrder -eq 0) { $right++ }
     elseif ($range.ParagraphFormat.Alignment -eq 1 -and $range.ParagraphFormat.ReadingOrder -eq 0) { $center++ }
     else { $left++ }
   }
   [Console]::WriteLine("$right,$center,$left")
 } finally {
-  if ($document) { $document.Close($false) }
-  if ($word) { $word.Quit() }
+  if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
+  if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

@@ -62,7 +62,7 @@ def submit_sample(config: Config, order_id: str, path: Path, pdf: Path, notes: s
 def submit_final(config: Config, order_id: str, files: dict[str, Path], notes: str) -> dict[str, Any]:
     opened = {field: path.open("rb") for field, path in files.items()}
     try:
-        upload = {field: (path.name, opened[field]) for field, path in files.items()}
+        upload = {field: (path.name, opened[field], "application/json" if field == "image_sources_file" else "application/octet-stream") for field, path in files.items()}
         return _json(requests.post(
             f"{config.backend_url}/api/worker/orders/{order_id}/submit-final",
             headers=_headers(config),

@@ -1,17 +1,7 @@
-param([Parameter(Mandatory = $true)][string]$Path)
-
-# This font maps the ordinary PAGE field digits to Persian glyphs. Using one
-# PAGE field per footer keeps numbering dynamic without creating hundreds of
-# nested IF fields, which can make Word repagination stall for minutes.
-$fontPath = Join-Path $PSScriptRoot "..\assets\fonts\PersianPagerNumber-Regular.ttf"
-if (-not (Test-Path -LiteralPath $fontPath)) { throw "Persian page-number font is missing" }
-Add-Type @'
-using System.Runtime.InteropServices;
-public static class PersianPageNumberFont {
-  [DllImport("gdi32.dll", SetLastError=true)] public static extern int AddFontResource(string path);
-}
-'@
-[void][PersianPageNumberFont]::AddFontResource($fontPath)
+param(
+  [Parameter(Mandatory = $true)][string]$Path,
+  [Parameter(Mandatory = $true)][string]$FontName
+)
 
 Add-Type @'
 using System;
@@ -61,6 +51,7 @@ $word = $null; $document = $null
 try {
   $word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0
   $word.ScreenUpdating = $false
+  $word.Options.ArabicNumeral = 2
   $word.Options.UpdateFieldsAtPrint = $true
   # Word stays invisible at the application level. The targeted ROT cleanup
   # above removes only a prior instance of this document before opening it.
@@ -82,9 +73,9 @@ try {
       $insertAt = $footer.Range.Duplicate; $insertAt.SetRange($footer.Range.End - 1, $footer.Range.End - 1)
       $pageField = $insertAt.Fields.Add($insertAt, 33) # wdFieldPage
       $pageField.ShowCodes = $false
-      $pageField.Result.Font.Name = 'Persian Pager Number'; $pageField.Result.Font.NameBi = 'Persian Pager Number'
+      $pageField.Result.Font.Name = $FontName; $pageField.Result.Font.NameBi = $FontName
       $pageField.Result.Font.Size = 12; $pageField.Result.Font.SizeBi = 12
-      $footer.Range.Font.Name = 'Persian Pager Number'; $footer.Range.Font.NameBi = 'Persian Pager Number'
+      $footer.Range.Font.Name = $FontName; $footer.Range.Font.NameBi = $FontName
       $footer.Range.ParagraphFormat.ReadingOrder = 0; $footer.Range.ParagraphFormat.Alignment = 1
     }
   }
@@ -92,4 +83,8 @@ try {
   foreach ($field in $document.Fields) { $field.ShowCodes = $false }
   $document.Save()
   [Console]::WriteLine("pages=$($document.ComputeStatistics(2));sections=$($document.Sections.Count);mode=dynamic_persian_page_field")
-} finally { if ($document) { $document.Close($false) }; if ($word) { $word.Quit() } }
+} finally {
+  if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
+  if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  [GC]::Collect(); [GC]::WaitForPendingFinalizers()
+}

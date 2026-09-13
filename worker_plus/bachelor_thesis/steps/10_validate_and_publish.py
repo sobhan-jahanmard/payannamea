@@ -9,13 +9,16 @@ TITLE = "Validate and publish"
 REPAIRABLE_LAYOUT_ERRORS = (
     "Persian runs do not use the required font",
     "Persian paragraphs have invalid direction or alignment",
-    "Persian runs are missing RTL direction",
+    # Covers both the singular and plural validator wording.
+    "Persian run",
+    "Persian body paragraphs are not justified",
     "Word RTL enforcement left",
     "Word reports",
     "cover page spacing audit failed",
     "cover typography audit failed",
     "cover layout audit failed",
     "top-level sections missing required page break",
+    "table of contents",
 )
 
 
@@ -122,7 +125,16 @@ def run(context: dict[str, Any], services: Any) -> None:
         submit_sample(services.config, order_id, word_name, pdf, "Worker Plus sample generated; awaiting customer approval.")
         context["status"] = "sample_pending_customer_approval"
     else:
-        files = {"docx_file": word_name, "pdf_file": pdf}
+        # The backend requires a provenance manifest whenever an order expects
+        # visuals. This document contains no embedded figures, so keep that
+        # fact explicit instead of fabricating image sources.
+        image_sources = services.workspace / "final" / "figures" / "image_sources.json"
+        write_json(image_sources, {
+            "included_figure_count": 0,
+            "figures": [],
+            "note": "No external or generated figures are embedded in this DOCX; no figure provenance is claimed."
+        })
+        files = {"docx_file": word_name, "pdf_file": pdf, "image_sources_file": image_sources}
         submit_final(services.config, order_id, files, "Worker Plus completed the review package.")
         context["status"] = "worker_done_pending_approval"
     context["artifacts"]["archive"] = str(archive_workspace(services.workspace, order_id))

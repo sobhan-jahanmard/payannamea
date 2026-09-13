@@ -9,6 +9,7 @@ try {
   $document = $word.Documents.Open($Path, $false, $true)
   [Console]::WriteLine($document.ComputeStatistics(2))
 } finally {
-  if ($document) { $document.Close($false) }
-  if ($word) { $word.Quit() }
+  if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
+  if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

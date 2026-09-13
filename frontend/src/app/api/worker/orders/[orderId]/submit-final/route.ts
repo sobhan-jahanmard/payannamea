@@ -11,7 +11,7 @@ interface Context {
   params: Promise<{ orderId: string }>;
 }
 
-const uploadFields = [["docx", "docx_file"], ["pdf", "pdf_file"]] as const;
+const uploadFields = [["docx", "docx_file"], ["pdf", "pdf_file"], ["image_sources", "image_sources_file"]] as const;
 
 export async function POST(request: Request, context: Context) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request, context: Context) {
     const { orderId } = await context.params;
     const form = await request.formData();
     for (const key of form.keys()) {
-      if (["worker_id", "notes", "replace_existing", "docx_file", "pdf_file"].includes(key)) continue;
+      if (["worker_id", "notes", "replace_existing", "docx_file", "pdf_file", "image_sources_file"].includes(key)) continue;
       throw new ApiError(422, `Unsupported final upload field: ${key}`);
     }
     const workerId = form.get("worker_id");
