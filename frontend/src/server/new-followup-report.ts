@@ -4,7 +4,6 @@ import { email } from "./email";
 // قیمت‌ها را به صورت بازه (مثلاً "15-20") وارد کنید.
 const bachelorThesisPrice = "10-20";
 const masterThesisPrice = "20-30";
-const doctoralDissertationPrice = "30-50";
 const thesisProposalPrice = "5-10";
 const universityResearchPrice = "2-10";
 const presentationAndPowerpointPrice = "2-10";
@@ -13,7 +12,6 @@ const depositPercentage = "20%";
 const orderPrices = [
   { label: "پایان‌نامه کارشناسی", price: bachelorThesisPrice },
   { label: "پایان‌نامه کارشناسی ارشد", price: masterThesisPrice },
-  { label: "رساله دکتری", price: doctoralDissertationPrice },
   { label: "پروپوزال پایان‌نامه", price: thesisProposalPrice },
   { label: "تحقیق دانشگاهی", price: universityResearchPrice },
   { label: "ارائه و پاورپوینت", price: presentationAndPowerpointPrice },

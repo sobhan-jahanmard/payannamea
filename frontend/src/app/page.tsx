@@ -58,12 +58,6 @@ const services = [
     body: "از انتخاب موضوع و پروپوزال تا نگارش فصل‌ها، تحلیل، و آماده‌سازی فایل نهایی طبق شیوه‌نامه دانشگاه.",
   },
   {
-    analyticsKey: "doctoral_dissertation",
-    icon: FileCheck2,
-    title: "رساله دکتری",
-    body: "برنامه‌ریزی ساختار رساله، تنظیم فصل‌ها، یکپارچه‌سازی منابع، و آماده‌سازی خروجی قابل بازبینی.",
-  },
-  {
     analyticsKey: "proposal",
     icon: ClipboardList,
     title: "پروپوزال پایان‌نامه",
@@ -141,7 +135,7 @@ export default function LandingPage() {
             </div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-amber-200/70 bg-amber-300 px-3 py-2 text-sm font-medium text-slate-950 shadow-sm">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-              پایان‌نامه کارشناسی، ارشد، رساله، پروپوزال، تحقیق و ارائه
+              پایان‌نامه کارشناسی و ارشد، پروپوزال، تحقیق و ارائه
             </div>
             <h1 className="text-4xl font-semibold leading-tight tracking-normal sm:text-5xl lg:text-6xl">
               خدمات دانشگاهی از ایده تا تحویل

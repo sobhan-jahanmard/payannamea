@@ -1,6 +1,6 @@
 # Worker Plus: پایان‌نامه کارشناسی
 
-این پوشه جایگزین Worker قدیمی برای جریان `bachelor_thesis` است. یک Worker دارد و با argument `--sample` فقط نمونهٔ چندصفحه‌ای تولید می‌کند.
+این پوشه فقط تنظیمات و utilityهای اختصاصی جریان `bachelor_thesis` را نگه می‌دارد. منطق مشترک Worker Plus در `../common/` است و `../run.py` بر اساس نوع سفارش، profile این پوشه را انتخاب می‌کند.
 
 ## اجرا
 
@@ -11,9 +11,9 @@ python -m pip install -r ../requirements.txt
 ```
 
 ```text
-python run.py
-python run.py --sample
-python run.py --order_id 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85
+python ../run.py
+python ../run.py --sample
+python ../run.py --order_id 872225ec-d68b-4f6e-aeaf-04b6c1c2ed85
 ```
 
 - اجرای عادی: تهیهٔ کامل پایان‌نامه و ارسال package برای بررسی مدیر.
@@ -132,7 +132,7 @@ Result: FAIL — <reason>
 برای اجرای دوبارهٔ sample از DOCX فعلی، بدون بازتولید محتوا یا بسته‌بندی Word، از workspace ذخیره‌شده اجرا کنید:
 
 ```text
-python run.py --step 16
+python ../run.py --step 16
 ```
 
 `--step` از شماره‌های terminal در فهرست بالا استفاده می‌کند. `--repackage` از Step 12 شروع می‌شود؛ یعنی DOCX را از source ذخیره‌شده دوباره می‌سازد و سپس Stepهای 13 تا 16 را اجرا می‌کند.

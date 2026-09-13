@@ -9,7 +9,6 @@ export const degreeOptions = [
 export const orderTypeOptions = [
   "پایان‌نامه کارشناسی",
   "پایان‌نامه کارشناسی ارشد",
-  "رساله دکتری",
   "پروپوزال پایان‌نامه",
   "تحقیق دانشگاهی",
   "ارائه و پاورپوینت"
@@ -73,14 +72,6 @@ export const orderTypeFieldConfigs: Record<string, OrderTypeFieldConfig> = {
     quantityTypes: ["pages", "words"],
     defaultQuantityType: "pages",
     defaultDegree: "کارشناسی ارشد",
-    requiresCitationStyle: true
-  },
-  "رساله دکتری": {
-    visible: thesisFields,
-    required: ["faculty", "advisor_name"],
-    quantityTypes: ["pages", "words"],
-    defaultQuantityType: "pages",
-    defaultDegree: "دکتری تخصصی",
     requiresCitationStyle: true
   },
   "پروپوزال پایان‌نامه": {

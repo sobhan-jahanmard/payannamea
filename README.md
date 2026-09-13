@@ -1,6 +1,6 @@
 # Academic Services
 
-Unified Next.js ordering system for theses, doctoral dissertations, proposals, research assignments, and presentations.
+Unified Next.js ordering system for bachelor’s and master’s theses, proposals, research assignments, and presentations.
 
 ## Structure
 
