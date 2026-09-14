@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AnalyticsTracker, CloudflareAnalytics } from "../components/analytics/AnalyticsTracker";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { TopNav } from "../components/layout/TopNav";
@@ -27,7 +28,9 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <AnalyticsTracker />
-          <TopNav />
+          <Suspense fallback={null}>
+            <TopNav />
+          </Suspense>
           {children}
         </AuthProvider>
         {process.env.NODE_ENV === "production" && cloudflareAnalyticsToken ? (
