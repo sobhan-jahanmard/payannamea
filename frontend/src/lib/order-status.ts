@@ -4,8 +4,8 @@ export const ORDER_STATUS_DEFINITIONS = {
   approved: { label: "تأیید شده", badgeClass: "border-emerald-300 bg-emerald-50 text-emerald-900" },
   in_progress: { label: "در حال انجام", badgeClass: "border-teal-300 bg-teal-50 text-teal-900" },
   sample_pending_customer_approval: { label: "نمونه آماده تأیید مشتری", badgeClass: "border-violet-300 bg-violet-50 text-violet-900" },
-  approved_pending_for_final_execution: { label: "نمونه تأیید شد؛ آماده اجرای نهایی", badgeClass: "border-emerald-300 bg-emerald-50 text-emerald-900" },
-  worker_done_pending_approval: { label: "انجام شده، در انتظار تأیید", badgeClass: "border-amber-300 bg-amber-50 text-amber-900" },
+  approved_pending_for_final_execution: { label: "هزینه کامل پروژه پرداخت شده", badgeClass: "border-emerald-300 bg-emerald-50 text-emerald-900" },
+  worker_done_pending_approval: { label: "کامل انجام شده در انتظار تأیید مشتری", badgeClass: "border-amber-300 bg-amber-50 text-amber-900" },
   admin_review: { label: "در انتظار بررسی مدیر", badgeClass: "border-amber-300 bg-amber-50 text-amber-900" },
   completed: { label: "انجام شده و تمام", badgeClass: "border-emerald-300 bg-emerald-50 text-emerald-900" },
   failed: { label: "ناموفق", badgeClass: "border-red-300 bg-red-50 text-red-800" }

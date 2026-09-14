@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Download,
   Edit3,
+  ExternalLink,
   FileUp,
   MessageSquarePlus,
   RefreshCcw,
@@ -261,14 +262,26 @@ function AdminOrderDetail() {
             جزئیات سفارش
           </h1>
         </div>
-        <Button
-          type="button"
-          onClick={() => void loadOrder()}
-          loading={loading}
-        >
-          <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-          تازه‌سازی
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild type="button" variant="outline">
+            <Link
+              href={`/status?order=${encodeURIComponent(orderId)}&customer_view=1`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              پیش‌نمایش نمای مشتری
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void loadOrder()}
+            loading={loading}
+          >
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+            تازه‌سازی
+          </Button>
+        </div>
       </div>
 
       {error ? (

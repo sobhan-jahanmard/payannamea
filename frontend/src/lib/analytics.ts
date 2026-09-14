@@ -18,6 +18,11 @@ let memoryVisitorId: string | null = null;
 let memorySessionId: string | null = null;
 let memoryUtmSource: string | null = null;
 
+function analyticsEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
 /** Keeps the first campaign source for the current browser until it converts. */
 export function captureUtmSource(): string | null {
   if (typeof window === "undefined") return null;
@@ -115,7 +120,7 @@ export function pageViewProperties(): AnalyticsProperties {
 }
 
 export function flushAnalyticsEvents(): void {
-  if (typeof window === "undefined" || sending || queue.length === 0) return;
+  if (!analyticsEnabled() || sending || queue.length === 0) return;
   const event = queue.shift();
   if (!event) return;
   sending = true;
@@ -152,7 +157,7 @@ export function trackAnalyticsEvent(
   eventName: string,
   properties: AnalyticsProperties = {},
 ): void {
-  if (typeof window === "undefined") return;
+  if (!analyticsEnabled()) return;
   queue.push({
     visitor_id: visitorId(),
     session_id: sessionId(),

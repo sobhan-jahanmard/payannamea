@@ -28,7 +28,11 @@ export async function GET(request: Request, context: Context) {
       }
     }
     const output = await findFinalOutput(orderId, outputId);
-    if (customerOrder && customerOrder.status !== "completed" && output.output_type !== "sample") {
+    if (
+      customerOrder &&
+      customerOrder.status !== "completed" &&
+      !["sample", "sample_pdf"].includes(output.output_type)
+    ) {
       throw new ApiError(403, "Only the sample output is available before completion");
     }
     const stored = await readStoredUpload(output.storage_path);
@@ -38,7 +42,7 @@ export async function GET(request: Request, context: Context) {
 
     const headers = new Headers();
     const downloadName = ["docx", "pdf", "deliverable_source"].includes(output.output_type)
-      ? customerOutputFileName(orderId, output)
+      ? customerOutputFileName(output)
       : path.basename(output.original_name);
     headers.set("Content-Type", output.content_type || stored.contentType || "application/octet-stream");
     headers.set(

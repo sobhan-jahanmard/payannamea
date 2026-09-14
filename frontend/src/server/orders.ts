@@ -165,6 +165,16 @@ const detailRelations = {
   worker_submissions: true
 } as const;
 
+// Customer pages never render operational history, internal notes, payment
+// records, or worker telemetry. Loading only their required relations prevents
+// a large Cartesian product when an order has many logs or worker runs.
+const customerDetailRelations = {
+  customer: true,
+  files: true,
+  references: true,
+  final_outputs: true
+} as const;
+
 function iso(value: Date | string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -273,7 +283,10 @@ export function serializeFinalOutput(output: FinalOutputEntity) {
 
 const CUSTOMER_OUTPUT_PRIORITY = ["sample", "sample_pdf", "docx", "pdf"];
 
-export function customerVisibleFinalOutputs(outputs: FinalOutputEntity[] | undefined): FinalOutputEntity[] {
+export function customerVisibleFinalOutputs(
+  outputs: FinalOutputEntity[] | undefined,
+  allowedTypes = CUSTOMER_OUTPUT_PRIORITY
+): FinalOutputEntity[] {
   if (!outputs?.length) {
     return [];
   }
@@ -287,10 +300,20 @@ export function customerVisibleFinalOutputs(outputs: FinalOutputEntity[] | undef
     }
     return right.created_at.getTime() - left.created_at.getTime();
   });
-  return selected.filter((output) => ["sample", "sample_pdf", "docx", "pdf"].includes(output.output_type));
+  return selected.filter((output) => allowedTypes.includes(output.output_type));
 }
 
-export function customerOutputFileName(orderId: string, output: FinalOutputEntity): string {
+export function customerOutputFileName(output: FinalOutputEntity): string {
+  const fixedNames: Record<string, string> = {
+    sample: "sample.docx",
+    sample_pdf: "sample.pdf",
+    docx: "final.docx",
+    pdf: "final.pdf",
+    pptx: "final.pptx",
+    deliverable_source: "final.md"
+  };
+  if (fixedNames[output.output_type]) return fixedNames[output.output_type];
+
   const extensionByType: Record<string, string> = {
     pptx: "pptx",
     docx: "docx",
@@ -299,7 +322,7 @@ export function customerOutputFileName(orderId: string, output: FinalOutputEntit
     deliverable_source: "md"
   };
   const extension = extensionByType[output.output_type] || pathExtension(output.original_name) || "dat";
-  return `order_${orderId}.${extension}`;
+  return `final.${extension}`;
 }
 
 function pathExtension(fileName: string): string | null {
@@ -310,8 +333,8 @@ function pathExtension(fileName: string): string | null {
 function serializeCustomerFinalOutput(output: FinalOutputEntity) {
   return {
     ...serializeFinalOutput(output),
-    original_name: customerOutputFileName(output.order_id, output),
-    stored_name: customerOutputFileName(output.order_id, output)
+    original_name: customerOutputFileName(output),
+    stored_name: customerOutputFileName(output)
   };
 }
 
@@ -397,7 +420,10 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     final_outputs:
       audience === "customer"
         ? ["completed", "sample_pending_customer_approval"].includes(order.status)
-          ? customerVisibleFinalOutputs(order.final_outputs).map(serializeCustomerFinalOutput)
+          ? customerVisibleFinalOutputs(
+              order.final_outputs,
+              order.status === "sample_pending_customer_approval" ? ["sample", "sample_pdf"] : undefined
+            ).map(serializeCustomerFinalOutput)
           : []
         : byDate(order.final_outputs).map(serializeFinalOutput),
     review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : [],
@@ -411,7 +437,11 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
 export async function getOrderOr404(orderId: string, manager?: EntityManager): Promise<OrderEntity> {
   const dataSource = manager ? null : await getDataSource();
   const repo = (manager ?? dataSource!.manager).getRepository(OrderSchema);
-  const order = await repo.findOne({ where: { id: orderId }, relations: detailRelations });
+  const order = await repo.findOne({
+    where: { id: orderId },
+    relations: detailRelations,
+    relationLoadStrategy: "query"
+  });
   if (!order) {
     throw new ApiError(404, "Order not found");
   }
@@ -419,7 +449,15 @@ export async function getOrderOr404(orderId: string, manager?: EntityManager): P
 }
 
 export async function getOrderForUserOr404(orderId: string, user: UserEntity): Promise<OrderEntity> {
-  const order = await getOrderOr404(orderId);
+  const dataSource = await getDataSource();
+  const order = await dataSource.getRepository(OrderSchema).findOne({
+    where: { id: orderId },
+    relations: customerDetailRelations,
+    relationLoadStrategy: "query"
+  });
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
   const canAccess = user.role === "admin"
     || (user.role === "operator" && order.created_by_user_id === user.id)
     || (user.role === "customer" && order.user_id === user.id);

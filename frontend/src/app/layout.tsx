@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Script from "next/script";
-
-import { AnalyticsTracker } from "../components/analytics/AnalyticsTracker";
+import { AnalyticsTracker, CloudflareAnalytics } from "../components/analytics/AnalyticsTracker";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { TopNav } from "../components/layout/TopNav";
 import "./globals.css";
@@ -33,11 +31,7 @@ export default function RootLayout({
           {children}
         </AuthProvider>
         {process.env.NODE_ENV === "production" && cloudflareAnalyticsToken ? (
-          <Script
-            src="https://static.cloudflareinsights.com/beacon.min.js"
-            strategy="afterInteractive"
-            data-cf-beacon={JSON.stringify({ token: cloudflareAnalyticsToken, spa: true })}
-          />
+          <CloudflareAnalytics token={cloudflareAnalyticsToken} />
         ) : null}
       </body>
     </html>

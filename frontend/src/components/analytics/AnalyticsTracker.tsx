@@ -176,3 +176,19 @@ export function AnalyticsTracker() {
 
   return null;
 }
+
+export function CloudflareAnalytics({ token }: { token: string }) {
+  useEffect(() => {
+    if (["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) return;
+
+    const script = document.createElement("script");
+    script.src = "https://static.cloudflareinsights.com/beacon.min.js";
+    script.defer = true;
+    script.dataset.cfBeacon = JSON.stringify({ token, spa: true });
+    document.head.appendChild(script);
+
+    return () => script.remove();
+  }, [token]);
+
+  return null;
+}

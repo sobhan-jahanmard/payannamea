@@ -14,15 +14,20 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { cn } from "../../lib/utils";
 import { useAuth } from "../auth/AuthProvider";
 
 export function TopNav() {
   const pathname = usePathname() ?? "/";
+  const searchParams = useSearchParams();
   const { user, isAdmin, canFollowUp, logout } = useAuth();
-  const isCustomer = user?.role === "customer";
+  const isCustomerPreview =
+    pathname === "/status" &&
+    searchParams?.get("customer_view") === "1" &&
+    (user?.role === "admin" || user?.role === "operator");
+  const isCustomer = isCustomerPreview || user?.role === "customer";
   const canUseCustomerPages = Boolean(user);
   const navItems = [
     { href: "/", label: "خانه", icon: Home },
@@ -32,13 +37,13 @@ export function TopNav() {
     ...(canUseCustomerPages
       ? [{ href: "/orders", label: isAdmin ? "همه سفارش‌ها" : user && !isCustomer ? "سفارش‌های ثبت‌شده" : "سفارش‌های من", icon: ListOrdered }]
       : []),
-    ...(canFollowUp
+    ...(!isCustomerPreview && canFollowUp
       ? [
           { href: "/follow-up", label: "پیگیری شماره", icon: SearchCheck },
           { href: "/follow-up/list", label: "لیست پیگیری‌ها", icon: ClipboardList },
         ]
       : []),
-    ...(isAdmin
+    ...(!isCustomerPreview && isAdmin
       ? [
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
           { href: "/admin/users", label: "کاربران", icon: Users },
@@ -104,11 +109,11 @@ export function TopNav() {
             <>
               <div
                 className="inline-flex h-10 max-w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm"
-                title={!isCustomer ? `${user.full_name ?? "کارکنان"} - ${user.username ?? user.email ?? ""}` : user.phone ?? ""}
+                title={isCustomerPreview ? "پیش‌نمایش نمای مشتری" : !isCustomer ? `${user.full_name ?? "کارکنان"} - ${user.username ?? user.email ?? ""}` : user.phone ?? ""}
               >
                 <Phone className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span className="ltr max-w-[220px] truncate text-left font-medium text-foreground">
-                  {!isCustomer ? user.username ?? user.email : user.phone}
+                  {isCustomerPreview ? "پیش‌نمایش مشتری" : !isCustomer ? user.username ?? user.email : user.phone}
                 </span>
               </div>
               <button
