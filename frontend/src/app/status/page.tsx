@@ -482,6 +482,9 @@ function StatusContent() {
     !isCustomerView &&
     (user?.role === "admin" || user?.role === "operator") &&
     Boolean(orderId);
+  const onlySampleOutputs = order
+    ? ["submitted", "approved", "in_progress", "sample_pending_customer_approval"].includes(order.status)
+    : false;
 
   async function removeStoredFile(file: OrderFile) {
     if (!order) return;
@@ -549,7 +552,7 @@ function StatusContent() {
           <section className="rounded-md border-2 border-primary/40 bg-teal-50 p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-bold text-teal-950">
-                {order.status === "sample_pending_customer_approval" ? "فایل‌های نمونه" : "خروجی‌های نهایی"}
+                {onlySampleOutputs ? "فایل‌های نمونه" : "خروجی‌های نهایی"}
               </h2>
               {order.final_outputs?.length ? (
                 <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-primary shadow-sm">
@@ -575,7 +578,7 @@ function StatusContent() {
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-primary/30 bg-white p-6 text-sm font-medium text-teal-900">
-                {order.status === "sample_pending_customer_approval" ? "هنوز فایل نمونه بارگذاری نشده است." : "هنوز خروجی نهایی بارگذاری نشده است."}
+                {onlySampleOutputs ? "هنوز فایل نمونه بارگذاری نشده است." : "هنوز خروجی نهایی بارگذاری نشده است."}
               </div>
             )}
           </section>

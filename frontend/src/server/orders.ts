@@ -282,6 +282,16 @@ export function serializeFinalOutput(output: FinalOutputEntity) {
 }
 
 const CUSTOMER_OUTPUT_PRIORITY = ["sample", "sample_pdf", "docx", "pdf"];
+const CUSTOMER_SAMPLE_ONLY_STATUSES: OrderStatus[] = [
+  "submitted",
+  "approved",
+  "in_progress",
+  "sample_pending_customer_approval"
+];
+
+export function customerIsLimitedToSampleOutputs(status: OrderStatus): boolean {
+  return CUSTOMER_SAMPLE_ONLY_STATUSES.includes(status);
+}
 
 export function customerVisibleFinalOutputs(
   outputs: FinalOutputEntity[] | undefined,
@@ -419,12 +429,10 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     status_logs: audience === "admin" ? byDate(order.status_logs).map(serializeStatusLog) : [],
     final_outputs:
       audience === "customer"
-        ? ["completed", "sample_pending_customer_approval"].includes(order.status)
-          ? customerVisibleFinalOutputs(
-              order.final_outputs,
-              order.status === "sample_pending_customer_approval" ? ["sample", "sample_pdf"] : undefined
-            ).map(serializeCustomerFinalOutput)
-          : []
+        ? customerVisibleFinalOutputs(
+            order.final_outputs,
+            customerIsLimitedToSampleOutputs(order.status) ? ["sample", "sample_pdf"] : undefined
+          ).map(serializeCustomerFinalOutput)
         : byDate(order.final_outputs).map(serializeFinalOutput),
     review_notes: audience === "admin" ? byDate(order.review_notes).map(serializeReviewNote) : [],
     payment_notes: audience === "admin" ? byDate(order.payment_notes).map(serializePaymentNote) : []

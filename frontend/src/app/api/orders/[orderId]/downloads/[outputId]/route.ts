@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../../../../../server/auth";
 import { readStoredUpload } from "../../../../../../server/files";
 import { ApiError, errorResponse } from "../../../../../../server/http";
-import { customerOutputFileName, findFinalOutput, getOrderForUserOr404, getOrderOr404 } from "../../../../../../server/orders";
+import { customerIsLimitedToSampleOutputs, customerOutputFileName, findFinalOutput, getOrderForUserOr404, getOrderOr404 } from "../../../../../../server/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,17 +23,14 @@ export async function GET(request: Request, context: Context) {
       await getOrderOr404(orderId);
     } else {
       customerOrder = await getOrderForUserOr404(orderId, user);
-      if (!["completed", "sample_pending_customer_approval"].includes(customerOrder.status)) {
-        throw new ApiError(403, "This output is not available at the current order stage");
-      }
     }
     const output = await findFinalOutput(orderId, outputId);
     if (
       customerOrder &&
-      customerOrder.status !== "completed" &&
+      customerIsLimitedToSampleOutputs(customerOrder.status) &&
       !["sample", "sample_pdf"].includes(output.output_type)
     ) {
-      throw new ApiError(403, "Only the sample output is available before completion");
+      throw new ApiError(403, "Only sample outputs are available at the current order stage");
     }
     const stored = await readStoredUpload(output.storage_path);
     if (!stored) {
