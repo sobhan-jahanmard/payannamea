@@ -109,12 +109,12 @@ function AnalyticsPanel() {
         <Metric label="میانگین زمان فعال" value={duration(data?.summary.avg_engaged_seconds)} />
       </section>
 
-      <section className="tool-surface p-5">
+      <section className="tool-surface min-w-0 overflow-hidden p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BarChart3 className="h-5 w-5" /> فعالیت روزانه</h2>
         <div
           dir="rtl"
           aria-label="نمودار فعالیت روزانه؛ جدیدترین روز در سمت راست قرار دارد"
-          className="flex min-h-44 flex-nowrap items-end gap-2 overflow-x-scroll pb-2"
+          className="flex w-full min-w-0 max-w-full min-h-44 flex-nowrap items-end gap-2 overflow-x-scroll pb-2"
         >
           {dailyActivity.map((item) => (
             <div key={item.date} className="flex w-12 shrink-0 flex-col items-center gap-2" title={`${item.date}: ${item.events} رویداد، ${item.page_views} بازدید صفحه`}>
