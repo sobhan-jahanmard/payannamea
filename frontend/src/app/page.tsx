@@ -197,7 +197,7 @@ export default function LandingPage() {
               className="w-full shrink-0 border border-amber-200 bg-amber-300 text-slate-950 shadow-md hover:bg-amber-200 sm:w-auto"
             >
               <a
-                href="/api/sample-download"
+                href="/sample/final.pdf"
                 download
                 target="_blank"
                 rel="noreferrer"
