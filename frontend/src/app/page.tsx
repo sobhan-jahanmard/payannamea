@@ -202,6 +202,8 @@ export default function LandingPage() {
                 target="_blank"
                 rel="noreferrer"
                 data-analytics-event="landing_sample_download_clicked"
+                data-analytics-label="final.pdf"
+                data-analytics-location="sample_download"
               >
                 دانلود نمونه‌کار
                 <Download className="h-4 w-4" aria-hidden="true" />
