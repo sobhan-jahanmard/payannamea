@@ -51,13 +51,6 @@ const optionalQuantity = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().min(1, "حداقل مقدار ۱ است").max(500000, "حداکثر مقدار ۵۰۰۰۰۰ است").optional());
 
-const optionalImageCount = z.preprocess((value) => {
-  if (value === "" || value === null || value === undefined) {
-    return undefined;
-  }
-  return Number(value);
-}, z.number().int().min(0, "حداقل مقدار ۰ است").max(1000, "حداکثر ۱۰۰۰ عکس").optional());
-
 const formSchema = z.object({
   correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
@@ -81,7 +74,6 @@ const formSchema = z.object({
   abstract: z.string().optional(),
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
-  image_count: optionalImageCount,
   requires_charts: z.boolean(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
@@ -163,7 +155,6 @@ function valuesFromOrder(order: Order): FormValues {
     abstract: order.abstract ?? "",
     quantity_type: order.quantity_type ?? orderTypeFieldConfig(order.order_type).defaultQuantityType,
     quantity_value: order.quantity_value ?? undefined,
-    image_count: order.image_count ?? undefined,
     requires_charts: order.requires_charts,
     deadline: order.deadline ?? "",
     notes: order.notes ?? "",
@@ -447,7 +438,6 @@ function StatusContent() {
       abstract: compact(values.abstract),
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
-      image_count: values.image_count,
       requires_charts: values.requires_charts,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
@@ -699,9 +689,6 @@ function StatusContent() {
                       </Select>
                     </Field>
                   </div>
-                  <Field label="تعداد عکس موردنیاز در فایل نهایی" error={errors.image_count?.message}>
-                    <Input className="ltr text-left" {...register("image_count")} type="number" min={0} max={1000} placeholder="مثلاً ۵" />
-                  </Field>
                   <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
                     <input type="checkbox" className="h-4 w-4 rounded border-input accent-teal-700" {...register("requires_charts")} />
                     افزودن گراف و چارت در صورت نیاز
@@ -765,7 +752,6 @@ function StatusContent() {
               <DetailItem label="شناسه سفارش" value={<span className="ltr inline-block">{order.id}</span>} />
               <DetailItem label="وضعیت فعلی" value={statusLabel(order.status)} />
               <DetailItem label="وضعیت پرداخت" value={paymentStatusLabel(order.payment_status)} />
-              <DetailItem label="وضعیت پرداخت معرف" value={paymentStatusLabel(order.moarref_payment_status)} />
               <DetailItem label="نوع سفارش" value={display(order.order_type)} />
               <DetailItem label="کد معرف" value={display(order.moarref_code)} />
               <DetailItem label="نام دانشجو" value={display(order.student_name)} />
@@ -788,7 +774,6 @@ function StatusContent() {
                 label="حجم موردنیاز"
                 value={order.quantity_value ? `${order.quantity_value.toLocaleString("fa-IR")} ${quantityLabel(order.quantity_type)}` : "-"}
               />
-              <DetailItem label="تعداد عکس" value={order.image_count || order.image_count === 0 ? order.image_count.toLocaleString("fa-IR") : "-"} />
               <DetailItem label="گراف و چارت" value={order.requires_charts ? "نیاز است" : "نیاز نیست"} />
               <DetailItem label="روش یا رویکرد انجام" value={order.methodology} />
               <DetailItem label="زبان" value={order.language} />

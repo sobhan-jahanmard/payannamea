@@ -1,5 +1,5 @@
 from typing import Any
-from common.helpers import write_text
+from common.helpers import write_json, write_text
 
 TITLE = "Review content"
 
@@ -12,16 +12,27 @@ def run(context: dict[str, Any], services: Any) -> None:
     admin_notes = [note for note in context["order"].get("review_notes", []) if str(note.get("note") or "").strip()]
     admin_audit = services.workspace / "reports" / "admin_instruction_audit.md"
     if admin_notes:
-        if admin_audit.exists():
-            admin_audit.unlink()
         contract = services.workspace / context["artifacts"]["resolved_source_rules"]
-        prompt = f"""متن {services.profile.DISPLAY_NAME} در `{source.relative_to(services.workspace)}` و قرارداد قواعد اجباری در `{contract.relative_to(services.workspace)}` را ممیزی کن.
+        attempts = []
+        for attempt in range(1, 7):
+            if admin_audit.exists():
+                admin_audit.unlink()
+            prompt = f"""متن {services.profile.DISPLAY_NAME} در `{source.relative_to(services.workspace)}` و قرارداد قواعد اجباری در `{contract.relative_to(services.workspace)}` را ممیزی کن.
 
 تمرکز اصلی روی بخش «قواعد اجباری اختصاصی مدیر» است. تک‌تک یادداشت‌های مدیر را با شاهد مشخص از متن خروجی بررسی کن. صرف وجود یادداشت در قرارداد، رعایت آن محسوب نمی‌شود. اگر هر دستور اجرا نشده، ناقص، متناقض یا بدون شاهد است، STATUS: FAIL بده. در غیر این صورت STATUS: PASS بده. پاسخ فقط یک گزارش Markdown کوتاه شامل خط اول وضعیت و جدول «دستور | وضعیت | شاهد» باشد. هیچ فایلی را تغییر نده."""
-        services.run_codex(prompt, admin_audit)
-        audit_text = admin_audit.read_text(encoding="utf-8") if admin_audit.exists() else ""
-        if not audit_text.lstrip().startswith("STATUS: PASS"):
-            raise RuntimeError("Mandatory admin-instruction audit failed; generation must be corrected before publication")
+            services.run_codex(prompt, admin_audit)
+            audit_text = admin_audit.read_text(encoding="utf-8") if admin_audit.exists() else ""
+            passed = audit_text.lstrip().startswith("STATUS: PASS")
+            attempts.append({"attempt": attempt, "passed": passed})
+            if passed:
+                break
+            repair = services.workspace / "reports" / "stage_checks" / f"admin_instruction_repair_{attempt}.md"
+            repair_prompt = f"""ممیزی `{admin_audit.relative_to(services.workspace)}` نشان می‌دهد بعضی دستورهای اجباری مدیر در `{source.relative_to(services.workspace)}` رعایت نشده‌اند. گزارش و قرارداد `{contract.relative_to(services.workspace)}` را بخوان و خود فایل متن را مستقیم و با کمترین تغییر لازم اصلاح کن. همهٔ دستورهای FAIL را واقعاً در محتوا اجرا کن، شاهد روشن ایجاد کن، منابع و شکل‌های درست را حفظ کن و چیزی جعل نکن. فقط گزارش کوتاه تعمیر را در خروجی بنویس."""
+            services.run_codex(repair_prompt, repair)
+        else:
+            write_json(services.workspace / "reports" / "stage_checks" / "admin_instruction_recovery.json", {"passed": False, "attempts": attempts})
+            raise RuntimeError("Mandatory admin-instruction audit remained unresolved after recovery loop")
+        write_json(services.workspace / "reports" / "stage_checks" / "admin_instruction_recovery.json", {"passed": True, "attempts": attempts})
         context["artifacts"]["admin_instruction_audit"] = str(admin_audit.relative_to(services.workspace))
     write_text(
         services.workspace / "reports" / "compliance_report.md",

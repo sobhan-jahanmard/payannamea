@@ -16,4 +16,4 @@ def run(context: dict[str, Any], services: Any) -> None:
     match = re.search(r"pages=(\d+);sections=(\d+);errors=(\d+)", result.stdout)
     if not match or result.returncode:
         raise RuntimeError("per-page Persian pagination verification failed: " + result.stdout[-1500:])
-    write_json(services.workspace / "reports" / "stage_checks" / "persian_pagination_verification.json", {"passed": True, "pages": int(match.group(1)), "sections": int(match.group(2)), "checked_pages": int(match.group(1)), "font": font_name, "errors": 0})
+    write_json(services.workspace / "reports" / "stage_checks" / "persian_pagination_verification.json", {"passed": True, "pages": int(match.group(1)), "sections": int(match.group(2)), "checked_pages": int(match.group(1)), "font": font_name, "numeral_mode": "wdNumeralHindi", "errors": 0})

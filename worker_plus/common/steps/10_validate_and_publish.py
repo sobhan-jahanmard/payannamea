@@ -1,8 +1,10 @@
 import importlib
 import json
 from typing import Any
+from docx import Document
 from common.api import submit_final
 from common.helpers import archive_workspace, write_json, write_text
+from common.visual_policy import visual_requirements
 
 TITLE = "Validate and publish"
 
@@ -38,6 +40,74 @@ def _append_before_references(source: str, addition: str) -> str:
     body, marker, references = source.partition("# منابع")
     suffix = marker + references if marker else ""
     return body.rstrip() + "\n\n" + addition.strip() + "\n\n" + suffix
+
+
+def _is_chart_kind(value: object) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {"chart", "graph"} or "نمودار" in normalized or "گراف" in normalized
+
+
+def enforce_visual_policy(context: dict[str, Any], services: Any, source: Any, docx: Any) -> None:
+    """Recheck visual density at the publication boundary, including resumed runs."""
+    policy = visual_requirements(context["order"])
+    required_total = int(policy["minimum_total_visuals"])
+    required_charts = int(policy["minimum_charts_or_graphs"])
+    if not required_total and not required_charts:
+        return
+
+    plan = services.workspace / context["artifacts"].get("visual_plan", "planning/visual_plan.json")
+    manifest = services.workspace / context["artifacts"].get("visual_manifest", "final/figures/manifest.json")
+    try:
+        visuals = json.loads(plan.read_text(encoding="utf-8")).get("visuals", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        visuals = []
+    try:
+        figures = json.loads(manifest.read_text(encoding="utf-8")).get("figures", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        figures = []
+
+    source_text = source.read_text(encoding="utf-8") if source.exists() else ""
+    valid_figures = [item for item in figures if isinstance(item, dict)]
+    manifest_charts = sum(_is_chart_kind(item.get("kind")) for item in valid_figures)
+    referenced = []
+    existing = []
+    for item in valid_figures:
+        raw_path = str(item.get("path") or "")
+        asset = services.workspace / raw_path
+        relative_from_final = raw_path.replace("\\", "/")
+        if relative_from_final.startswith("final/"):
+            relative_from_final = relative_from_final[len("final/"):]
+        existing.append(bool(raw_path) and asset.is_file() and asset.stat().st_size > 0)
+        referenced.append(bool(raw_path) and f"]({relative_from_final})" in source_text)
+    inline_shapes = len(Document(docx).inline_shapes) if docx.exists() else 0
+
+    failures = []
+    if len(visuals) < required_total:
+        failures.append(f"visual plan {len(visuals)}/{required_total}")
+    if len(valid_figures) < required_total:
+        failures.append(f"generated figures {len(valid_figures)}/{required_total}")
+    if manifest_charts < required_charts:
+        failures.append(f"charts/graphs {manifest_charts}/{required_charts}")
+    if sum(existing) < required_total:
+        failures.append(f"existing PNG assets {sum(existing)}/{required_total}")
+    if sum(referenced) < required_total:
+        failures.append(f"figures referenced in source {sum(referenced)}/{required_total}")
+    if inline_shapes < required_total:
+        failures.append(f"figures embedded in DOCX {inline_shapes}/{required_total}")
+
+    report_path = services.workspace / "reports" / "stage_checks" / "visual_policy_gate.json"
+    write_json(report_path, {
+        "passed": not failures,
+        "policy": policy,
+        "observed": {
+            "planned": len(visuals), "generated": len(valid_figures),
+            "charts_or_graphs": manifest_charts, "existing_assets": sum(existing),
+            "source_references": sum(referenced), "docx_inline_shapes": inline_shapes,
+        },
+        "failures": failures,
+    })
+    if failures:
+        raise RuntimeError("Visual policy gate failed: " + "; ".join(failures))
 
 
 def complete_page_target(context: dict[str, Any], services: Any, source: Any, docx: Any, rules: dict[str, Any]) -> int | None:
@@ -87,12 +157,36 @@ def complete_page_target(context: dict[str, Any], services: Any, source: Any, do
         f"({progress[-1]['actual_pages']}/{required_pages})"
     )
 
+
+def audit_visual_quality(context: dict[str, Any], services: Any, pdf: Any) -> None:
+    """Require a vision-capable AI review of the asset itself and its final layout."""
+    order = context["order"]
+    required = int(visual_requirements(order)["minimum_total_visuals"])
+    if not required:
+        return
+    manifest = services.workspace / context["artifacts"].get("visual_manifest", "final/figures/manifest.json")
+    if not manifest.exists():
+        raise RuntimeError("Required visuals have no manifest for visual quality review")
+    services.render_pdf_pages(pdf, services.workspace / "reports" / "rendered_pages")
+    report = services.workspace / "reports" / "visual_quality_audit.md"
+    prompt = f"""ممیزی بصری اجباری سفارش «{order.get('title')}» را انجام بده. manifest تصاویر در `{manifest.relative_to(services.workspace)}`، خود PNGها در `final/figures/` و صفحات رندرشدهٔ PDF در `reports/rendered_pages/` هستند.
+
+هر PNG و صفحهٔ PDF حاوی آن را با ابزار مشاهدهٔ تصویر بررسی کن. خط اول پاسخ دقیقاً `STATUS: PASS` یا `STATUS: FAIL` باشد و سپس جدولی با ستون‌های «شکل | کیفیت حرفه‌ای | محتوای واقعی/منبع | خوانایی و RTL | تناسب با استدلال | صفحهٔ PDF | نتیجه» بده.
+
+فقط وقتی PASS بده که همهٔ شکل‌ها حرفه‌ای، خوانا، دارای برچسب درست، بدون برش/هم‌پوشانی، و مفید برای استدلال باشند. نمودار یا گراف تزئینی، خالی، بی‌محتوا، کلیشه‌ای، بدون داده/منبع/فرض روشن، یا نامرتبط با موضوع باید FAIL شود؛ صرف زیبا بودن برای PASS کافی نیست. بررسی کن که نمودار واقعاً ادعای قابل‌فهم و مرتبطی را منتقل می‌کند، نه اینکه فقط برای پُرکردن صفحه اضافه شده باشد. نمودار الزامی: {'بله' if order.get('requires_charts') else 'خیر'}."""
+    services.run_codex(prompt, report)
+    text = report.read_text(encoding="utf-8") if report.exists() else ""
+    if not text.lstrip().startswith("STATUS: PASS"):
+        raise RuntimeError("AI visual quality audit failed; publication is blocked")
+    context["artifacts"]["visual_quality_audit"] = str(report.relative_to(services.workspace))
+
 def run(context: dict[str, Any], services: Any) -> None:
     docx = services.workspace / context["artifacts"]["docx"]
     if not docx.exists() or docx.stat().st_size == 0:
         raise RuntimeError("DOCX output is missing")
     source = services.workspace / context["artifacts"]["source"]
     rules = json.loads((services.workspace / context["artifacts"]["university_rules"]).read_text(encoding="utf-8"))
+    enforce_visual_policy(context, services, source, docx)
     complete_page_target(context, services, source, docx, rules)
     repair_attempts: list[dict[str, Any]] = []
     for attempt in range(1, 4):
@@ -116,11 +210,13 @@ def run(context: dict[str, Any], services: Any) -> None:
     word_name = services.workspace / "final" / "final.docx"
     if docx != word_name:
         word_name.write_bytes(docx.read_bytes())
-    services.export_pdf(word_name, pdf)
+    pdf_font = rules["font"]["persian"]
+    services.export_pdf(word_name, pdf, pdf_font)
+    audit_visual_quality(context, services, pdf)
     sample_docx = services.workspace / "final" / "sample.docx"
     sample_pdf = services.workspace / "final" / "sample.pdf"
     full_pages, sample_pages = services.create_first_half_sample(word_name, sample_docx)
-    services.export_pdf(sample_docx, sample_pdf)
+    services.export_pdf(sample_docx, sample_pdf, pdf_font)
     context["artifacts"].update({
         "final_docx": str(word_name.relative_to(services.workspace)),
         "final_pdf": str(pdf.relative_to(services.workspace)),

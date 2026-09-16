@@ -27,12 +27,62 @@ if hasattr(sys.stderr, "reconfigure"):
 
 STEPS = [
     "01_fetch_order", "02_prepare_workspace", "03_check_intake",
-    "04_extract_university_rules", "05_collect_sources", "05a_analyze_customer_sources", "05b_resolve_source_rules", "06_build_thesis_plan",
-    "07_generate_content", "08_review_content", "08b_audit_source_compliance", "09_package_docx", "09b_polish_cover", "10b_finalize_persian_pagination", "10c_verify_persian_pagination", "10_validate_and_publish",
+    "04_extract_university_rules", "04a_build_order_contract", "05_collect_sources", "05a_analyze_customer_sources", "05b_resolve_source_rules", "06_build_thesis_plan", "06a_plan_visuals", "06b_generate_visual_assets",
+    "07_generate_content", "07a_validate_visual_placement", "08_review_content", "08b_audit_source_compliance", "09_package_docx", "09b_polish_cover", "10b_finalize_persian_pagination", "10c_verify_persian_pagination", "10_validate_and_publish",
 ]
 FAILURE_STEP = "11_handle_failure"
 TOTAL_STEPS = len(STEPS) + 1
 WORKER_LABEL = "Order workflow"
+MAX_RECOVERY_CYCLES = 12
+
+# A failed quality gate usually means that an earlier artifact needs correction,
+# not that the order itself has failed.  Restart from the earliest owner of that
+# artifact and replay every dependent step.
+RECOVERY_RESTARTS = {
+    "07a_validate_visual_placement": "07_generate_content",
+    "08_review_content": "07_generate_content",
+    "08b_audit_source_compliance": "07_generate_content",
+    "09_package_docx": "07_generate_content",
+    "09b_polish_cover": "09_package_docx",
+    "10b_finalize_persian_pagination": "09_package_docx",
+    "10c_verify_persian_pagination": "09_package_docx",
+    "10_validate_and_publish": "09_package_docx",
+}
+
+
+def recovery_start(step_name: str, error: Exception | None = None) -> int:
+    if step_name == "10_validate_and_publish" and error and "Visual policy gate failed" in str(error):
+        return STEPS.index("06a_plan_visuals")
+    return STEPS.index(RECOVERY_RESTARTS.get(step_name, step_name))
+
+
+def error_fingerprint(step_name: str, error: Exception) -> str:
+    # Numbers and generated paths vary between attempts; the stable message is
+    # what tells us whether recovery is actually making progress.
+    message = re.sub(r"\d+", "#", str(error).lower())
+    message = re.sub(r"\s+", " ", message).strip()
+    return f"{step_name}:{message[:500]}"
+
+
+def is_deferred_service_error(error: Exception) -> bool:
+    """Do not mark an order failed when the model provider is temporarily unavailable."""
+    message = str(error).lower()
+    return any(marker in message for marker in (
+        "usage limit", "purchase more credits", "try again at", "rate limit", "temporarily unavailable",
+        "pdf font verification failed", "required font is not installed",
+    ))
+
+
+def has_declared_chart_figure(markdown: str, manifest: Path | None = None) -> bool:
+    """Use the manifest's explicit kind; captions need not repeat the word chart."""
+    if manifest and manifest.is_file():
+        try:
+            figures = json.loads(manifest.read_text(encoding="utf-8")).get("figures", [])
+            if any(str(item.get("kind") or "").lower() in {"chart", "graph"} for item in figures if isinstance(item, dict)):
+                return True
+        except (OSError, json.JSONDecodeError):
+            pass
+    return bool(re.search(r"!\[(?:[^\]]*?(?:نمودار|گراف|chart|graph)[^\]]*)\]\([^)]+\)", markdown, re.I))
 
 
 @dataclass
@@ -105,19 +155,26 @@ class Services:
             command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
         result = subprocess.run(command, cwd=str(self.workspace), input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
         print(result.stdout, end="", flush=True)
+        # A single `codex exec` can emit several cumulative usage events. Keep
+        # only the final/highest value for this invocation, then add it to the
+        # order-wide usage below. Taking max directly on self.token_usage would
+        # lose every invocation except the most expensive one.
+        invocation_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
         for line in result.stdout.splitlines():
             try: event = json.loads(line)
             except json.JSONDecodeError: continue
             usage = event.get("usage") or event.get("data", {}).get("usage") or {}
             for key, usage_field in (("input_tokens", "inputTokens"), ("cached_input_tokens", "cachedInputTokens"), ("output_tokens", "outputTokens"), ("total_tokens", "totalTokens")):
-                if isinstance(usage.get(key), int): self.token_usage[usage_field] = max(self.token_usage[usage_field], usage[key])
+                if isinstance(usage.get(key), int): invocation_usage[usage_field] = max(invocation_usage[usage_field], usage[key])
             detail = usage.get("output_tokens_details") or {}
             input_detail = usage.get("input_tokens_details") or {}
-            if isinstance(input_detail.get("cached_tokens"), int): self.token_usage["cachedInputTokens"] = max(self.token_usage["cachedInputTokens"], input_detail["cached_tokens"])
-            if isinstance(detail.get("reasoning_tokens"), int): self.token_usage["reasoningTokens"] = max(self.token_usage["reasoningTokens"], detail["reasoning_tokens"])
-            if isinstance(usage.get("reasoning_output_tokens"), int): self.token_usage["reasoningTokens"] = max(self.token_usage["reasoningTokens"], usage["reasoning_output_tokens"])
-        if not self.token_usage["totalTokens"]:
-            self.token_usage["totalTokens"] = self.token_usage["inputTokens"] + self.token_usage["outputTokens"]
+            if isinstance(input_detail.get("cached_tokens"), int): invocation_usage["cachedInputTokens"] = max(invocation_usage["cachedInputTokens"], input_detail["cached_tokens"])
+            if isinstance(detail.get("reasoning_tokens"), int): invocation_usage["reasoningTokens"] = max(invocation_usage["reasoningTokens"], detail["reasoning_tokens"])
+            if isinstance(usage.get("reasoning_output_tokens"), int): invocation_usage["reasoningTokens"] = max(invocation_usage["reasoningTokens"], usage["reasoning_output_tokens"])
+        if not invocation_usage["totalTokens"]:
+            invocation_usage["totalTokens"] = invocation_usage["inputTokens"] + invocation_usage["outputTokens"]
+        for usage_field, amount in invocation_usage.items():
+            self.token_usage[usage_field] += amount
         if result.returncode:
             raise RuntimeError(f"Codex exited with code {result.returncode}")
         deadline = time.monotonic() + 1800
@@ -126,6 +183,30 @@ class Services:
                 return
             time.sleep(5)
         raise RuntimeError(f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes")
+
+    def render_pdf_pages(self, pdf: Path, output_dir: Path) -> list[Path]:
+        """Render final pages without relying on a machine-specific Poppler PATH."""
+        try:
+            import pymupdf
+        except ImportError as exc:
+            raise RuntimeError("PDF visual audit requires PyMuPDF; install worker_plus/requirements.txt") from exc
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for stale in output_dir.glob("page-*.png"):
+            stale.unlink()
+        try:
+            document = pymupdf.open(pdf)
+            zoom = 150 / 72
+            pages = []
+            for number, page in enumerate(document, start=1):
+                output = output_dir / f"page-{number:03}.png"
+                page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False).save(output)
+                pages.append(output)
+            document.close()
+        except Exception as exc:
+            raise RuntimeError(f"PDF visual rendering failed: {exc}") from exc
+        if not pages:
+            raise RuntimeError("PDF visual rendering produced no pages")
+        return pages
 
     def release_docx_lock(self, path: Path) -> None:
         """Close only a stale Word instance for this worker artifact."""
@@ -277,6 +358,7 @@ class Services:
         normal = style("Normal", font["body_pt"], align=WD_ALIGN_PARAGRAPH.JUSTIFY)
         normal.paragraph_format.first_line_indent = Cm(paragraph_rules["first_line_cm"])
         style("TOC Entry", font["body_pt"], align=WD_ALIGN_PARAGRAPH.RIGHT)
+        style("Figure Caption", rules["captions"]["font_pt"], align=WD_ALIGN_PARAGRAPH.CENTER)
         style("Title", font["heading_1_pt"] + 2, True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 1", font["heading_1_pt"], True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 2", font["heading_2_pt"], True, WD_ALIGN_PARAGRAPH.RIGHT)
@@ -337,6 +419,23 @@ class Services:
         bidi(footer)
 
         lines = source.read_text(encoding="utf-8").splitlines()
+        # A content-repair agent may legitimately remove the Markdown TOC while
+        # fixing another issue. The DOCX must still have a real, clickable TOC;
+        # derive one from the document's actual headings instead of failing a
+        # packaging-only quality gate three times.
+        has_markdown_toc = any(normalize_persian(item.strip()) == "# فهرست مطالب" for item in lines)
+        if not has_markdown_toc:
+            toc_entries: list[str] = []
+            for item in lines:
+                candidate = normalize_persian(item.strip())
+                prefix = next((value for value in ("## ", "# ") if candidate.startswith(value)), None)
+                if prefix is None:
+                    continue
+                heading = normalize_persian(candidate[len(prefix):])
+                if heading and heading not in {"فهرست مطالب", "منابع"}:
+                    toc_entries.append(f"- {heading}")
+            if toc_entries:
+                lines = ["# فهرست مطالب", *toc_entries, "", *lines]
         index = 0
         chapter_count = 0
         redundant_cover_headings = {"عنوان پژوهش", "عنوان پایان نامه", "عنوان پایان‌نامه", "عنوان پروژه"}
@@ -442,6 +541,27 @@ class Services:
                         for p in cell.paragraphs:
                             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT; bidi(p)
                             for r in p.runs: apply_persian_run(r, font["table_pt"])
+                continue
+            # `line` is normalized for Persian prose, but normalizing it also
+            # transforms ASCII digits in asset filenames (V04.png -> V۰۴.png).
+            # Parse Markdown image paths from the raw source instead.
+            image_match = re.fullmatch(r"!\[(.+?)\]\(([^)]+)\)", raw_line.strip())
+            if image_match:
+                caption, relative_image = image_match.groups()
+                image_path = (source.parent / relative_image).resolve()
+                if not image_path.is_file():
+                    raise RuntimeError(f"Markdown figure is missing: {relative_image}")
+                paragraph = document.add_paragraph()
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = paragraph.add_run()
+                run.add_picture(str(image_path), width=Cm(14.5))
+                caption_paragraph = document.add_paragraph(normalize_persian(caption), style="Figure Caption")
+                caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                caption_paragraph.paragraph_format.first_line_indent = Cm(0)
+                bidi(caption_paragraph)
+                for run in caption_paragraph.runs:
+                    apply_persian_run(run, rules["captions"]["font_pt"])
+                index += 1
                 continue
             if line.startswith("# "):
                 paragraph = document.add_paragraph(line[2:], style="Heading 1")
@@ -576,7 +696,7 @@ class Services:
             raise RuntimeError("Word page count returned no numeric result")
         return int(counts[-1])
 
-    def export_pdf(self, docx: Path, pdf: Path) -> None:
+    def export_pdf(self, docx: Path, pdf: Path, font_name: str) -> None:
         if os.name != "nt":
             raise RuntimeError("PDF export requires the Windows Word runtime")
         script = Path(__file__).resolve().parent / "scripts" / "export_pdf.ps1"
@@ -587,7 +707,7 @@ class Services:
             if pdf.exists():
                 pdf.unlink()
             process = subprocess.Popen(
-                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf)],
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf), "-FontName", font_name],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
             )
             try:
@@ -602,9 +722,37 @@ class Services:
                 raise RuntimeError("Word PDF export timed out after retry")
             last_output = output
             if process.returncode == 0 and pdf.exists() and pdf.stat().st_size:
+                self.verify_pdf_font(pdf, font_name)
                 return
             self.release_docx_lock(docx)
         raise RuntimeError("Word PDF export failed: " + last_output[-500:])
+
+    def verify_pdf_font(self, pdf: Path, font_name: str) -> None:
+        """Require the requested thesis font in the actual exported PDF."""
+        try:
+            import pymupdf
+        except ImportError as exc:
+            raise RuntimeError("PDF font verification requires PyMuPDF; install worker_plus/requirements.txt") from exc
+
+        def normalized(value: str) -> str:
+            # PDF subset names are commonly written as ABCDEF+Font-Name.
+            value = value.split("+", 1)[-1]
+            return "".join(char.lower() for char in value if char.isalnum())
+
+        expected = normalized(font_name)
+        document = pymupdf.open(pdf)
+        try:
+            exported_fonts = {
+                normalized(str(font[3]))
+                for page in document
+                for font in page.get_fonts(full=True)
+            }
+        finally:
+            document.close()
+        if not any(expected in exported or exported in expected for exported in exported_fonts):
+            raise RuntimeError(
+                f"PDF font verification failed: expected '{font_name}', found {sorted(exported_fonts)}"
+            )
 
     def create_first_half_sample(self, docx: Path, sample_docx: Path) -> tuple[int, int]:
         """Save the actual first half of rendered Word pages as a separate DOCX."""
@@ -651,6 +799,10 @@ class Services:
             if line.strip().startswith("|") and bool(text.splitlines()[index + 1].strip()) and set(text.splitlines()[index + 1].strip()) <= {"|", "-", ":", " "}
         )
         if len(document.tables) < source_table_count: errors.append("not all Markdown tables were converted to DOCX tables")
+        chart_required = bool(order.get("requires_charts"))
+        manifest = self.workspace / "final" / "figures" / "manifest.json"
+        if chart_required and not has_declared_chart_figure(text, manifest):
+            errors.append("order requires a chart or graph but no declared chart figure exists")
         if document.styles["Normal"].font.name != rules["font"]["persian"]: errors.append("default Persian font was not applied")
         if len(document.paragraphs) < 12: errors.append("DOCX contains too few paragraphs")
         toc_present = any(paragraph.text.strip() == "فهرست مطالب" for paragraph in document.paragraphs)
@@ -700,7 +852,7 @@ class Services:
         # Centred text is only legitimate for the cover/chapter title and table
         # headers.  A centred or left-aligned body paragraph is a Word-layout bug.
         paragraphs_to_audit = [
-            (paragraph, paragraph.style.name in ("Title", "Heading 1"), paragraph.style.name == "Normal")
+            (paragraph, paragraph.style.name in ("Title", "Heading 1", "Figure Caption"), paragraph.style.name == "Normal")
             for paragraph in document.paragraphs
         ]
         paragraphs_to_audit.extend(
@@ -798,7 +950,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="Avoid Codex and create a tiny test source")
     parser.add_argument("--offline", action="store_true", help="Run all steps with a local mock order; no backend changes")
     parser.add_argument("--repackage", action="store_true", help="Restart at Step 12 (Package DOCX) using the saved source, without invoking Codex")
-    parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from the terminal step number (1-16); Step 16 regenerates and publishes sample.docx/sample.pdf from final.docx")
+    parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from a terminal step number; the final step validates, visually audits, and publishes the package")
     return parser
 
 
@@ -860,13 +1012,13 @@ def main() -> None:
             # A deliberate re-run from generation must not silently reuse a stale
             # model output.  Starting at packaging/validation leaves source data
             # untouched for visual-only corrections.
-            if args.step <= 7:
+            if args.step <= STEPS.index("07_generate_content") + 1:
                 for stale in (workspace / "final" / "deliverable_source.md", workspace / "final" / "sample_source.md"):
                     if stale.exists():
                         stale.unlink()
                 for stale in (workspace / "drafts").glob("continuation_*.md"):
                     stale.unlink()
-            if args.step <= 9:
+            if args.step <= STEPS.index("09_package_docx") + 1:
                 for stale in (workspace / "final" / "deliverable.docx", workspace / "final" / "sample.docx"):
                     if stale.exists():
                         stale.unlink()
@@ -877,19 +1029,75 @@ def main() -> None:
     if context.get("order"):
         services.profile = profile_for(context["order"])
 
+    terminal_error: Exception | None = None
+    recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])
+    repeated_errors: dict[str, int] = {}
     try:
-        for index, name in enumerate(STEPS, start=1):
+        cursor = 0
+        recovery_cycles = 0
+        while cursor < len(STEPS):
+            name = STEPS[cursor]
             if name in context["completed_steps"]:
+                cursor += 1
                 continue
             module = importlib.import_module(f"common.steps.{name}")
-            header(index, module.TITLE, context)
+            header(cursor + 1, module.TITLE, context)
             context["current_step"] = name
             save(workspace, context)
-            module.run(context, services)
-            context["completed_steps"].append(name)
+            try:
+                module.run(context, services)
+            except Exception as exc:
+                recovery_cycles += 1
+                fingerprint = error_fingerprint(name, exc)
+                repeated_errors[fingerprint] = repeated_errors.get(fingerprint, 0) + 1
+                restart = recovery_start(name, exc)
+                event = {
+                    "cycle": recovery_cycles,
+                    "failed_step": name,
+                    "restart_step": STEPS[restart],
+                    "same_error_count": repeated_errors[fingerprint],
+                    "error": str(exc),
+                }
+                recovery_history.append(event)
+                context.setdefault("errors", []).append(str(exc))
+                context["status"] = "in_progress"
+                context["current_step"] = None
+                if is_deferred_service_error(exc):
+                    # This is an external capacity pause, not an order defect.
+                    # Keep the claimed order resumable and avoid an irreversible
+                    # backend `failed` status or a wasteful rapid retry loop.
+                    context["deferred_error"] = event
+                    context["errors"] = []
+                    save(workspace, context)
+                    print("Result: PAUSED — model capacity is unavailable; order remains in_progress.", flush=True)
+                    return
+                # Invalidate the failed artifact and everything derived from it.
+                context["completed_steps"] = [step for step in context["completed_steps"] if STEPS.index(step) < restart]
+                save(workspace, context)
+                print(
+                    f"Result: RETRY — {exc}\nRecovery {recovery_cycles}/{MAX_RECOVERY_CYCLES}: "
+                    f"restarting from {restart + 1:02} ({STEPS[restart]})",
+                    flush=True,
+                )
+                # Three identical failures are useful evidence, but still leave
+                # room for broader replay cycles before declaring a terminal fault.
+                if recovery_cycles >= MAX_RECOVERY_CYCLES or repeated_errors[fingerprint] >= 6:
+                    terminal_error = exc
+                    break
+                cursor = restart
+                continue
+            if name not in context["completed_steps"]:
+                context["completed_steps"].append(name)
             context["current_step"] = None
+            context["status"] = "in_progress" if cursor + 1 < len(STEPS) else context["status"]
             save(workspace, context)
             print("Result: PASS", flush=True)
+            cursor += 1
+        if terminal_error is not None:
+            raise terminal_error
+        # Recovered errors are diagnostic history, not a failed run.
+        context["errors"] = []
+        save(workspace, context)
     except Exception as exc:
         context.setdefault("errors", []).append(str(exc))
         save(workspace, context)
@@ -914,7 +1122,7 @@ def main() -> None:
             )
         except Exception as cleanup_error:
             print(f"Could not complete worker cleanup: {cleanup_error}", file=sys.stderr)
-        if context.get("order_id") and not args.offline:
+        if context.get("order_id") and not args.offline and not context.get("deferred_error"):
             try:
                 errors = context.get("errors") or []
                 record_run(config, context["order_id"], {"workerId": config.worker_id, "model": config.codex_model, "mode": context["mode"], "status": "completed" if not errors else "failed", "notes": errors[-1] if errors else None, **services.token_usage})

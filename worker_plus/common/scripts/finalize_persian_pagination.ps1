@@ -87,10 +87,11 @@ $word = $null; $document = $null
 try {
   $word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0
   $word.ScreenUpdating = $false
-  # Use contextual numerals only after assigning fa-IR directly to the rebuilt
-  # footer and PAGE range below. This preserves Persian glyphs without changing
-  # Latin numbers in a DOI/URL elsewhere in the document.
-  $word.Options.ArabicNumeral = 2 # wdNumeralContext
+  # `wdNumeralContext` leaves a lone PAGE field in its Western form because it
+  # has no surrounding Persian text to establish context. `wdNumeralHindi`
+  # forces the Persian/Arabic-Indic glyph form for the dynamic PAGE result while
+  # leaving all ordinary body text untouched.
+  $word.Options.ArabicNumeral = 1 # wdNumeralHindi
   $word.Options.UpdateFieldsAtPrint = $true
   # Word stays invisible at the application level. The targeted ROT cleanup
   # above removes only a prior instance of this document before opening it.
@@ -105,11 +106,13 @@ try {
   # Vercel's function payload limit. Keep the document portable while embedding
   # only the glyphs that the generated thesis actually uses.
   $document.SaveSubsetFonts = $true
-  $pageNumberFont = 'Persian Pager Number'
+  # Use the university's required Persian font for PAGE too. The numeral shape
+  # is controlled by wdNumeralHindi above; a substitution font can silently
+  # leave ASCII glyphs in the exported PDF.
+  $pageNumberFont = $FontName
   # Word chooses the shape of a PAGE result from its character style, not
-  # reliably from direct font formatting alone. This mirrors the manual Word
-  # fix: make a character style whose Latin and complex-script fonts are both
-  # Persian, then assign it to every PAGE field.
+  # reliably from direct font formatting alone. Make a character style whose
+  # Latin and complex-script fonts both use the required Persian font.
   $pageNumberStyleName = 'Persian Page Number'
   try { $pageNumberStyle = $document.Styles.Item($pageNumberStyleName) }
   catch { $pageNumberStyle = $document.Styles.Add($pageNumberStyleName, 2) } # wdStyleTypeCharacter

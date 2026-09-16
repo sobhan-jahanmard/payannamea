@@ -185,7 +185,6 @@ export interface Order {
   abstract?: string | null;
   quantity_type?: string | null;
   quantity_value?: number | null;
-  image_count?: number | null;
   requires_charts: boolean;
   deadline?: string | null;
   notes?: string | null;
@@ -237,7 +236,6 @@ export interface OrderCreatePayload {
   abstract?: string;
   quantity_type?: string;
   quantity_value?: number;
-  image_count?: number;
   requires_charts: boolean;
   deadline?: string;
   notes?: string;

@@ -409,12 +409,6 @@ function AdminOrderDetail() {
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">تعداد عکس</dt>
-                <dd className="font-medium">
-                  {order.image_count || order.image_count === 0
-                    ? order.image_count.toLocaleString("fa-IR")
-                    : "-"}
-                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">گراف و چارت</dt>

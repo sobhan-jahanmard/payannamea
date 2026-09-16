@@ -53,7 +53,6 @@ export const referenceSchema = z.object({
 });
 
 const optionalQuantity = z.number().int().min(1).max(500000).optional().nullable();
-const optionalImageCount = z.number().int().min(0).max(1000).optional().nullable();
 const academicDetailFields = {
   faculty: z.string().max(255).optional().nullable(),
   department: z.string().max(255).optional().nullable(),
@@ -126,7 +125,6 @@ export const orderCreateSchema = z.object({
   ...academicDetailFields,
   quantity_type: z.enum(quantityTypeOptions as [QuantityType, ...QuantityType[]]).optional().nullable(),
   quantity_value: optionalQuantity,
-  image_count: optionalImageCount,
   requires_charts: z.boolean().default(false),
   deadline: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -384,7 +382,7 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     id: order.id,
     status: order.status,
     payment_status: order.payment_status,
-    moarref_payment_status: order.moarref_payment_status,
+    ...(audience === "admin" ? { moarref_payment_status: order.moarref_payment_status } : {}),
     correspondence_email: order.correspondence_email,
     degree: order.degree,
     university: order.university,
@@ -407,7 +405,6 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     abstract: order.abstract,
     quantity_type: order.quantity_type,
     quantity_value: order.quantity_value,
-    image_count: order.image_count,
     requires_charts: order.requires_charts,
     deadline: iso(order.deadline),
     notes: order.notes,
@@ -556,7 +553,6 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown,
       abstract: compact(payload.abstract),
       quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
       quantity_value: payload.quantity_value ?? null,
-      image_count: payload.image_count ?? null,
       requires_charts: payload.requires_charts,
       deadline: parseDeadline(payload.deadline),
       notes: compact(payload.notes),
@@ -632,7 +628,6 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         abstract: compact(payload.abstract),
         quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
         quantity_value: payload.quantity_value ?? null,
-        image_count: payload.image_count ?? null,
         requires_charts: payload.requires_charts,
         deadline: parseDeadline(payload.deadline),
         notes: compact(payload.notes),

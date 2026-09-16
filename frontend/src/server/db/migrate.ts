@@ -64,7 +64,6 @@ const statements = [
     slide_count integer,
     quantity_type varchar(40),
     quantity_value integer,
-    image_count integer,
     requires_charts boolean not null default false,
     service_type varchar(160),
     project_stage varchar(160),
@@ -97,7 +96,6 @@ const statements = [
   `alter table orders add column if not exists slide_count integer`,
   `alter table orders add column if not exists quantity_type varchar(40)`,
   `alter table orders add column if not exists quantity_value integer`,
-  `alter table orders add column if not exists image_count integer`,
   `alter table orders add column if not exists requires_charts boolean not null default false`,
   `alter table orders alter column deadline type timestamptz using deadline::timestamptz`,
   `update orders set status = 'in_progress' where status in ('queued', 'locked_by_worker', 'waiting_for_review', 'revision_required')`,
@@ -119,6 +117,7 @@ const statements = [
   `update orders set correspondence_email = 'unknown@example.invalid' where correspondence_email is null`,
   `alter table orders alter column correspondence_email set not null`,
   `alter table orders add column if not exists moarref_code varchar(120)`,
+  `alter table orders drop column if exists image_count`,
   `create table if not exists order_files (
     id varchar(36) primary key,
     order_id varchar(36) not null references orders(id) on delete cascade,

@@ -97,15 +97,18 @@ worker_plus/workspace/in_progress/order_context.json
 6. **Analyze customer sources** — فایل‌ها و منابع ارسالی مشتری را تحلیل می‌کند.
 7. **Resolve source rules** — محدودیت‌ها و قواعد قابل‌استفادهٔ منابع را تعیین می‌کند.
 8. **Build thesis plan** — فهرست و طرح فصل‌های پایان‌نامه را می‌سازد.
-9. **Generate content** — متن کامل، یا در حالت Sample متن چندصفحه‌ای نماینده، را تولید می‌کند.
-10. **Review content** — متن، citation و موارد نیازمند بررسی انسانی را کنترل می‌کند.
-11. **Audit source compliance** — انطباق محتوا با منابع و محدودیت‌ها را کنترل می‌کند.
-12. **Package DOCX** — `final.docx` را از متن تأییدشده می‌سازد.
-13. **Polish cover** — صفحهٔ عنوان را اصلاح و کنترل می‌کند.
-14. **Finalize Persian pagination** — شماره‌گذاری و صفحه‌بندی فارسی را نهایی می‌کند.
-15. **Verify Persian pagination** — صفحه‌بندی فارسی را صفحه‌به‌صفحه کنترل می‌کند.
-16. **Validate and publish** — خروجی را اعتبارسنجی می‌کند، `sample.docx` و `sample.pdf` را از `final.docx` می‌سازد، سپس آن‌ها را منتشر می‌کند.
-17. **Handle failure** — فقط در خطا اجرا می‌شود؛ علت را ثبت و سفارش را `failed` می‌کند.
+9. **Plan section-level visuals** — پیش از نگارش، بر اساس حجم سفارش تراکم منطقی شکل‌ها و نمودارها را محاسبه و برای هرکدام ادعا، داده/منبع و بخش هدف را تعیین می‌کند.
+10. **Generate planned visual assets** — PNGهای حرفه‌ای را پیش از متن و بر پایهٔ نقشهٔ بصری می‌سازد.
+11. **Generate content** — متن کامل را در بخش هدف هر شکل، با تحلیل قبل و بعد آن، تولید می‌کند.
+12. **Validate visual placement and argument** — پیوند شکل با ادعا و بخش درست را ممیزی می‌کند.
+13. **Review content** — متن، citation و موارد نیازمند بررسی انسانی را کنترل می‌کند.
+14. **Audit source compliance** — انطباق محتوا با منابع و محدودیت‌ها را کنترل می‌کند.
+15. **Package DOCX** — `final.docx` را از متن تأییدشده می‌سازد.
+16. **Polish cover** — صفحهٔ عنوان را اصلاح و کنترل می‌کند.
+17. **Finalize Persian pagination** — شماره‌گذاری و صفحه‌بندی فارسی را نهایی می‌کند.
+18. **Verify Persian pagination** — صفحه‌بندی فارسی را صفحه‌به‌صفحه کنترل می‌کند.
+19. **Validate and publish** — خروجی را اعتبارسنجی می‌کند، شکل‌ها و صفحات PDF را با AI ممیزی می‌کند، سپس `sample.docx` و `sample.pdf` را می‌سازد و منتشر می‌کند.
+20. **Handle failure** — فقط در خطا اجرا می‌شود؛ علت را ثبت و سفارش را `failed` می‌کند.
 
 ## نمایش پیشرفت در Terminal
 
@@ -127,7 +130,7 @@ Result: SKIPPED (already completed)
 Result: FAIL — <reason>
 ```
 
-در حالت Sample، شمارش terminal همان `01/17` تا `16/17` است. Step 16 فایل‌های `sample.docx` و `sample.pdf` را از `final.docx` می‌سازد و برای تأیید مشتری ارسال می‌کند.
+در حالت Sample، شمارش terminal مطابق تعداد مرحله‌های فعال است (اکنون `01/20` تا `20/20`). مرحلهٔ انتشار فایل‌های `sample.docx` و `sample.pdf` را از `final.docx` می‌سازد و برای تأیید مشتری ارسال می‌کند.
 
 برای اجرای دوبارهٔ sample از DOCX فعلی، بدون بازتولید محتوا یا بسته‌بندی Word، از workspace ذخیره‌شده اجرا کنید:
 

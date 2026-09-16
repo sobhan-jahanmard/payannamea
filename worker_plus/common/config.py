@@ -34,5 +34,5 @@ def load_config() -> Config:
         workspace_root=WORKER_ROOT / "workspace",
         codex_bin=codex_bin,
         codex_sandbox="workspace-write",
-        codex_model="gpt-5.6-terra",
+        codex_model="gpt-5.6-sol",
     )

@@ -28,4 +28,4 @@ def run(context: dict[str, Any], services: Any) -> None:
     match = re.search(r"pages=(\d+);sections=(\d+)", stdout)
     if not match:
         raise RuntimeError("dynamic Persian pagination returned no verification result: " + stdout[-800:])
-    write_json(services.workspace / "reports" / "stage_checks" / "persian_pagination.json", {"passed": True, "pages": int(match.group(1)), "sections": int(match.group(2)), "font": font_name, "mode": "dynamic_persian_page_field"})
+    write_json(services.workspace / "reports" / "stage_checks" / "persian_pagination.json", {"passed": True, "pages": int(match.group(1)), "sections": int(match.group(2)), "font": font_name, "mode": "dynamic_persian_page_field_hindi_numerals"})

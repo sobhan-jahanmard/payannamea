@@ -9,12 +9,23 @@ def run(context: dict[str, Any], services: Any) -> None:
     scope = "بستهٔ کامل منطبق با طرح مصوب"
     volume_rule = "حداقل ۶٬۰۰۰ واژهٔ محتوای فارسی تولید کن. به‌دلیل محدودیت طول پاسخ، متن را فشرده یا خلاصه نکن؛ هر فصل باید چند بخش فرعی و پاراگراف‌های تحلیلی کامل داشته باشد."
     target = services.workspace / "final" / "deliverable_source.md"
+    # If a resumed run expanded the visual plan, the old prose was written for a
+    # different set of assets. Regenerate it rather than trying to bolt several
+    # figures onto a completed argument after the fact.
+    if context.get("artifacts", {}).pop("visual_plan_changed", False):
+        if target.exists():
+            target.unlink()
+        for stale in (services.workspace / "drafts").glob("continuation_*.md"):
+            stale.unlink()
     uploaded_sources = context.get("artifacts", {}).get("customer_sources", "extracted/customer_sources")
     source_contract = context.get("artifacts", {}).get("resolved_source_rules", "extracted/resolved_source_rules.md")
     admin_rules = context.get("artifacts", {}).get("admin_internal_rules", "extracted/admin_internal_rules.md")
+    order_contract = context.get("artifacts", {}).get("order_execution_contract", "planning/order_execution_contract.md")
+    visual_plan = context.get("artifacts", {}).get("visual_plan", "planning/visual_plan.json")
+    visual_manifest = context.get("artifacts", {}).get("visual_manifest", "final/figures/manifest.json")
     prompt = f"""برای {services.profile.DISPLAY_NAME} با عنوان «{order.get('title')}»، {scope} آماده کن.
 
-خروجی باید Markdown آماده‌ی تبدیل به Word باشد، نه توضیح درباره‌ی کار. فقط متن نهایی را بده؛ هیچ مقدمه، عذرخواهی، کدبلاک، TODO یا ادعای انجام‌نداده نیاور. از ابزار فایل، shell یا ویرایش فایل استفاده نکن.
+خروجی باید Markdown آماده‌ی تبدیل به Word باشد، نه توضیح درباره‌ی کار. فقط متن نهایی را بده؛ هیچ مقدمه، عذرخواهی، کدبلاک، TODO یا ادعای انجام‌نداده نیاور. برای خواندن فایل‌های مرجع نام‌برده حتماً از ابزار فایل یا shell به‌صورت read-only استفاده کن؛ هیچ فایل workspace را نساز، حذف یا ویرایش نکن. متن نهایی پاسخ تو توسط worker در فایل مقصد ذخیره می‌شود.
 
 قواعد محتوایی اجباری:
 1) ساختار روشن و سلسله‌مراتبی با # برای فصل‌های اصلی و ## برای بخش‌های فرعی؛ عنوان‌ها نباید خالی باشند.
@@ -26,7 +37,7 @@ def run(context: dict[str, Any], services: Any) -> None:
 7) {volume_rule}
 
 Worker بر اساس شیوه‌نامه، فونت، صفحه‌آرایی و کنترل کیفیت را اعمال می‌کند و پاسخ تو را در `{target.relative_to(services.workspace)}` ذخیره می‌کند."""
-    prompt += f"""\n\nمنابع آپلودشدهٔ مشتری در `{uploaded_sources}`، قرارداد یکپارچهٔ قواعد در `{source_contract}` و یادداشت‌های اجباری مدیر در `{admin_rules}` قرار دارند. پیش از نوشتن همه را بررسی کن، تمام بایدها و نبایدها و تک‌تک یادداشت‌های مدیر را رعایت کن و هیچ فایل یا قاعده‌ای را نادیده نگیر. تعارض حل‌نشده یا دستور ناممکن را با ادعای ساختگی پنهان نکن."""
+    prompt += f"""\n\nمنابع آپلودشدهٔ مشتری در `{uploaded_sources}`، قرارداد یکپارچهٔ قواعد در `{source_contract}`، قرارداد اجرایی تمام فیلدهای سفارش در `{order_contract}` و یادداشت‌های اجباری مدیر در `{admin_rules}` قرار دارند. نقشهٔ بصریِ از پیش تعیین‌شده در `{visual_plan}` و فایل/manifest شکل‌های آماده در `{visual_manifest}` است. پیش از نوشتن همه را بررسی کن. برای هر شکل، متن همان بخش هدف را حول ادعای پشتیبانی‌شده بنویس: پیش از شکل مسئله یا ادعا را مطرح کن، با syntax دقیق `![caption](figures/name.png)` شکل را در همان بخش قرار بده، و بعد از آن تحلیل کن که شکل چگونه ادعا را پشتیبانی می‌کند. شکل را صرفاً تزئینی یا در بخش نامرتبط قرار نده و فایل شکل تازه نساز. تمام بایدها و نبایدها و تک‌تک یادداشت‌های مدیر را رعایت کن و هیچ فایل یا قاعده‌ای را نادیده نگیر. تعارض حل‌نشده یا دستور ناممکن را با ادعای ساختگی پنهان نکن."""
     services.run_codex(prompt, target)
     # Full theses are often longer than one model response. Extend the body in focused batches
     # while preserving the original verified reference list instead of accepting a short package.

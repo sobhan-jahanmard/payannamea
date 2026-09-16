@@ -52,13 +52,6 @@ const optionalQuantity = z.preprocess((value) => {
   return Number(value);
 }, z.number().int().min(1, "حداقل مقدار ۱ است").max(500000, "حداکثر مقدار ۵۰۰۰۰۰ است").optional());
 
-const optionalImageCount = z.preprocess((value) => {
-  if (value === "" || value === null || value === undefined) {
-    return undefined;
-  }
-  return Number(value);
-}, z.number().int().min(0, "حداقل مقدار ۰ است").max(1000, "حداکثر ۱۰۰۰ عکس").optional());
-
 const formSchema = z.object({
   customer_phone: z.string().trim().max(40).optional(),
   correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
@@ -83,7 +76,6 @@ const formSchema = z.object({
   abstract: z.string().optional(),
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
-  image_count: optionalImageCount,
   requires_charts: z.boolean(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
@@ -362,7 +354,6 @@ function OrderForm() {
         "abstract",
         "quantity_type",
         "quantity_value",
-        "image_count"
       ],
       3: ["moarref_code"]
     }),
@@ -448,7 +439,6 @@ function OrderForm() {
       abstract: compact(values.abstract),
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
-      image_count: values.image_count,
       requires_charts: values.requires_charts,
       deadline: compact(values.deadline),
       notes: compact(values.notes),
@@ -706,9 +696,6 @@ function OrderForm() {
                     </Select>
                   </Field>
                 </div>
-                <Field label="تعداد عکس موردنیاز در فایل نهایی" error={errors.image_count?.message}>
-                  <Input className="ltr text-left" {...register("image_count")} type="number" min={0} max={1000} placeholder="مثلاً ۵" />
-                </Field>
                 <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
                   <input type="checkbox" className="h-4 w-4 rounded border-input accent-teal-700" {...register("requires_charts")} />
                   افزودن گراف و چارت در صورت نیاز
@@ -823,10 +810,6 @@ function OrderForm() {
                     <dd className="font-medium">
                       {watched.quantity_value ? `${watched.quantity_value.toLocaleString("fa-IR")} ${quantityLabel(watched.quantity_type)}` : "-"}
                     </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">تعداد عکس</dt>
-                    <dd className="font-medium">{watched.image_count || watched.image_count === 0 ? watched.image_count.toLocaleString("fa-IR") : "-"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">گراف و چارت</dt>

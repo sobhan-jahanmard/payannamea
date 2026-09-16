@@ -11,7 +11,8 @@ export async function GET(request: Request) {
   try {
     const user = await getCurrentUser(request);
     const orders = user.role === "admin" ? await listAdminOrders(null) : await listCustomerOrders(user);
-    return json(orders.map((order) => serializeOrder(order, false)));
+    const audience = user.role === "customer" ? "customer" : "admin";
+    return json(orders.map((order) => serializeOrder(order, false, audience)));
   } catch (error) {
     return errorResponse(error);
   }
