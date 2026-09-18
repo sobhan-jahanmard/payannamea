@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -143,6 +144,17 @@ class Services:
         if self.args.dry_run:
             write_text(target, "# خروجی آزمایشی\n\nاین خروجی فقط برای dry-run ساخته شده است.\n")
             return
+        operator_note = str(getattr(self.args, "operator_note", "") or "").strip()
+        if operator_note:
+            failure_context = str(getattr(self.args, "failure_context", "") or "").strip()
+            prompt += (
+                "\n\n## دستور اپراتور برای این اجرای مجدد\n"
+                "این یادداشت را با توجه به قرارداد سفارش، فایل‌های موجود و علت خطای قبلی تحلیل کن. "
+                "آن را کورکورانه اجرا نکن؛ راه‌حلی انتخاب کن که خطای قبلی تکرار نشود و قواعد قطعی پروژه نقض نشوند.\n"
+                f"یادداشت اپراتور:\n{operator_note}\n"
+            )
+            if failure_context:
+                prompt += f"\nخطای ثبت‌شده در اجرای قبلی:\n{failure_context}\n"
         command = [
             self.config.codex_bin, "exec", "--model", self.config.codex_model,
             "--json",
@@ -951,6 +963,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--offline", action="store_true", help="Run all steps with a local mock order; no backend changes")
     parser.add_argument("--repackage", action="store_true", help="Restart at Step 12 (Package DOCX) using the saved source, without invoking Codex")
     parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from a terminal step number; the final step validates, visually audits, and publishes the package")
+    parser.add_argument("--operator-note", default="", help="Operator guidance that every AI-assisted step must analyze and apply during this run")
     return parser
 
 
@@ -1024,10 +1037,41 @@ def main() -> None:
                         stale.unlink()
     else:
         context = load(workspace) if args.resume else new_context(workspace, "sample" if args.sample else "full")
+    args.operator_note = args.operator_note.strip()
+    latest_recovery = (context.get("recovery_history") or [{}])[-1]
+    args.failure_context = str(latest_recovery.get("error") or ((context.get("errors") or [""])[-1])).strip()
+    context["operator_note"] = args.operator_note
+    if args.operator_note:
+        context.setdefault("operator_note_history", []).append({
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "from_step": STEPS[args.step - 1] if args.step else ("resume" if args.resume else STEPS[0]),
+            "note": args.operator_note,
+            "failure_context": args.failure_context or None,
+        })
     save(workspace, context)
     services = Services(config, args, workspace)
     if context.get("order"):
         services.profile = profile_for(context["order"])
+
+    # A retry note must be acted on even when the selected step is a purely
+    # deterministic validator/packager that would not normally invoke Codex.
+    # Let AI inspect and minimally repair the existing upstream artifacts first;
+    # the real step still runs afterwards and remains the final authority.
+    if args.operator_note and context.get("completed_steps"):
+        next_step_index = min(len(context["completed_steps"]), len(STEPS) - 1)
+        next_step = STEPS[next_step_index]
+        analysis_report = workspace / "reports" / "operator_note_analysis.md"
+        analysis_report.parent.mkdir(parents=True, exist_ok=True)
+        if analysis_report.exists():
+            analysis_report.unlink()
+        preflight_prompt = f"""پیش از اجرای مجدد مرحله `{next_step}`، نقش تحلیل‌گر بازیابی workflow را انجام بده.
+
+فایل `order_context.json`، گزارش‌های `reports/` و artifactهای مرتبط موجود در workspace را بخوان. علت خطای قبلی و یادداشت اپراتور که در انتهای این prompt آمده را تحلیل کن. اگر برای جلوگیری از تکرار خطا لازم است یکی از artifactهای موجود اصلاح شود، همان فایل را مستقیم و با کمترین تغییر لازم ویرایش کن. validatorها را حذف یا دور نزن، نتیجه جعلی PASS نساز، داده یا منبع جعل نکن و فایل‌های سالم نامرتبط را تغییر نده.
+
+در خروجی Markdown کوتاه بنویس: علت محتمل، فایل‌های بررسی‌شده، تغییرهای انجام‌شده و اینکه مرحله `{next_step}` اکنون چه چیزی را باید اعتبارسنجی کند."""
+        services.run_codex(preflight_prompt, analysis_report)
+        context["artifacts"]["operator_note_analysis"] = str(analysis_report.relative_to(workspace))
+        save(workspace, context)
 
     terminal_error: Exception | None = None
     recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])

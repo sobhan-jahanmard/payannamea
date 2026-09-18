@@ -1,0 +1,49 @@
+{
+  "name": "worker-plus-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-platform desktop control panel for Worker Plus",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on tcp:5174 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5174 nodemon --watch dist-electron --delay 400ms --exec electron .\"",
+    "build": "tsc -p tsconfig.electron.json && vite build && electron-builder",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.7.2",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "ir.daneshyar.workerplus",
+    "productName": "Worker Plus",
+    "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+    "extraResources": [
+      { "from": "../run.py", "to": "worker_plus/run.py" },
+      { "from": "../requirements.txt", "to": "worker_plus/requirements.txt" },
+      { "from": "../common", "to": "worker_plus/common", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../bachelor_thesis", "to": "worker_plus/bachelor_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../master_thesis", "to": "worker_plus/master_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../thesis_proposal", "to": "worker_plus/thesis_proposal", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../university_research", "to": "worker_plus/university_research", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../presentation", "to": "worker_plus/presentation", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] }
+    ],
+    "directories": { "output": "release" },
+    "win": { "target": ["nsis", "portable"] },
+    "linux": { "target": ["AppImage", "deb"], "category": "Utility" }
+  }
+}
