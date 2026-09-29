@@ -1,5 +1,6 @@
 from typing import Any
 from common.helpers import write_json, write_text
+from common.deliverable_policy import deliverable_contract, deterministic_content_issues
 
 TITLE = "Review content"
 
@@ -9,6 +10,44 @@ def run(context: dict[str, Any], services: Any) -> None:
     prohibited = [marker for marker in ("TODO", "TBD", "[NEEDS") if marker in text]
     if prohibited:
         raise RuntimeError("Generated text contains placeholders: " + ", ".join(prohibited))
+    decision_contract = deliverable_contract(context["order"])
+    decision_audit = services.workspace / "reports" / "decision_content_audit.md"
+    audit_prompt = f"""متن `{source.relative_to(services.workspace)}` و قرارداد خروجی `{context['artifacts']['order_execution_contract']}` را ممیزی کن.
+
+برای تک‌تک deliverableها بررسی کن که متن فقط روش را آموزش نداده و واقعاً دارای شاهد قابل ردیابی، اجرای روش، محاسبه/مقایسه، نتیجه مشخص و محدودیت است. تناسب عمق با سطح تحصیلی، نبود تکرار معنایی و قرارگرفتن مطالب قبل از جمع‌بندی را نیز بررسی کن. اگر یک خروجی با عبارت‌های توصیه‌ای، فهرست داده‌های لازم، عدد بدون منشأ یا جزئیات نامرتبط جایگزین شده است FAIL بده.
+
+خط اول دقیقاً `STATUS: PASS` یا `STATUS: FAIL` و سپس جدول «خروجی | شاهد | اجرای روش | نتیجه | وضعیت | اقدام اصلاحی» باشد. هیچ فایلی را تغییر نده."""
+    recovery_attempts = []
+    for attempt in range(1, 4):
+        current_text = source.read_text(encoding="utf-8")
+        deterministic_issues = deterministic_content_issues(current_text, decision_contract)
+        if decision_audit.exists():
+            decision_audit.unlink()
+        services.run_codex(audit_prompt, decision_audit)
+        audit_text = decision_audit.read_text(encoding="utf-8") if decision_audit.exists() else ""
+        passed = not deterministic_issues and audit_text.lstrip().startswith("STATUS: PASS")
+        recovery_attempts.append({"attempt": attempt, "passed": passed, "issues": deterministic_issues})
+        if passed:
+            break
+        if attempt == 3:
+            details = "; ".join(deterministic_issues) if deterministic_issues else "AI decision audit failed"
+            write_json(services.workspace / "reports" / "stage_checks" / "decision_content_recovery.json", {"passed": False, "attempts": recovery_attempts})
+            raise RuntimeError("Decision-content quality gate failed: " + details)
+        repair_report = services.workspace / "reports" / "stage_checks" / f"decision_content_repair_{attempt}.md"
+        if repair_report.exists():
+            repair_report.unlink()
+        repair_prompt = f"""ممیزی `{decision_audit.relative_to(services.workspace)}` و کنترل قطعی زیر نشان می‌دهد متن `{source.relative_to(services.workspace)}` ناقص است:
+{chr(10).join('- ' + issue for issue in deterministic_issues) or '- موارد FAIL گزارش ممیزی AI'}
+
+قرارداد `{context['artifacts']['order_execution_contract']}` و منابع موجود را بخوان و خود فایل متن را مستقیم اصلاح کن. فقط بخش‌های ناقص را با شاهد، اجرای روش، محاسبه/مقایسه و نتیجه مشخص تعمیر کن. متن راهنماگونه، داده جعلی، تکرار فصل و افزودن محتوا پس از جمع‌بندی ممنوع است. منبع تازه معتبر را با citation منطبق اضافه کن. پاسخ خودت فقط گزارش کوتاه تعمیر باشد."""
+        services.run_codex(repair_prompt, repair_report)
+    write_json(services.workspace / "reports" / "stage_checks" / "deterministic_content_audit.json", {
+        "passed": True,
+        "project_type": decision_contract["project_type"],
+        "issues": [],
+    })
+    write_json(services.workspace / "reports" / "stage_checks" / "decision_content_recovery.json", {"passed": True, "attempts": recovery_attempts})
+    context["artifacts"]["decision_content_audit"] = str(decision_audit.relative_to(services.workspace))
     admin_notes = [note for note in context["order"].get("review_notes", []) if str(note.get("note") or "").strip()]
     admin_audit = services.workspace / "reports" / "admin_instruction_audit.md"
     if admin_notes:

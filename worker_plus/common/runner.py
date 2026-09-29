@@ -165,7 +165,10 @@ class Services:
         ]
         if os.name == "nt":
             command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
-        result = subprocess.run(command, cwd=str(self.workspace), input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+        codex_env = os.environ.copy()
+        if self.config.codex_home is not None:
+            codex_env["CODEX_HOME"] = str(self.config.codex_home)
+        result = subprocess.run(command, cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
         print(result.stdout, end="", flush=True)
         # A single `codex exec` can emit several cumulative usage events. Keep
         # only the final/highest value for this invocation, then add it to the
@@ -371,6 +374,7 @@ class Services:
         normal.paragraph_format.first_line_indent = Cm(paragraph_rules["first_line_cm"])
         style("TOC Entry", font["body_pt"], align=WD_ALIGN_PARAGRAPH.RIGHT)
         style("Figure Caption", rules["captions"]["font_pt"], align=WD_ALIGN_PARAGRAPH.CENTER)
+        style("Table Caption", rules["captions"]["font_pt"], align=WD_ALIGN_PARAGRAPH.CENTER)
         style("Title", font["heading_1_pt"] + 2, True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 1", font["heading_1_pt"], True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 2", font["heading_2_pt"], True, WD_ALIGN_PARAGRAPH.RIGHT)
@@ -485,6 +489,26 @@ class Services:
             paragraph._p.remove(run._r)
             hyperlink.append(run._r)
             paragraph._p.append(hyperlink)
+            tab = paragraph.add_run("\t")
+            apply_persian_run(tab)
+            page_run = paragraph.add_run()
+            begin = OxmlElement("w:fldChar"); begin.set(qn("w:fldCharType"), "begin")
+            instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve"); instr.text = f" PAGEREF {anchor} \\h "
+            separate = OxmlElement("w:fldChar"); separate.set(qn("w:fldCharType"), "separate")
+            result = OxmlElement("w:t"); result.text = "۱"
+            end = OxmlElement("w:fldChar"); end.set(qn("w:fldCharType"), "end")
+            page_run._r.extend([begin, instr, separate, result, end])
+            apply_persian_run(page_run)
+
+        def add_toc_field(paragraph: Any, instruction: str) -> None:
+            run = paragraph.add_run()
+            begin = OxmlElement("w:fldChar"); begin.set(qn("w:fldCharType"), "begin")
+            instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve"); instr.text = instruction
+            separate = OxmlElement("w:fldChar"); separate.set(qn("w:fldCharType"), "separate")
+            result = OxmlElement("w:t"); result.text = "برای به‌روزرسانی فهرست، فیلدها را به‌روزرسانی کنید."
+            end = OxmlElement("w:fldChar"); end.set(qn("w:fldCharType"), "end")
+            run._r.extend([begin, instr, separate, result, end])
+            apply_persian_run(run)
 
         while index < len(lines):
             raw_line = lines[index]
@@ -530,6 +554,24 @@ class Services:
                             bidi(toc_item)
                             add_toc_link(toc_item, item_text, anchor)
                     index += 1
+                # Separate lists are dynamic Word fields and receive page
+                # numbers during the existing Word pagination/finalization step.
+                if any(re.fullmatch(r"!\[(.+?)\]\(([^)]+)\)", item.strip()) for item in lines):
+                    figures_heading = document.add_paragraph("فهرست شکل‌ها", style="Heading 1")
+                    figures_heading.paragraph_format.page_break_before = True
+                    figures_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(figures_heading)
+                    for run in figures_heading.runs: apply_persian_run(run)
+                    field_paragraph = document.add_paragraph(style="TOC Entry"); bidi(field_paragraph)
+                    add_toc_field(field_paragraph, ' TOC \\h \\z \\t "Figure Caption,1" ')
+                    chapter_count += 1
+                if any(re.match(r"^\s*جدول\s+[0-9۰-۹]+", normalize_persian(item.strip())) for item in lines):
+                    tables_heading = document.add_paragraph("فهرست جدول‌ها", style="Heading 1")
+                    tables_heading.paragraph_format.page_break_before = True
+                    tables_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(tables_heading)
+                    for run in tables_heading.runs: apply_persian_run(run)
+                    field_paragraph = document.add_paragraph(style="TOC Entry"); bidi(field_paragraph)
+                    add_toc_field(field_paragraph, ' TOC \\h \\z \\t "Table Caption,1" ')
+                    chapter_count += 1
                 continue
             if line.startswith("|") and index + 1 < len(lines) and set(lines[index + 1].strip()) <= {"|", "-", ":", " "}:
                 rows: list[list[str]] = []
@@ -598,6 +640,10 @@ class Services:
                 paragraph = document.add_paragraph(line[2:], style="Normal")
                 paragraph.paragraph_format.first_line_indent = Cm(0)
                 paragraph.paragraph_format.right_indent = Cm(0.6)
+            elif re.match(r"^جدول\s+[0-9۰-۹]+", line):
+                paragraph = document.add_paragraph(line, style="Table Caption")
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                paragraph.paragraph_format.first_line_indent = Cm(0)
             else:
                 paragraph = document.add_paragraph(line, style="Normal")
             if paragraph.style.name == "Normal":

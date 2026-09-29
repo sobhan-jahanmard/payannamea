@@ -3,6 +3,7 @@ import shutil
 from typing import Any
 from common.api import download_file
 from common.helpers import write_json, write_text
+from common.input_files import materialize_local_file, target_name
 
 TITLE = "Prepare workspace"
 
@@ -11,6 +12,11 @@ def run(context: dict[str, Any], services: Any) -> None:
     if not services.args.resume:
         for child in workspace.iterdir():
             if child.name != "order_context.json":
+                # Input files are a local cache and may be the only available
+                # copy during an offline run. They are matched by name and size
+                # below, so unrelated stale files are never added as artifacts.
+                if child.name == "input":
+                    continue
                 if child.is_dir():
                     shutil.rmtree(child)
                 else:
@@ -20,10 +26,20 @@ def run(context: dict[str, Any], services: Any) -> None:
     write_json(workspace / "customer_input.json", context["order"])
     files = []
     for item in context["order"].get("files", []):
-        target = workspace / "input" / "files" / f"{item['file_type']}__{item['original_name']}"
-        # Downloading an input file is a read-only backend operation.  Offline
-        # runs of a real order need the same inputs, but never claim or update it.
-        download_file(services.config, item["url"], target)
+        target = workspace / "input" / "files" / target_name(item)
+        local = materialize_local_file(
+            workspace, services.config.workspace_root, str(context["order_id"]), item, target,
+        )
+        if local is None:
+            if services.args.offline:
+                raise RuntimeError(
+                    f"Offline input file is missing locally: {item.get('original_name') or item.get('stored_name')}. "
+                    "Place it in input/files or the archived order workspace."
+                )
+            url = item.get("url")
+            if not url:
+                raise RuntimeError(f"Uploaded input has no URL or local copy: {target.name}")
+            download_file(services.config, str(url), target)
         files.append(str(target))
     context["artifacts"]["input_files"] = files
     write_text(workspace / "reports" / "human_review_checklist.md", "# Human Review Checklist\n\n- موارد نیازمند بررسی در مرحله‌های بعد ثبت می‌شوند.\n")

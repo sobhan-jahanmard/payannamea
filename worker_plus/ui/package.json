@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on tcp:5174 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5174 nodemon --watch dist-electron --delay 400ms --exec electron .\"",
     "build": "tsc -p tsconfig.electron.json && vite build && electron-builder",
+    "build:portable": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json"
   },
   "dependencies": {

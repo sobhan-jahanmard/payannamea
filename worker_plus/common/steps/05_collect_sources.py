@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from common.api import download_file
 from common.helpers import write_json, write_text
+from common.input_files import materialize_local_file, safe_name, target_name
 
 TITLE = "Collect required sources"
 
@@ -14,15 +14,17 @@ def run(context: dict[str, Any], services: Any) -> None:
     source_dir.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, Any]] = []
     for file in order.get("files", []):
-        name = Path(str(file.get("original_name") or file.get("stored_name") or "source.bin")).name.replace("..", "_")
+        name = safe_name(file.get("original_name") or file.get("stored_name"))
         target = source_dir / name
-        url = file.get("url")
-        if not url:
-            raise RuntimeError(f"Uploaded source {name} has no download URL")
         if not target.exists():
-            download_file(services.config, str(url), target)
+            input_target = services.workspace / "input" / "files" / target_name(file)
+            local = materialize_local_file(
+                services.workspace, services.config.workspace_root, str(context["order_id"]), file, input_target,
+            )
+            if local is not None:
+                target.write_bytes(local.read_bytes())
         if not target.exists() or not target.stat().st_size:
-            raise RuntimeError(f"Uploaded source {name} could not be downloaded")
+            raise RuntimeError(f"Uploaded source {name} is not available in the prepared local inputs")
         records.append({"id": file.get("id"), "name": name, "type": file.get("file_type"), "path": str(target.relative_to(services.workspace)), "size_bytes": target.stat().st_size, "required": True})
     references = order.get("references", [])
     write_json(services.workspace / "extracted" / "references.json", {"references": references, "uploaded_sources": records})

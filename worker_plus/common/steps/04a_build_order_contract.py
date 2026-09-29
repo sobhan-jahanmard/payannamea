@@ -5,6 +5,7 @@ from typing import Any
 
 from common.helpers import write_json, write_text
 from common.visual_policy import visual_requirements
+from common.deliverable_policy import deliverable_contract
 
 TITLE = "Build order execution contract"
 
@@ -40,6 +41,7 @@ def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]
     active = {key: order.get(key) for key in CONTENT_FIELDS if order.get(key) not in (None, "", False, 0)}
     visual_policy = visual_requirements(order)
+    deliverables = deliverable_contract(order)
     contract = {
         "order_id": order["id"],
         "content_inputs": active,
@@ -53,11 +55,15 @@ def run(context: dict[str, Any], services: Any) -> None:
             "require_caption_and_in_text_reference": True,
             "require_ai_visual_review_of_asset_and_rendered_page": True,
         },
+        "deliverable_contract": deliverables,
     }
     write_json(services.workspace / "planning" / "order_execution_contract.json", contract)
     lines = ["# قرارداد اجرایی سفارش", "", "این قرارداد در طرح، تولید، کنترل و انتشار اجباری است.", "", "## داده‌های مؤثر"]
     lines.extend(f"- **{key}**: {CONTENT_FIELDS[key]} — `{value}`" for key, value in active.items())
     lines.extend(["", "## الزام بصری", f"- مبنای حجم: {visual_policy['page_equivalent']} صفحهٔ معادل", f"- حداقل شکل معنادار: {visual_policy['minimum_total_visuals']}", f"- حداقل نمودار/گراف: {visual_policy['minimum_charts_or_graphs']}", f"- سیاست تراکم: {visual_policy['basis']}", "- نمودار تزئینی، خالی، بدون منبع یا بدون ارتباط روشن با استدلال سفارش مردود است.", "- هر شکل باید عنوان، منبع/فرض شفاف، ارجاع در متن و تأیید بصری AI داشته باشد."])
+    lines.extend(["", "## قرارداد خروجی تصمیم‌محور", f"- نوع پروژه: `{deliverables['project_type']}`", f"- سطح علمی: `{deliverables['academic_level']}`", f"- قاعده تکمیل: {deliverables['completion_rule']}", f"- کمبود داده: {deliverables['missing_data_rule']}"])
+    for item in deliverables["deliverables"]:
+        lines.append(f"- **{item['id']}** — پرسش: {item['question']} | شاهد: {item['evidence']} | روش: {item['method']} | خروجی: {item['output']}")
     write_text(services.workspace / "planning" / "order_execution_contract.md", "\n".join(lines) + "\n")
     context["artifacts"]["order_execution_contract"] = "planning/order_execution_contract.md"
     context["artifacts"]["order_execution_contract_json"] = "planning/order_execution_contract.json"

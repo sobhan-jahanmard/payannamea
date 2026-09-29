@@ -33,18 +33,23 @@ export function App() {
   const [logs, setLogs] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [offline, setOffline] = useState(true); const [sample, setSample] = useState(false); const [operatorNote, setOperatorNote] = useState("");
 
-  const refresh = () => window.workerPlus.readState().then(setState);
+  const applyState = (nextState: WorkerState) => { setState(nextState); setLogs(nextState.logs || ""); };
+  const refresh = () => window.workerPlus.readState().then(applyState);
   useEffect(() => {
     refresh(); const unsubscribe = window.workerPlus.onEvent(event => {
       if (event.type === "log") setLogs(previous => (previous + String(event.value)).slice(-100_000));
-      if (event.type === "state") setState(event.value as WorkerState); if (event.type === "exit") refresh();
+      if (event.type === "state") applyState(event.value as WorkerState); if (event.type === "exit") refresh();
     }); return unsubscribe;
   }, []);
 
   async function lookup() { setBusy(true); setError(""); try { const result = await window.workerPlus.lookupOrder(query); setOrderId(result.id); setOrder(result.order); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }
-  async function action(task: () => Promise<unknown>) { setError(""); setLogs(""); try { await task(); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }
+  async function action(task: () => Promise<unknown>, clearLogs = true) { setError(""); if (clearLogs) setLogs(""); try { await task(); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }
   async function openOutput(name: "sample.pdf" | "sample.docx" | "final.pdf" | "final.docx") { setError(""); try { await window.workerPlus.openOutput(name); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }
-  const completed = new Set(state?.context?.completed_steps || []); const current = state?.context?.current_step;
+  const completed = new Set(state?.context?.completed_steps || []);
+  const savedCurrent = state?.context?.current_step;
+  const current = state?.running ? savedCurrent : undefined;
+  const interruptedStep = !state?.running && state?.context?.status === "in_progress" ? savedCurrent : undefined;
+  const displayedRunStatus = state?.running ? "در حال انجام" : interruptedStep ? "متوقف / قطع‌شده" : runStatus(state?.context?.status);
   const latestFailure = state?.context?.recovery_history?.at(-1);
   const terminalFailedStep = state?.context?.status === "failed" ? latestFailure?.failed_step : undefined;
   const percent = useMemo(() => Math.round(completed.size / STEPS.length * 100), [state]);
@@ -54,19 +59,20 @@ export function App() {
     <section className="search-card"><div className="searchbox"><Search size={20}/><input ref={searchInput} value={query} readOnly={false} disabled={false} onChange={e => { setQuery(e.target.value); setError(""); }} onKeyDown={e => e.key === "Enter" && lookup()} placeholder="لینک یا شناسه سفارش را وارد کنید…"/><button onClick={lookup} disabled={busy}>{busy ? <LoaderCircle className="spin"/> : "پیدا کردن"}</button></div>{error && <div className="error"><CircleAlert size={17}/>{error}</div>}</section>
 
     {order ? <>
-      <section className="order-head"><div><span className="tag">{value(order, "order_type")}</span><h2>{value(order, "title", "subject")}</h2><div className="order-id-row"><div className="muted ltr">{orderId}</div><button className="edit-order" onClick={() => { searchInput.current?.focus(); searchInput.current?.select(); }}><Pencil size={13}/> تغییر سفارش</button></div></div><div className="facts"><div className="status-fact"><span>وضعیت</span><b>{orderStatus(value(order, "status"))}</b><div className="status-tooltip"><strong>وضعیت‌های سفارش</strong>{Object.entries(ORDER_STATUS_DEFINITIONS).map(([key, definition]) => <div key={key} className={value(order, "status") === key ? "active" : ""}><i>{value(order, "status") === key && <Check size={13}/>}</i><span>{definition.label}</span></div>)}</div></div><div><span>تعداد / حجم</span><b>{value(order, "quantity", "quantity_value")}</b></div><div><span>آخرین اجرا</span><b>{runStatus(state?.context?.status)}</b></div></div></section>
+      <section className="order-head"><div><span className="tag">{value(order, "order_type")}</span><h2>{value(order, "title", "subject")}</h2><div className="order-id-row"><div className="muted ltr">{orderId}</div><button className="edit-order" onClick={() => { searchInput.current?.focus(); searchInput.current?.select(); }}><Pencil size={13}/> تغییر سفارش</button></div></div><div className="facts"><div className="status-fact"><span>وضعیت</span><b>{orderStatus(value(order, "status"))}</b><div className="status-tooltip"><strong>وضعیت‌های سفارش</strong>{Object.entries(ORDER_STATUS_DEFINITIONS).map(([key, definition]) => <div key={key} className={value(order, "status") === key ? "active" : ""}><i>{value(order, "status") === key && <Check size={13}/>}</i><span>{definition.label}</span></div>)}</div></div><div><span>تعداد / حجم</span><b>{value(order, "quantity", "quantity_value")}</b></div><div><span>آخرین اجرا</span><b>{displayedRunStatus}</b></div></div></section>
       <div className="layout"><section className="panel timeline"><div className="panel-title"><div><h3>مراحل اجرا</h3><p>{completed.size} از {STEPS.length} مرحله انجام شده</p></div><strong>{percent.toLocaleString("fa-IR")}٪</strong></div><div className="progress"><i style={{width: `${percent}%`}}/></div>
         <div className="steps">{STEPS.map((step, index) => { const status = terminalFailedStep === step ? "failed" : completed.has(step) ? "done" : current === step ? "running" : "pending"; return <div className={`step ${status}`} key={step}><div className="step-number">{(index + 1).toLocaleString("fa-IR")}</div><div className="step-icon">{status === "failed" ? <CircleAlert/> : status === "done" ? <CircleCheck/> : status === "running" ? <LoaderCircle className="spin"/> : <CircleDashed/>}</div><div className="step-copy"><b>{labels[step]}</b><span>{step}</span></div><button disabled={Boolean(state?.running)} onClick={() => action(() => window.workerPlus.startRun({orderId, offline, sample, step: index + 1, note: operatorNote}))}><RotateCcw size={15}/> اجرا از اینجا</button></div>; })}</div>
       </section>
       <aside><section className="panel actions"><h3>اجرای سفارش</h3><label><input type="checkbox" checked={offline} onChange={e => setOffline(e.target.checked)}/><span><b>حالت آفلاین</b><small>بدون تغییر وضعیت backend</small></span></label><label><input type="checkbox" checked={sample} onChange={e => setSample(e.target.checked)}/><span><b>خروجی نمونه</b><small>اجرای workflow در حالت sample</small></span></label>
         {latestFailure?.error && <div className="failure-box"><div><CircleAlert size={16}/><b>آخرین خطای ثبت‌شده</b></div><span>{latestFailure.failed_step ? `${labels[latestFailure.failed_step] || latestFailure.failed_step}: ` : ""}{latestFailure.error}</span>{latestFailure.restart_step && <small>شروع پیشنهادی سیستم: {labels[latestFailure.restart_step] || latestFailure.restart_step}</small>}</div>}
+        {interruptedStep && <div className="interrupted-box"><CircleAlert size={16}/><span>هیچ پردازشی فعال نیست؛ اجرای قبلی هنگام «{labels[interruptedStep] || interruptedStep}» قطع شده است.</span></div>}
         <div className="note-field"><label htmlFor="operator-note">یادداشت برای AI</label><textarea id="operator-note" value={operatorNote} onChange={event => setOperatorNote(event.target.value)} placeholder="مثلاً علت خطا را بررسی کن، جدول‌ها را ساده‌تر بساز و محدودیت گزارش‌شده را رعایت کن…"/><small>این یادداشت همراه علت خطای قبلی به تمام مراحل AI در اجرای بعدی داده می‌شود.</small></div>
         <button className="primary" disabled={Boolean(state?.running)} onClick={() => action(() => window.workerPlus.startRun({orderId, offline, sample, note: operatorNote}))}><Play size={18}/> شروع اجرای کامل</button>
-        <div className="button-row"><button disabled={Boolean(state?.running)} onClick={() => action(() => window.workerPlus.resumeRun(operatorNote))}><RotateCcw size={17}/> ادامه اجرا</button><button className="danger" disabled={!state?.running} onClick={() => action(() => window.workerPlus.stopRun())}><Square size={16}/> توقف</button></div>
+        <div className="button-row"><button disabled={Boolean(state?.running)} onClick={() => action(() => window.workerPlus.resumeRun(operatorNote))}><RotateCcw size={17}/> ادامه اجرا</button><button className="danger" disabled={!state?.running} onClick={() => action(() => window.workerPlus.stopRun(), false)}><Square size={16}/> توقف</button></div>
         <div className="output-actions"><button className="ghost workspace-button" onClick={() => window.workerPlus.openWorkspace()}><ExternalLink size={17}/> باز کردن workspace</button><div className="output-grid">{(["sample.pdf", "sample.docx", "final.pdf", "final.docx"] as const).map(name => <button key={name} className={state?.outputs?.[name] === false ? "missing" : ""} title={`باز کردن ${name}`} onClick={() => openOutput(name)}><FileText size={15}/><span>{name}</span></button>)}</div></div>
       </section>
       </aside></div>
-      <section className="panel console console-wide"><div className="console-title"><Terminal size={17}/><b>خروجی زنده</b><span>{state?.running ? "در حال اجرا" : "متوقف"}</span></div><pre>{logs || "هنوز خروجی‌ای ثبت نشده است."}</pre></section>
+      <section className="panel console console-wide"><div className="console-title"><Terminal size={17}/><b>خروجی زنده</b><span>{state?.running ? "در حال اجرا" : "متوقف"}</span></div><pre>{logs || (interruptedStep ? `پردازش فعالی پیدا نشد. آخرین اجرای ذخیره‌شده هنگام مرحله ${labels[interruptedStep] || interruptedStep} قطع شده است.` : "هنوز خروجی‌ای ثبت نشده است.")}</pre></section>
     </> : <section className="empty"><div><Search/><h2>یک سفارش را پیدا کنید</h2><p>لینک صفحه سفارش یا شناسه آن را در کادر بالا وارد کنید.</p></div></section>}
   </main>;
 }

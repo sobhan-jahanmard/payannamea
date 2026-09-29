@@ -35,13 +35,6 @@ def repair_layout(context: dict[str, Any], services: Any, source: Any, docx: Any
         importlib.import_module(module_name).run(context, services)
 
 
-def _append_before_references(source: str, addition: str) -> str:
-    """Keep the single, reviewed reference list at the end of the source."""
-    body, marker, references = source.partition("# منابع")
-    suffix = marker + references if marker else ""
-    return body.rstrip() + "\n\n" + addition.strip() + "\n\n" + suffix
-
-
 def _is_chart_kind(value: object) -> bool:
     normalized = str(value or "").strip().lower()
     return normalized in {"chart", "graph"} or "نمودار" in normalized or "گراف" in normalized
@@ -143,14 +136,12 @@ def complete_page_target(context: dict[str, Any], services: Any, source: Any, do
         continuation = services.workspace / "drafts" / f"page_completion_{attempt}.md"
         if continuation.exists():
             continuation.unlink()
-        prompt = f"""برای {services.profile.DISPLAY_NAME} «{order.get('title')}» یک بخش تحلیلیِ جدید، دقیق و غیرتکراری حدود {batch_words} واژه بنویس تا کمبود {missing_pages} صفحهٔ واقعی Word جبران شود.
+        prompt = f"""فایل `{source.relative_to(services.workspace)}` را مستقیم اصلاح کن تا کمبود {missing_pages} صفحه واقعی (تقریباً {batch_words} واژه محتوای مفید) جبران شود. قرارداد خروجی `{context['artifacts']['order_execution_contract']}` و گزارش‌های ممیزی در `reports/` را بخوان.
 
-فقط Markdown با ## و ### و پاراگراف‌های کامل بده؛ «# منابع» یا فهرست منابع نساز. فقط از استنادهای موجود [1] تا [7] استفاده کن و هیچ داده، آمار، نتیجه، مجوز یا منبع جعلی نساز. تمرکز را بر ابعاد تکمیلیِ پروژهٔ طراحی کارخانه بگذار: تحلیل زنجیره تأمین PET، مشخصات و کنترل خوراک، طراحی فرایند و موازنه‌های مفهومی، انتخاب و ظرفیت‌سنجی تجهیزات، جانمایی و جریان مواد، برنامه‌ریزی تولید و کنترل کیفیت، HSE، مجوزها و انطباق، بازار و تدارکات، ساختار سازمانی و نیروی انسانی، مدیریت ریسک، سناریوهای مالیِ مبتنی بر فرض‌های شفاف و برنامه اجرا. از مطالب قبلی تکرار نکن. از ابزار فایل و shell استفاده نکن؛ فقط متن نهایی را بده."""
+فصل یا «تحلیل یکپارچه» تازه به انتهای سند اضافه نکن. فقط بخش‌های موجودی را توسعه بده که طبق قرارداد فاقد داده، محاسبه، مقایسه یا نتیجه‌اند. از تکرار معنایی و متن راهنماگونه پرهیز کن. منابع تازه معتبر را همراه استناد به فهرست منابع اضافه کن و به شماره‌های ثابت محدود نشو. داده جعلی ممنوع است؛ در نبود داده از سناریوی شفاف استفاده کن یا کمبود را اعلام کن. پاسخ خودت فقط گزارش کوتاه تغییرات باشد."""
         services.run_codex(prompt, continuation)
-        addition = continuation.read_text(encoding="utf-8").strip() if continuation.exists() else ""
-        if not addition:
+        if not continuation.exists() or not continuation.read_text(encoding="utf-8").strip():
             raise RuntimeError("Page-completion continuation was empty")
-        source.write_text(_append_before_references(source.read_text(encoding="utf-8"), addition), encoding="utf-8")
 
     raise RuntimeError(
         f"Rendered Word page target was not reached after {len(progress)} content-extension attempts "

@@ -10,5 +10,5 @@ declare global {
     onEvent(listener: (event: WorkerEvent) => void): () => void;
   }; }
 }
-export type WorkerState = { running: boolean; workspace: string; outputs: Record<string, boolean>; context: null | { order_id?: string; status?: string; mode?: string; current_step?: string | null; completed_steps?: string[]; errors?: string[]; operator_note?: string; recovery_history?: Array<{ failed_step?: string; restart_step?: string; error?: string; cycle?: number; same_error_count?: number }> } };
+export type WorkerState = { running: boolean; workspace: string; outputs: Record<string, boolean>; logs?: string; context: null | { order_id?: string; status?: string; mode?: string; current_step?: string | null; completed_steps?: string[]; errors?: string[]; operator_note?: string; recovery_history?: Array<{ failed_step?: string; restart_step?: string; error?: string; cycle?: number; same_error_count?: number }> } };
 export {};

@@ -9,10 +9,20 @@ const contextFile = path.join(workspace, "order_context.json");
 let window: BrowserWindow | null = null;
 let child: ChildProcessWithoutNullStreams | null = null;
 let stateTimer: NodeJS.Timeout | null = null;
+let logBuffer = "";
 
 function envFile(): Record<string, string> {
-  const file = path.join(workerRoot, ".env");
-  if (!existsSync(file)) return {};
+  const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+  const candidates = app.isPackaged
+    ? [
+        portableDir && path.resolve(portableDir, "..", "..", ".env"),
+        portableDir && path.join(portableDir, ".env"),
+        path.join(path.dirname(process.execPath), ".env"),
+        path.join(workerRoot, ".env"),
+      ]
+    : [path.join(workerRoot, ".env")];
+  const file = candidates.find((candidate): candidate is string => Boolean(candidate && existsSync(candidate)));
+  if (!file) return {};
   return Object.fromEntries(readFileSync(file, "utf8").split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#") && line.includes("=")).map(line => {
     const at = line.indexOf("="); return [line.slice(0, at).trim(), line.slice(at + 1).trim().replace(/^['\"]|['\"]$/g, "")];
   }));
@@ -37,26 +47,59 @@ function orderId(value: string): string {
 function state() {
   const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
   const outputs = Object.fromEntries(outputNames.map(name => [name, existsSync(path.join(workspace, "final", name))]));
-  if (!existsSync(contextFile)) return { running: Boolean(child), context: null, workspace, outputs };
-  try { return { running: Boolean(child), context: JSON.parse(readFileSync(contextFile, "utf8")), workspace, outputs }; }
-  catch { return { running: Boolean(child), context: null, workspace, outputs }; }
+  if (!existsSync(contextFile)) return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer };
+  try { return { running: Boolean(child), context: JSON.parse(readFileSync(contextFile, "utf8")), workspace, outputs, logs: logBuffer }; }
+  catch { return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer }; }
 }
 
-function broadcast(type: "log" | "exit" | "state", value: unknown) { window?.webContents.send("worker:event", { type, value }); }
+function broadcast(type: "log" | "exit" | "state", value: unknown) {
+  if (type === "log") logBuffer = (logBuffer + String(value)).slice(-100_000);
+  window?.webContents.send("worker:event", { type, value });
+}
+
+function waitForExit(target: ChildProcessWithoutNullStreams, timeoutMs = 5000) {
+  if (target.exitCode !== null || target.signalCode !== null) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Worker PID ${target.pid ?? "unknown"} did not exit within ${timeoutMs}ms.`));
+    }, timeoutMs);
+    const onExit = () => { cleanup(); resolve(); };
+    const onError = (error: Error) => { cleanup(); reject(error); };
+    const cleanup = () => {
+      clearTimeout(timer);
+      target.off("exit", onExit);
+      target.off("error", onError);
+    };
+    target.once("exit", onExit);
+    target.once("error", onError);
+  });
+}
 
 function run(args: string[]) {
   if (child) throw new Error("یک اجرا در حال انجام است.");
-  const python = process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
-  child = spawn(python, [path.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, env: { ...process.env, PYTHONUNBUFFERED: "1" } });
-  child.stdout.on("data", data => broadcast("log", data.toString()));
-  child.stderr.on("data", data => broadcast("log", data.toString()));
+  logBuffer = "";
+  const configuredEnv = envFile();
+  const python = configuredEnv.WORKER_PLUS_PYTHON || process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
+  const spawnedChild = spawn(python, [path.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, env: { ...process.env, ...configuredEnv, PYTHONUNBUFFERED: "1" } });
+  child = spawnedChild;
+  broadcast("log", `[worker] starting ${python} run.py ${args.join(" ")}\n`);
+  spawnedChild.stdout.on("data", data => broadcast("log", data.toString()));
+  spawnedChild.stderr.on("data", data => broadcast("log", data.toString()));
   stateTimer = setInterval(() => broadcast("state", state()), 750);
-  child.on("exit", (code, signal) => {
-    child = null;
+  let finished = false;
+  const finish = (code: number | null, signal: NodeJS.Signals | null, error?: Error) => {
+    if (finished) return;
+    finished = true;
+    if (error) broadcast("log", `[worker] failed to start: ${error.message}\n`);
+    else broadcast("log", `[worker] exited (code=${code ?? "null"}, signal=${signal ?? "none"})\n`);
+    if (child === spawnedChild) child = null;
     if (stateTimer) clearInterval(stateTimer);
     stateTimer = null;
-    broadcast("exit", { code, signal }); broadcast("state", state());
-  });
+    broadcast("exit", { code, signal, error: error?.message }); broadcast("state", state());
+  };
+  spawnedChild.on("error", error => finish(null, null, error));
+  spawnedChild.on("exit", (code, signal) => finish(code, signal));
   broadcast("state", state());
   return { started: true };
 }
@@ -87,13 +130,34 @@ app.whenReady().then(() => {
     return run(args);
   });
   ipcMain.handle("worker:resume", (_event, note?: string) => run(note?.trim() ? ["--resume", "--operator-note", note.trim()] : ["--resume"]));
-  ipcMain.handle("worker:stop", () => {
+  ipcMain.handle("worker:stop", async () => {
     if (!child) return false;
+    const target = child;
+    const pid = target.pid;
+    if (!pid) throw new Error("Worker process has no PID and cannot be stopped.");
+    broadcast("log", `[worker] stop requested for PID ${pid}\n`);
     if (process.platform === "win32") {
-      spawn("taskkill", ["/pid", String(child.pid), "/t"], { windowsHide: true });
+      await new Promise<void>((resolve, reject) => {
+        const killer = spawn("taskkill", ["/pid", String(pid), "/t", "/f"], { windowsHide: true });
+        let output = "";
+        killer.stdout.on("data", data => { output += data.toString(); });
+        killer.stderr.on("data", data => { output += data.toString(); });
+        killer.on("error", reject);
+        killer.on("exit", code => {
+          if (output.trim()) broadcast("log", `[worker] taskkill: ${output.trim()}\n`);
+          if (code === 0) resolve();
+          else reject(new Error(`taskkill failed with exit code ${code}${output.trim() ? `: ${output.trim()}` : ""}`));
+        });
+      });
+      await waitForExit(target);
+      broadcast("log", `[worker] PID ${pid} stopped\n`);
       return true;
     }
-    return child.kill("SIGTERM");
+    const stopped = target.kill("SIGTERM");
+    if (!stopped) throw new Error("Worker process did not accept SIGTERM.");
+    await waitForExit(target);
+    broadcast("log", `[worker] PID ${pid} stopped\n`);
+    return true;
   });
   ipcMain.handle("worker:open-workspace", async () => { await shell.openPath(workspace); });
   ipcMain.handle("worker:open-output", async (_event, name: string) => {

@@ -34,3 +34,10 @@ worker_plus/workspace/*
 
 */.env
 */.env.local/
+*.pak
+*.asar
+worker_plus/ui/release-portable*
+worker_plus/ui/release-portable-final*
+worker_plus/ui/release-portable-staging*
+worker_plus/ui/dist-electron/main.js
+worker_plus/ui/release

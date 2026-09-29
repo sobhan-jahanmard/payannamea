@@ -20,6 +20,7 @@ class Config:
     codex_bin: str
     codex_sandbox: str
     codex_model: str
+    codex_home: Path | None
 
 
 def load_config() -> Config:
@@ -35,4 +36,5 @@ def load_config() -> Config:
         codex_bin=codex_bin,
         codex_sandbox="workspace-write",
         codex_model="gpt-5.6-sol",
+        codex_home=Path(value).expanduser() if (value := os.getenv("WORKER_PLUS_CODEX_HOME", "").strip()) else None,
     )
