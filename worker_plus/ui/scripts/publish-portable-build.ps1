@@ -7,9 +7,9 @@ $ErrorActionPreference = "Stop"
 
 $uiRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $stagingDir = [System.IO.Path]::GetFullPath($StagingDirectory)
-$stagingExe = [System.IO.Path]::GetFullPath((Join-Path $stagingDir "Worker Plus 0.1.0.exe"))
+$stagingExe = [System.IO.Path]::GetFullPath((Join-Path $stagingDir "Daneshyar 0.1.0.exe"))
 $finalDir = [System.IO.Path]::GetFullPath((Join-Path $uiRoot "release-portable-final"))
-$finalExe = Join-Path $finalDir "Worker Plus 0.1.0.exe"
+$finalExe = Join-Path $finalDir "Daneshyar 0.1.0.exe"
 $expectedPrefix = $uiRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 
 foreach ($path in @($stagingExe, $finalDir)) {

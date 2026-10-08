@@ -6,7 +6,7 @@ try {
     $buildLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
 }
 catch [System.IO.IOException] {
-    throw "Another Worker Plus portable build is already running. Wait for it to finish before starting a new build."
+    throw "Another Daneshyar portable build is already running. Wait for it to finish before starting a new build."
 }
 
 $stagingName = "release-portable-staging-{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss"), $PID

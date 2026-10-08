@@ -2,14 +2,28 @@ import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { cleanupWorkspace, type CleanupOptions } from "./cleanup";
 
 const workerRoot = app.isPackaged ? path.join(process.resourcesPath, "worker_plus") : path.resolve(__dirname, "../..");
-const workspace = path.join(workerRoot, "workspace", "in_progress");
-const contextFile = path.join(workspace, "order_context.json");
+const appIcon = app.isPackaged
+  ? path.join(process.resourcesPath, "daneshyar-logo.png")
+  : path.resolve(__dirname, "../../../frontend/public/images/daneshyar-logo.png");
+function workspace(): string {
+  const root = path.join(workerRoot, "workspace");
+  try {
+    const pointer = JSON.parse(readFileSync(path.join(root, "active.json"), "utf8"));
+    const resolved = path.resolve(root, String(pointer.path));
+    const relative = path.relative(root, resolved);
+    if (!relative.startsWith("..") && !path.isAbsolute(relative)) return resolved;
+  } catch { /* Legacy workspace remains available for resume. */ }
+  return path.join(root, "in_progress");
+}
+function contextFile() { return path.join(workspace(), "order_context.json"); }
 let window: BrowserWindow | null = null;
 let child: ChildProcessWithoutNullStreams | null = null;
 let stateTimer: NodeJS.Timeout | null = null;
 let logBuffer = "";
+let cleaning = false;
 
 function envFile(): Record<string, string> {
   const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
@@ -44,12 +58,21 @@ function orderId(value: string): string {
   } catch { return clean; }
 }
 
+function readUsage() {
+  const file = path.join(workspace(), "telemetry", "summary.json");
+  try { return existsSync(file) ? { usage: JSON.parse(readFileSync(file, "utf8")) } : {}; }
+  catch { return {}; }
+}
+
 function state() {
+  const catalog = path.join(workspace(), "reports", "workflow_artifacts.json");
+  let workflow: unknown;
+  try { if (existsSync(catalog)) workflow = JSON.parse(readFileSync(catalog, "utf8")); } catch { /* Atomic writer may be replacing the projection. */ }
   const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
-  const outputs = Object.fromEntries(outputNames.map(name => [name, existsSync(path.join(workspace, "final", name))]));
-  if (!existsSync(contextFile)) return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer };
-  try { return { running: Boolean(child), context: JSON.parse(readFileSync(contextFile, "utf8")), workspace, outputs, logs: logBuffer }; }
-  catch { return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer }; }
+  const outputs = Object.fromEntries(outputNames.map(name => [name, existsSync(path.join(workspace(), "final", name))]));
+  if (!existsSync(contextFile())) return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
+  try { return { running: Boolean(child), cleaning, context: { ...JSON.parse(readFileSync(contextFile(), "utf8")), ...readUsage() }, workflow, workspace: workspace(), outputs, logs: logBuffer }; }
+  catch { return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer }; }
 }
 
 function broadcast(type: "log" | "exit" | "state", value: unknown) {
@@ -76,12 +99,14 @@ function waitForExit(target: ChildProcessWithoutNullStreams, timeoutMs = 5000) {
   });
 }
 
-function run(args: string[]) {
+function run(args: string[], note?: string) {
+  if (cleaning) throw new Error("پاک‌سازی محلی در حال انجام است.");
   if (child) throw new Error("یک اجرا در حال انجام است.");
   logBuffer = "";
   const configuredEnv = envFile();
   const python = configuredEnv.WORKER_PLUS_PYTHON || process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
-  const spawnedChild = spawn(python, [path.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, env: { ...process.env, ...configuredEnv, PYTHONUNBUFFERED: "1" } });
+  if (note?.trim()) args.push("--operator-note-stdin");
+  const spawnedChild = spawn(python, [path.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, windowsHide: true, env: { ...process.env, ...configuredEnv, PYTHONUNBUFFERED: "1" } });
   child = spawnedChild;
   broadcast("log", `[worker] starting ${python} run.py ${args.join(" ")}\n`);
   spawnedChild.stdout.on("data", data => broadcast("log", data.toString()));
@@ -100,12 +125,14 @@ function run(args: string[]) {
   };
   spawnedChild.on("error", error => finish(null, null, error));
   spawnedChild.on("exit", (code, signal) => finish(code, signal));
+  spawnedChild.stdin.on("error", error => broadcast("log", `[worker] guidance input failed: ${error.message}\n`));
+  spawnedChild.stdin.end(note?.trim() || "", "utf8");
   broadcast("state", state());
   return { started: true };
 }
 
 function createWindow() {
-  window = new BrowserWindow({ width: 1280, height: 840, minWidth: 980, minHeight: 680, backgroundColor: "#f3f4f6", webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false } });
+  window = new BrowserWindow({ width: 1280, height: 840, minWidth: 980, minHeight: 680, icon: appIcon, backgroundColor: "#f3f4f6", webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false } });
   if (process.env.VITE_DEV_SERVER_URL) window.loadURL(process.env.VITE_DEV_SERVER_URL);
   else window.loadFile(path.join(__dirname, "../dist/index.html"));
 }
@@ -119,17 +146,33 @@ app.whenReady().then(() => {
     return { id, order: payload };
   });
   ipcMain.handle("worker:state", () => state());
+  ipcMain.handle("worker:reset", async (_event, options: CleanupOptions) => {
+    if (child || cleaning) throw new Error("ابتدا اجرای فعال را متوقف کنید و منتظر پایان آن بمانید.");
+    const saved = state();
+    if (!options?.orderId || saved.context?.order_id !== options.orderId || saved.workspace !== options.workspace) throw new Error("پاک‌سازی فقط برای اجرای محلی همین سفارش مجاز است؛ وضعیت برنامه را تازه‌سازی کنید.");
+    cleaning = true;
+    broadcast("state", state());
+    try {
+      const configuredEnv = envFile();
+      const python = configuredEnv.WORKER_PLUS_PYTHON || process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
+      const result = await cleanupWorkspace(workerRoot, python, { ...process.env, ...configuredEnv }, options);
+      logBuffer = "";
+      return result;
+    } finally {
+      cleaning = false;
+      broadcast("state", state());
+    }
+  });
   ipcMain.handle("worker:start", (_event, options: { orderId: string; offline: boolean; sample: boolean; step?: number; note?: string }) => {
     if (options.step) {
       const savedOrderId = state().context?.order_id;
       if (savedOrderId !== options.orderId) throw new Error("اجرای مرحله‌ای فقط برای سفارش موجود در workspace فعلی مجاز است. ابتدا اجرای کامل این سفارش را شروع کنید.");
     }
     const args = options.step ? ["--step", String(options.step)] : ["--order-id", options.orderId];
-    if (options.offline) args.push("--offline"); if (options.sample) args.push("--sample");
-    if (options.note?.trim()) args.push("--operator-note", options.note.trim());
-    return run(args);
+    args.push(options.offline ? "--offline" : "--online"); if (options.sample) args.push("--sample");
+    return run(args, options.note);
   });
-  ipcMain.handle("worker:resume", (_event, note?: string) => run(note?.trim() ? ["--resume", "--operator-note", note.trim()] : ["--resume"]));
+  ipcMain.handle("worker:resume", (_event, note?: string) => run(["--resume"], note));
   ipcMain.handle("worker:stop", async () => {
     if (!child) return false;
     const target = child;
@@ -159,11 +202,27 @@ app.whenReady().then(() => {
     broadcast("log", `[worker] PID ${pid} stopped\n`);
     return true;
   });
-  ipcMain.handle("worker:open-workspace", async () => { await shell.openPath(workspace); });
+  ipcMain.handle("worker:open-workspace", async () => { await shell.openPath(workspace()); });
+  ipcMain.handle("worker:open-report", async (_event, relativePath: string) => {
+    const root = path.resolve(workspace());
+    const target = path.resolve(root, relativePath);
+    const relative = path.relative(root, target).replace(/\\/g, "/");
+    if (!["reports/", "research/", "analysis/", "datasets/"].some(prefix => relative.startsWith(prefix)) || relative.includes("../") || !existsSync(target)) throw new Error("گزارش خطا در workspace موجود نیست.");
+    const result = await shell.openPath(target);
+    if (result) throw new Error(result);
+  });
+  ipcMain.handle("worker:open-artifact", async (_event, relativePath: string) => {
+    const root = path.resolve(workspace());
+    const target = path.resolve(root, relativePath);
+    const relative = path.relative(root, target).replace(/\\/g, "/");
+    if (!["artifacts/", "reports/"].some(prefix => relative.startsWith(prefix)) || relative.includes("../") || !existsSync(target) || ![".json", ".md", ".txt", ".csv", ".png", ".docx", ".pdf", ".xlsx"].includes(path.extname(target).toLowerCase())) throw new Error("فایل ثبت‌شده در workspace موجود نیست.");
+    const result = await shell.openPath(target);
+    if (result) throw new Error(result);
+  });
   ipcMain.handle("worker:open-output", async (_event, name: string) => {
     const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx"]);
     if (!allowed.has(name)) throw new Error("نام فایل خروجی معتبر نیست.");
-    const target = path.join(workspace, "final", name);
+    const target = path.join(workspace(), "final", name);
     if (!existsSync(target)) throw new Error(`فایل ${name} هنوز ساخته نشده است.`);
     const result = await shell.openPath(target);
     if (!result) return { path: target };

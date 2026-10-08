@@ -2,7 +2,7 @@
   "name": "worker-plus-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Cross-platform desktop control panel for Worker Plus",
+  "description": "Cross-platform desktop control panel for Daneshyar",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on tcp:5174 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5174 nodemon --watch dist-electron --delay 400ms --exec electron .\"",
@@ -31,12 +31,15 @@
   },
   "build": {
     "appId": "ir.daneshyar.workerplus",
-    "productName": "Worker Plus",
+    "productName": "Daneshyar",
+    "icon": "../../frontend/public/images/daneshyar-logo.png",
     "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
     "extraResources": [
+      { "from": "../../frontend/public/images/daneshyar-logo.png", "to": "daneshyar-logo.png" },
       { "from": "../run.py", "to": "worker_plus/run.py" },
       { "from": "../requirements.txt", "to": "worker_plus/requirements.txt" },
       { "from": "../common", "to": "worker_plus/common", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../.agents/skills", "to": "worker_plus/.agents/skills", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../bachelor_thesis", "to": "worker_plus/bachelor_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../master_thesis", "to": "worker_plus/master_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../thesis_proposal", "to": "worker_plus/thesis_proposal", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },

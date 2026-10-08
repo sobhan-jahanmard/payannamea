@@ -7,13 +7,29 @@ const electron_1 = require("electron");
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = __importDefault(require("node:path"));
+const cleanup_1 = require("./cleanup");
 const workerRoot = electron_1.app.isPackaged ? node_path_1.default.join(process.resourcesPath, "worker_plus") : node_path_1.default.resolve(__dirname, "../..");
-const workspace = node_path_1.default.join(workerRoot, "workspace", "in_progress");
-const contextFile = node_path_1.default.join(workspace, "order_context.json");
+const appIcon = electron_1.app.isPackaged
+    ? node_path_1.default.join(process.resourcesPath, "daneshyar-logo.png")
+    : node_path_1.default.resolve(__dirname, "../../../frontend/public/images/daneshyar-logo.png");
+function workspace() {
+    const root = node_path_1.default.join(workerRoot, "workspace");
+    try {
+        const pointer = JSON.parse((0, node_fs_1.readFileSync)(node_path_1.default.join(root, "active.json"), "utf8"));
+        const resolved = node_path_1.default.resolve(root, String(pointer.path));
+        const relative = node_path_1.default.relative(root, resolved);
+        if (!relative.startsWith("..") && !node_path_1.default.isAbsolute(relative))
+            return resolved;
+    }
+    catch { /* Legacy workspace remains available for resume. */ }
+    return node_path_1.default.join(root, "in_progress");
+}
+function contextFile() { return node_path_1.default.join(workspace(), "order_context.json"); }
 let window = null;
 let child = null;
 let stateTimer = null;
 let logBuffer = "";
+let cleaning = false;
 function envFile() {
     const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
     const candidates = electron_1.app.isPackaged
@@ -50,16 +66,32 @@ function orderId(value) {
         return clean;
     }
 }
-function state() {
-    const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
-    const outputs = Object.fromEntries(outputNames.map(name => [name, (0, node_fs_1.existsSync)(node_path_1.default.join(workspace, "final", name))]));
-    if (!(0, node_fs_1.existsSync)(contextFile))
-        return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer };
+function readUsage() {
+    const file = node_path_1.default.join(workspace(), "telemetry", "summary.json");
     try {
-        return { running: Boolean(child), context: JSON.parse((0, node_fs_1.readFileSync)(contextFile, "utf8")), workspace, outputs, logs: logBuffer };
+        return (0, node_fs_1.existsSync)(file) ? { usage: JSON.parse((0, node_fs_1.readFileSync)(file, "utf8")) } : {};
     }
     catch {
-        return { running: Boolean(child), context: null, workspace, outputs, logs: logBuffer };
+        return {};
+    }
+}
+function state() {
+    const catalog = node_path_1.default.join(workspace(), "reports", "workflow_artifacts.json");
+    let workflow;
+    try {
+        if ((0, node_fs_1.existsSync)(catalog))
+            workflow = JSON.parse((0, node_fs_1.readFileSync)(catalog, "utf8"));
+    }
+    catch { /* Atomic writer may be replacing the projection. */ }
+    const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
+    const outputs = Object.fromEntries(outputNames.map(name => [name, (0, node_fs_1.existsSync)(node_path_1.default.join(workspace(), "final", name))]));
+    if (!(0, node_fs_1.existsSync)(contextFile()))
+        return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
+    try {
+        return { running: Boolean(child), cleaning, context: { ...JSON.parse((0, node_fs_1.readFileSync)(contextFile(), "utf8")), ...readUsage() }, workflow, workspace: workspace(), outputs, logs: logBuffer };
+    }
+    catch {
+        return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
     }
 }
 function broadcast(type, value) {
@@ -86,13 +118,17 @@ function waitForExit(target, timeoutMs = 5000) {
         target.once("error", onError);
     });
 }
-function run(args) {
+function run(args, note) {
+    if (cleaning)
+        throw new Error("پاک‌سازی محلی در حال انجام است.");
     if (child)
         throw new Error("یک اجرا در حال انجام است.");
     logBuffer = "";
     const configuredEnv = envFile();
     const python = configuredEnv.WORKER_PLUS_PYTHON || process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
-    const spawnedChild = (0, node_child_process_1.spawn)(python, [node_path_1.default.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, env: { ...process.env, ...configuredEnv, PYTHONUNBUFFERED: "1" } });
+    if (note?.trim())
+        args.push("--operator-note-stdin");
+    const spawnedChild = (0, node_child_process_1.spawn)(python, [node_path_1.default.join(workerRoot, "run.py"), ...args], { cwd: workerRoot, windowsHide: true, env: { ...process.env, ...configuredEnv, PYTHONUNBUFFERED: "1" } });
     child = spawnedChild;
     broadcast("log", `[worker] starting ${python} run.py ${args.join(" ")}\n`);
     spawnedChild.stdout.on("data", data => broadcast("log", data.toString()));
@@ -117,11 +153,13 @@ function run(args) {
     };
     spawnedChild.on("error", error => finish(null, null, error));
     spawnedChild.on("exit", (code, signal) => finish(code, signal));
+    spawnedChild.stdin.on("error", error => broadcast("log", `[worker] guidance input failed: ${error.message}\n`));
+    spawnedChild.stdin.end(note?.trim() || "", "utf8");
     broadcast("state", state());
     return { started: true };
 }
 function createWindow() {
-    window = new electron_1.BrowserWindow({ width: 1280, height: 840, minWidth: 980, minHeight: 680, backgroundColor: "#f3f4f6", webPreferences: { preload: node_path_1.default.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false } });
+    window = new electron_1.BrowserWindow({ width: 1280, height: 840, minWidth: 980, minHeight: 680, icon: appIcon, backgroundColor: "#f3f4f6", webPreferences: { preload: node_path_1.default.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false } });
     if (process.env.VITE_DEV_SERVER_URL)
         window.loadURL(process.env.VITE_DEV_SERVER_URL);
     else
@@ -138,6 +176,26 @@ electron_1.app.whenReady().then(() => {
         return { id, order: payload };
     });
     electron_1.ipcMain.handle("worker:state", () => state());
+    electron_1.ipcMain.handle("worker:reset", async (_event, options) => {
+        if (child || cleaning)
+            throw new Error("ابتدا اجرای فعال را متوقف کنید و منتظر پایان آن بمانید.");
+        const saved = state();
+        if (!options?.orderId || saved.context?.order_id !== options.orderId || saved.workspace !== options.workspace)
+            throw new Error("پاک‌سازی فقط برای اجرای محلی همین سفارش مجاز است؛ وضعیت برنامه را تازه‌سازی کنید.");
+        cleaning = true;
+        broadcast("state", state());
+        try {
+            const configuredEnv = envFile();
+            const python = configuredEnv.WORKER_PLUS_PYTHON || process.env.WORKER_PLUS_PYTHON || (process.platform === "win32" ? "python" : "python3");
+            const result = await (0, cleanup_1.cleanupWorkspace)(workerRoot, python, { ...process.env, ...configuredEnv }, options);
+            logBuffer = "";
+            return result;
+        }
+        finally {
+            cleaning = false;
+            broadcast("state", state());
+        }
+    });
     electron_1.ipcMain.handle("worker:start", (_event, options) => {
         if (options.step) {
             const savedOrderId = state().context?.order_id;
@@ -145,15 +203,12 @@ electron_1.app.whenReady().then(() => {
                 throw new Error("اجرای مرحله‌ای فقط برای سفارش موجود در workspace فعلی مجاز است. ابتدا اجرای کامل این سفارش را شروع کنید.");
         }
         const args = options.step ? ["--step", String(options.step)] : ["--order-id", options.orderId];
-        if (options.offline)
-            args.push("--offline");
+        args.push(options.offline ? "--offline" : "--online");
         if (options.sample)
             args.push("--sample");
-        if (options.note?.trim())
-            args.push("--operator-note", options.note.trim());
-        return run(args);
+        return run(args, options.note);
     });
-    electron_1.ipcMain.handle("worker:resume", (_event, note) => run(note?.trim() ? ["--resume", "--operator-note", note.trim()] : ["--resume"]));
+    electron_1.ipcMain.handle("worker:resume", (_event, note) => run(["--resume"], note));
     electron_1.ipcMain.handle("worker:stop", async () => {
         if (!child)
             return false;
@@ -189,12 +244,32 @@ electron_1.app.whenReady().then(() => {
         broadcast("log", `[worker] PID ${pid} stopped\n`);
         return true;
     });
-    electron_1.ipcMain.handle("worker:open-workspace", async () => { await electron_1.shell.openPath(workspace); });
+    electron_1.ipcMain.handle("worker:open-workspace", async () => { await electron_1.shell.openPath(workspace()); });
+    electron_1.ipcMain.handle("worker:open-report", async (_event, relativePath) => {
+        const root = node_path_1.default.resolve(workspace());
+        const target = node_path_1.default.resolve(root, relativePath);
+        const relative = node_path_1.default.relative(root, target).replace(/\\/g, "/");
+        if (!["reports/", "research/", "analysis/", "datasets/"].some(prefix => relative.startsWith(prefix)) || relative.includes("../") || !(0, node_fs_1.existsSync)(target))
+            throw new Error("گزارش خطا در workspace موجود نیست.");
+        const result = await electron_1.shell.openPath(target);
+        if (result)
+            throw new Error(result);
+    });
+    electron_1.ipcMain.handle("worker:open-artifact", async (_event, relativePath) => {
+        const root = node_path_1.default.resolve(workspace());
+        const target = node_path_1.default.resolve(root, relativePath);
+        const relative = node_path_1.default.relative(root, target).replace(/\\/g, "/");
+        if (!["artifacts/", "reports/"].some(prefix => relative.startsWith(prefix)) || relative.includes("../") || !(0, node_fs_1.existsSync)(target) || ![".json", ".md", ".txt", ".csv", ".png", ".docx", ".pdf", ".xlsx"].includes(node_path_1.default.extname(target).toLowerCase()))
+            throw new Error("فایل ثبت‌شده در workspace موجود نیست.");
+        const result = await electron_1.shell.openPath(target);
+        if (result)
+            throw new Error(result);
+    });
     electron_1.ipcMain.handle("worker:open-output", async (_event, name) => {
         const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx"]);
         if (!allowed.has(name))
             throw new Error("نام فایل خروجی معتبر نیست.");
-        const target = node_path_1.default.join(workspace, "final", name);
+        const target = node_path_1.default.join(workspace(), "final", name);
         if (!(0, node_fs_1.existsSync)(target))
             throw new Error(`فایل ${name} هنوز ساخته نشده است.`);
         const result = await electron_1.shell.openPath(target);

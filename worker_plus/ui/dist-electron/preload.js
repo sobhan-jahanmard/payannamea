@@ -7,7 +7,10 @@ electron_1.contextBridge.exposeInMainWorld("workerPlus", {
     startRun: (options) => electron_1.ipcRenderer.invoke("worker:start", options),
     resumeRun: (note) => electron_1.ipcRenderer.invoke("worker:resume", note),
     stopRun: () => electron_1.ipcRenderer.invoke("worker:stop"),
+    resetRun: (options) => electron_1.ipcRenderer.invoke("worker:reset", options),
     openWorkspace: () => electron_1.ipcRenderer.invoke("worker:open-workspace"),
+    openReport: (relativePath) => electron_1.ipcRenderer.invoke("worker:open-report", relativePath),
+    openArtifact: (relativePath) => electron_1.ipcRenderer.invoke("worker:open-artifact", relativePath),
     openOutput: (name) => electron_1.ipcRenderer.invoke("worker:open-output", name),
     onEvent: (listener) => {
         const handler = (_event, value) => listener(value);
