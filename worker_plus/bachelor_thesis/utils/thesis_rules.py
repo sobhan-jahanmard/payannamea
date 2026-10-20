@@ -35,7 +35,7 @@ DEFAULT_THESIS_RULES: dict[str, Any] = {
         "supervisor_after_pt": 16,
     },
     "captions": {"table_position": "above", "figure_position": "below", "font_pt": 11},
-    "references": {"style": "IEEE", "single_spaced": True},
+    "references": {"single_spaced": True},
     "quality": {"min_sample_words": 900, "min_full_words": 5000, "require_citations": True, "require_reference_list": True},
 }
 
@@ -71,9 +71,8 @@ def _extract_explicit_overrides(text: str) -> dict[str, Any]:
     return overrides
 
 
-def resolve_thesis_rules(files: list[str], citation_style: str | None) -> dict[str, Any]:
+def resolve_thesis_rules(files: list[str]) -> dict[str, Any]:
     rules = deepcopy(DEFAULT_THESIS_RULES)
-    rules["references"]["style"] = citation_style or rules["references"]["style"]
     evidence: list[dict[str, str]] = []
     for raw in files:
         path = Path(raw)

@@ -3,6 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$FontName
 )
 
+. "$PSScriptRoot\user_fonts.ps1"
+$loadedFonts = @(Register-WorkerUserFonts)
 Add-Type @'
 using System;
 using System.Collections.Generic;
@@ -143,5 +145,6 @@ try {
 } finally {
   if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
   if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  Unregister-WorkerUserFonts $loadedFonts
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

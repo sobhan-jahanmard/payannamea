@@ -172,7 +172,6 @@ export interface Order {
   order_type?: string | null;
   methodology: string;
   language: string;
-  academic_style: string;
   field_of_study?: string | null;
   faculty?: string | null;
   department?: string | null;
@@ -223,7 +222,6 @@ export interface OrderCreatePayload {
   order_type: string;
   methodology: string;
   language: string;
-  academic_style: string;
   field_of_study?: string;
   faculty?: string;
   department?: string;

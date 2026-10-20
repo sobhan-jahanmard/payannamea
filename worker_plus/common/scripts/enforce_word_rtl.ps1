@@ -3,6 +3,8 @@ param(
   [switch]$AuditOnly
 )
 
+. "$PSScriptRoot\user_fonts.ps1"
+$loadedFonts = @(Register-WorkerUserFonts)
 # python-docx writes the correct OOXML flags, but some Word installations inherit
 # an LTR direct format when opening a generated file.  This final pass uses Word's
 # own object model so the toolbar state is truly RTL/Align Right in Word itself.
@@ -26,11 +28,16 @@ try {
   foreach ($paragraph in $document.Paragraphs) {
     $text = $paragraph.Range.Text.Trim([char]13, [char]7, ' ')
     if ($text -notmatch '\p{IsArabic}') { continue }
+    # Physical alignment is mirrored inside RTL index tables. Preserve the
+    # renderer's intentionally opposite Word alignment for both cells.
+    $indexEntry = ($paragraph.Style.NameLocal -eq 'TOC Entry')
     $paragraphs += [PSCustomObject]@{
       Start = $paragraph.Range.Start
       End = $paragraph.Range.End
       Centered = ($paragraph.Alignment -eq 1)
       Justified = ($paragraph.Alignment -eq 3)
+      IndexEntry = $indexEntry
+      OriginalAlignment = $paragraph.Alignment
     }
   }
 
@@ -40,7 +47,7 @@ try {
     if (-not $AuditOnly) {
       $range = $document.Range($saved.Start, $saved.End)
       $range.ParagraphFormat.ReadingOrder = 0
-      $range.ParagraphFormat.Alignment = if ($saved.Centered) { 1 } elseif ($saved.Justified) { 3 } else { 2 }
+      $range.ParagraphFormat.Alignment = if ($saved.IndexEntry) { $saved.OriginalAlignment } elseif ($saved.Centered) { 1 } elseif ($saved.Justified) { 3 } else { 2 }
     }
   }
   if (-not $AuditOnly) {
@@ -62,7 +69,8 @@ try {
 
   foreach ($saved in $paragraphs) {
     $range = $document.Range($saved.Start, $saved.End)
-    if ($range.ParagraphFormat.Alignment -in @(2, 3) -and $range.ParagraphFormat.ReadingOrder -eq 0) { $right++ }
+    if ($saved.IndexEntry -and $range.ParagraphFormat.Alignment -in @(0, 2) -and $range.ParagraphFormat.ReadingOrder -eq 0) { $right++ }
+    elseif ($range.ParagraphFormat.Alignment -in @(2, 3) -and $range.ParagraphFormat.ReadingOrder -eq 0) { $right++ }
     elseif ($range.ParagraphFormat.Alignment -eq 1 -and $range.ParagraphFormat.ReadingOrder -eq 0) { $center++ }
     else { $left++ }
   }
@@ -70,5 +78,6 @@ try {
 } finally {
   if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
   if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  Unregister-WorkerUserFonts $loadedFonts
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

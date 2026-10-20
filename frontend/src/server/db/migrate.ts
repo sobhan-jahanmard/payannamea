@@ -50,7 +50,6 @@ const statements = [
     order_type varchar(120),
     methodology varchar(160) not null,
     language varchar(80) not null,
-    academic_style varchar(120) not null,
     field_of_study varchar(255),
     faculty varchar(255),
     department varchar(255),
@@ -117,6 +116,7 @@ const statements = [
   `update orders set correspondence_email = 'unknown@example.invalid' where correspondence_email is null`,
   `alter table orders alter column correspondence_email set not null`,
   `alter table orders add column if not exists moarref_code varchar(120)`,
+  `alter table orders drop column if exists academic_style`,
   `alter table orders drop column if exists image_count`,
   `create table if not exists order_files (
     id varchar(36) primary key,

@@ -3,6 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$FontName
 )
 
+. "$PSScriptRoot\user_fonts.ps1"
+$loadedFonts = @(Register-WorkerUserFonts)
 $word = $null; $document = $null
 try {
   $word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0
@@ -37,5 +39,6 @@ try {
 } finally {
   if ($document) { $document.Close($false); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($document) }
   if ($word) { $word.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word) }
+  Unregister-WorkerUserFonts $loadedFonts
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

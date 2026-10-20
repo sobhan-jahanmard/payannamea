@@ -4,7 +4,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.runner import main
+from common.execution_lock import execution_lock
 
 
 if __name__ == "__main__":
-    main()
+    with execution_lock(Path(__file__).resolve().parent / "workspace"):
+        main()

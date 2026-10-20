@@ -8,9 +8,10 @@ contextBridge.exposeInMainWorld("workerPlus", {
   stopRun: () => ipcRenderer.invoke("worker:stop"),
   resetRun: (options: { orderId: string; workspace: string }) => ipcRenderer.invoke("worker:reset", options),
   openWorkspace: () => ipcRenderer.invoke("worker:open-workspace"),
+  openFinalFolder: () => ipcRenderer.invoke("worker:open-final-folder"),
   openReport: (relativePath: string) => ipcRenderer.invoke("worker:open-report", relativePath),
   openArtifact: (relativePath: string) => ipcRenderer.invoke("worker:open-artifact", relativePath),
-  openOutput: (name: "sample.pdf" | "sample.docx" | "final.pdf" | "final.docx") => ipcRenderer.invoke("worker:open-output", name),
+  openOutput: (name: "sample.pdf" | "sample.docx" | "final.pdf" | "final.docx" | "report_1.pdf" | "report_1.docx" | "report_2.pdf" | "report_2.docx" | "report_3.pdf" | "report_3.docx") => ipcRenderer.invoke("worker:open-output", name),
   onEvent: (listener: (event: WorkerEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, value: WorkerEvent) => listener(value);
     ipcRenderer.on("worker:event", handler);

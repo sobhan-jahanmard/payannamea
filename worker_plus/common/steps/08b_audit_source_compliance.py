@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import Any
 
 from common.helpers import write_json, write_text
+from common.page_budget import planned_page_budget
 
 TITLE = "Audit source-rule compliance"
 
@@ -38,7 +40,10 @@ def evaluate(context: dict[str, Any], services: Any) -> tuple[bool, list[tuple[s
         context["artifacts"].get("admin_internal_rules", "extracted/admin_internal_rules.md"),
     ))
 
-    minimum_words = 6000
+    rules_path = services.workspace / context["artifacts"].get("university_rules", "extracted/university_rules.json")
+    rules = json.loads(rules_path.read_text(encoding="utf-8")) if rules_path.exists() else None
+    budget = planned_page_budget(context["order"], services.workspace / context["artifacts"].get("visual_plan", "planning/visual_plan.json"), rules)
+    minimum_words = min(6000, budget["minimum_persian_words"]) if budget else 6000
     source_ok = source.exists() and persian_word_count(source_text) >= minimum_words
     checks.append((f"متن خروجی دست‌کم {minimum_words} واژهٔ فارسی دارد", "PASS" if source_ok else "FAIL", str(source.relative_to(services.workspace))))
 
@@ -76,11 +81,11 @@ def repair_source(context: dict[str, Any], services: Any, failed_rules: list[str
 فقط این خطاها را با کمترین تغییر لازم اصلاح کن:
 {rules}
 
-قرارداد منابع در `{contract.relative_to(services.workspace)}` و منابع آپلودشدهٔ مشتری در `extracted/customer_sources/` هستند. قواعد قطعی:
+قرارداد منابع در `{contract.relative_to(services.workspace)}`، منابع آپلودشدهٔ مشتری در `extracted/customer_sources/` و منابع وبِ بازیابی‌شده در `{context['artifacts']['research_evidence']}` هستند. قواعد قطعی:
 1) بخش `# منابع` باید وجود داشته باشد.
 2) هر ارجاع عددی در متن مانند `[1]` باید دقیقاً یک مدخل قابل‌ردیابی با همان شماره در بخش منابع داشته باشد؛ قالب مجاز آغاز خط `[{1}]` یا `{1}.` است.
 3) هر `TODO`، `TBD` و `[NEEDS` را حذف یا با متن نهاییِ مستند جایگزین کن.
-4) منبع یا داده جعلی نساز. اگر برای یک استناد منبع معتبر در فایل‌ها وجود ندارد، آن استناد و ادعای وابسته را به یک فرض/پیشنهادِ صریح و بدون استناد تبدیل کن.
+4) منبع یا داده جعلی نساز. منابع وب ثبت‌شده در ledger پژوهش معتبرند؛ آن‌ها را فقط به دلیل نبودن در فایل‌های آپلودی حذف نکن. اگر برای یک استناد هیچ منبع قابل‌ردیابی در فایل‌ها، ledger یا وب وجود ندارد، ابتدا جست‌وجو کن و سپس ادعای بی‌پشتوانه را به فرض صریح و بدون استناد تبدیل کن.
 5) ساختار، حجم، شکل‌ها و محتوای درستِ فعلی را حفظ کن. پس از ویرایش فقط یک تأیید کوتاه بده.
 """
     services.run_codex(prompt, response)

@@ -23,32 +23,24 @@ The app reads `workspace/active.json` and isolated run directories, with legacy
 Stages and Persian labels come from `common/stages.json`. The evidence panel
 shows current and historical artifact versions, validation issues and exact
 upstream versions. Old/stale outputs can be inspected through artifact history.
+The Python runner uses that same stage registry. Its web-research stage runs
+before outlining and drafting, and the action panel shows direct, proxy, and
+assumption counts with links to the evidence ledger and completed analysis.
+"Without server registration" leaves backend status unchanged while web
+research still runs. Resume and stage restart use the active workspace shown
+by the desktop app.
 
 Paused executions show every structured validation issue and source location in
 the failure panel, alongside the full report and suggested restart stage.
-Style-guide extraction now corrects a rejected page using its precise feedback
-and actual page image, retains the prior extraction, and repeats independent
-validation within the configured repair limit. An unchanged/invalid correction
-or a genuinely unsupported feature still pauses with details. Use the suggested
-stage button to continue an existing execution after a fix.
-Stage 9 reviews the complete research evidence together. Genuine rejected
-findings receive automatic correction, targeted source discovery where needed,
-and independent validation within the repair limit. No manually written AI note
-is needed for those corrections. Resume an existing source-workspace run through
-this development UI; portable packages use their own resource workspace.
-Missing research coverage now advances through direct discovery, cited foreign
-or other-context proxies, and explicit justified author assumptions. Their ledger
-is `research/coverage.json` inside the research artifact. Missing exact local
-sources alone do not reopen an already resolved gap. Source transfers and
-assumptions are disclosed automatically in the thesis, and genuine logical or
-provenance defects receive their own correction/review.
-Stage 10 now resolves missing numerical inputs through actual direct/proxy
-searches and explicit design assumptions, then builds shared executable
-calculations with automatic correction and independent checks. It no longer
-requires a supplied CSV for every design operation. Results and adaptations
-are clearly labelled design scenarios and disclosed in the thesis; missing
-experiments or empirical meta-analysis are never represented as completed.
-Existing missing-data failures can resume from stage 10 through the source UI.
+Stage 9 gathers and validates web evidence before the outline is written.
+Failed entries are retried with validation feedback. A source with no country,
+extracted fact, or URL does not satisfy the ledger. Foreign proxies must carry
+their transfer limitation, and the prose audit checks that the absence of
+Iranian data is disclosed. The ledger is `research/evidence.json`; the executed
+calculations are in `research/analysis.md`.
+Visual planning caps the number of figures. Each numeric chart carries values,
+a unit, and a visible source or assumption. A failed visual audit restarts at
+planning so the figures and text that cites them are rebuilt together.
 The worker applies no token, call-count or prompt-character ceiling. After a
 failure the AI textarea contains an actionable plan based on the responsible
 stage, exact issues and report, including for existing paused executions.

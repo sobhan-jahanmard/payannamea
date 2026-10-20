@@ -8,7 +8,32 @@ $ErrorActionPreference = "Stop"
 $word = $null
 $document = $null
 $stage = "start"
+$loadedFonts = @()
 try {
+  # Per-user fonts are registered in HKCU but a new Word COM process can miss
+  # them until GDI loads the files into this logon session.  Load the required
+  # font before Word starts, so PDF export embeds the font named by the guide.
+  Add-Type -MemberDefinition @'
+[DllImport("gdi32.dll", CharSet=CharSet.Unicode)]
+public static extern int AddFontResource(string path);
+[DllImport("gdi32.dll", CharSet=CharSet.Unicode)]
+public static extern bool RemoveFontResource(string path);
+'@ -Name SessionFontResource -Namespace WorkerPlus
+  $userFonts = Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts' -ErrorAction SilentlyContinue
+  if ($userFonts) {
+    foreach ($entry in $userFonts.PSObject.Properties) {
+      if ($entry.Name -notlike "$FontName* (TrueType)") { continue }
+      $fontPath = [string]$entry.Value
+      if (-not [System.IO.Path]::IsPathRooted($fontPath)) {
+        $fontPath = Join-Path "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" $fontPath
+      }
+      if (Test-Path -LiteralPath $fontPath) {
+        if ([WorkerPlus.SessionFontResource]::AddFontResource($fontPath) -gt 0) {
+          $loadedFonts += $fontPath
+        }
+      }
+    }
+  }
   $stage = "create Word application"
   $word = New-Object -ComObject Word.Application
   $word.Visible = $false
@@ -87,6 +112,9 @@ try {
   if ($word) {
     $word.Quit()
     [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($word)
+  }
+  foreach ($fontPath in $loadedFonts) {
+    [void][WorkerPlus.SessionFontResource]::RemoveFontResource($fontPath)
   }
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

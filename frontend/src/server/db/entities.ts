@@ -47,7 +47,6 @@ export interface OrderEntity {
   order_type: string | null;
   methodology: string;
   language: string;
-  academic_style: string;
   field_of_study: string | null;
   faculty: string | null;
   department: string | null;
@@ -283,7 +282,6 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     order_type: { type: String, length: 120, nullable: true },
     methodology: { type: String, length: 160 },
     language: { type: String, length: 80 },
-    academic_style: { type: String, length: 120 },
     field_of_study: { type: String, length: 255, nullable: true },
     faculty: { type: String, length: 255, nullable: true },
     department: { type: String, length: 255, nullable: true },

@@ -1,10 +1,12 @@
 import importlib
 import json
+import re
 from typing import Any
 from docx import Document
 from common.api import submit_final
 from common.helpers import archive_workspace, write_json, write_text
 from common.visual_policy import visual_requirements
+from common.page_budget import page_budget, planned_page_budget
 
 TITLE = "Validate and publish"
 
@@ -29,6 +31,7 @@ def repair_layout(context: dict[str, Any], services: Any, source: Any, docx: Any
     for module_name in (
         "common.steps.09_package_docx",
         "common.steps.09b_polish_cover",
+        "common.steps.09c_package_interim_reports",
         "common.steps.10b_finalize_persian_pagination",
         "common.steps.10c_verify_persian_pagination",
     ):
@@ -104,48 +107,54 @@ def enforce_visual_policy(context: dict[str, Any], services: Any, source: Any, d
 
 
 def complete_page_target(context: dict[str, Any], services: Any, source: Any, docx: Any, rules: dict[str, Any]) -> int | None:
-    """Add genuine analytical sections until Word itself reports the requested size.
-
-    A word-count estimate is only used to size a continuation request.  It is never
-    used as the pass condition: every iteration rebuilds the DOCX and asks Word for
-    its rendered page count.
-    """
+    """Keep the rendered Word package near the order's requested page count."""
     order = context["order"]
-    if order.get("quantity_type") != "pages":
+    budget = planned_page_budget(order, services.workspace / context["artifacts"].get("visual_plan", "planning/visual_plan.json"), rules)
+    if not budget:
         return None
-    required_pages = int(order.get("quantity_value") or 0)
-    if required_pages <= 0:
-        return None
-
+    required_pages = budget["minimum"]
+    maximum_pages = budget["word_maximum"]
     progress_path = services.workspace / "reports" / "stage_checks" / "page_completion.json"
-    progress: list[dict[str, int]] = []
-    for attempt in range(1, 13):
-        # Packaging on every pass makes this a rendered-Word feedback loop rather
-        # than a blind batch of text generation.
-        services.write_docx(source, docx, order.get("title") or services.profile.DISPLAY_NAME, rules, order)
+    progress: list[dict[str, Any]] = []
+    for attempt in range(1, 9):
+        # The incoming DOCX already passed the dependent packaging stages. After
+        # a content edit replay them before measuring, including interim reports.
+        if attempt > 1:
+            repair_layout(context, services, source, docx, rules)
         actual_pages = services.count_docx_pages(docx)
-        progress.append({"attempt": attempt, "actual_pages": actual_pages, "required_pages": required_pages})
-        write_json(progress_path, {"passed": actual_pages >= required_pages, "attempts": progress})
-        if actual_pages >= required_pages:
+        source_words = len(re.findall(r"[آ-یA-Za-z]{2,}", source.read_text(encoding="utf-8")))
+        estimated_content_pages = actual_pages - budget["reserved_nonbody_pages"] - budget["reserved_visual_pages"] - budget["reserved_table_pages"]
+        observed_density = round(source_words / estimated_content_pages) if source_words >= 500 and estimated_content_pages > 0 else budget["words_per_text_page"]
+        words_per_page = max(140, min(420, observed_density))
+        direction = "expand" if actual_pages < required_pages else "compress" if actual_pages > maximum_pages else "pass"
+        progress.append({"attempt": attempt, "actual_pages": actual_pages, "required_pages": required_pages, "maximum_word_pages": maximum_pages, "maximum_pdf_pages": budget["maximum"], "actual_source_words": source_words, "estimated_words_per_text_page": words_per_page, "action": direction})
+        write_json(progress_path, {"passed": direction == "pass", "attempts": progress})
+        if direction == "pass":
             return actual_pages
-
-        missing_pages = required_pages - actual_pages
-        # The safety margin absorbs page-flow variation caused by headings/tables;
-        # this requests substantive content, never blank pages or forced breaks.
-        batch_words = max(3000, missing_pages * 560)
-        continuation = services.workspace / "drafts" / f"page_completion_{attempt}.md"
+        continuation = services.workspace / "drafts" / f"page_budget_{attempt}.md"
         if continuation.exists():
             continuation.unlink()
-        prompt = f"""فایل `{source.relative_to(services.workspace)}` را مستقیم اصلاح کن تا کمبود {missing_pages} صفحه واقعی (تقریباً {batch_words} واژه محتوای مفید) جبران شود. قرارداد خروجی `{context['artifacts']['order_execution_contract']}` و گزارش‌های ممیزی در `reports/` را بخوان.
-
-فصل یا «تحلیل یکپارچه» تازه به انتهای سند اضافه نکن. فقط بخش‌های موجودی را توسعه بده که طبق قرارداد فاقد داده، محاسبه، مقایسه یا نتیجه‌اند. از تکرار معنایی و متن راهنماگونه پرهیز کن. منابع تازه معتبر را همراه استناد به فهرست منابع اضافه کن و به شماره‌های ثابت محدود نشو. داده جعلی ممنوع است؛ در نبود داده از سناریوی شفاف استفاده کن یا کمبود را اعلام کن. پاسخ خودت فقط گزارش کوتاه تغییرات باشد."""
+        if direction == "expand":
+            missing_pages = required_pages - actual_pages
+            batch_words = min(900, max(200, missing_pages * words_per_page))
+            prompt = f"""فایل `{source.relative_to(services.workspace)}` را مستقیم اصلاح کن. Word فعلاً {actual_pages} صفحهٔ واقعی می‌شمارد؛ سفارش حداقل {required_pages} و سقف PDF {budget['maximum']} صفحه است. حدود {batch_words} واژهٔ مفید در بخش‌های موجود اضافه کن. قرارداد `{context['artifacts']['order_execution_contract']}` و گزارش‌های ممیزی `reports/` را بخوان. فقط شکاف داده، محاسبه، مقایسه یا نتیجه را تکمیل کن؛ فصل/جدول تازهٔ غیرضروری، تکرار و صفحه‌سازی ممنوع است. منابع تازه معتبر را همراه استناد اضافه کن و داده جعل نکن. پاسخ فقط گزارش کوتاه تغییرات باشد."""
+        else:
+            excess = actual_pages - maximum_pages
+            prompt = f"""فایل `{source.relative_to(services.workspace)}` را مستقیم ویرایش کن. Word آن را {actual_pages} صفحهٔ واقعی می‌شمارد، در حالی که سفارش {required_pages} صفحه و سقف PDF {budget['maximum']} صفحه است؛ حدود {excess} صفحه باید با تلخیص واقعی کم شود. بر پایهٔ تراکم اندازه‌گیری‌شدهٔ همین فایل، برآورد متن برای این اختلاف حدود {excess * words_per_page} واژه است؛ اگر شکل یا جدول عامل اصلی است، فضای اشغال‌شدهٔ آن را هم بررسی کن. قرارداد `{context['artifacts']['order_execution_contract']}`، شواهد پژوهش و گزارش‌های ممیزی `reports/` را بخوان. فصل‌ها و زیربخش‌های هم‌پوشان را ادغام کن، پاراگراف‌های تکراری و جدول‌های چندگانهٔ هم‌معنا را فشرده کن، عنوان و منبع شکل/جدول را کوتاه و روشن نگه دار، و فهرست مطالب Markdown را با عنوان‌های باقی‌مانده هماهنگ کن. هر خروجی اجباری باید همچنان شاهد، محاسبه/مقایسه، نتیجه، محدودیت و استناد قابل ردیابی داشته باشد. شکل‌های الزامی، اعداد معتبر، صورت‌های مالی لازم و منابع استفاده‌شده را حذف نکن. فونت، حاشیه یا فاصلهٔ مصوب دانشگاه را تغییر نده و صفحه را با ترفند قالب‌بندی کم نکن. پاسخ فقط گزارش کوتاه تغییرات باشد."""
+        previous = source.read_text(encoding="utf-8")
         services.run_codex(prompt, continuation)
         if not continuation.exists() or not continuation.read_text(encoding="utf-8").strip():
-            raise RuntimeError("Page-completion continuation was empty")
+            raise RuntimeError("Page-budget revision produced no report")
+        if source.read_text(encoding="utf-8") == previous:
+            raise RuntimeError(f"Page-budget {direction} revision did not change the source")
+        # Both shorter and longer manuscripts must still satisfy the decision
+        # and source audits before a new page count can be accepted.
+        importlib.import_module("common.steps.08_review_content").run(context, services)
+        importlib.import_module("common.steps.08b_audit_source_compliance").run(context, services)
 
     raise RuntimeError(
-        f"Rendered Word page target was not reached after {len(progress)} content-extension attempts "
-        f"({progress[-1]['actual_pages']}/{required_pages})"
+        f"Rendered Word package missed the {required_pages}–{maximum_pages} page window "
+        f"after {len(progress)} revisions (last count: {progress[-1]['actual_pages']})"
     )
 
 
@@ -160,6 +169,14 @@ def audit_visual_quality(context: dict[str, Any], services: Any, pdf: Any) -> No
         raise RuntimeError("Required visuals have no manifest for visual quality review")
     services.render_pdf_pages(pdf, services.workspace / "reports" / "rendered_pages")
     report = services.workspace / "reports" / "visual_quality_audit.md"
+    # run_codex skips a nonempty target on resume. A quality retry must inspect
+    # the newly rendered PDF instead of accepting the prior PASS or FAIL text.
+    if report.exists():
+        previous = report.with_name("visual_quality_audit.previous.md")
+        if previous.exists():
+            report.unlink()
+        else:
+            report.replace(previous)
     prompt = f"""ممیزی بصری اجباری سفارش «{order.get('title')}» را انجام بده. manifest تصاویر در `{manifest.relative_to(services.workspace)}`، خود PNGها در `final/figures/` و صفحات رندرشدهٔ PDF در `reports/rendered_pages/` هستند.
 
 هر PNG و صفحهٔ PDF حاوی آن را با ابزار مشاهدهٔ تصویر بررسی کن. خط اول پاسخ دقیقاً `STATUS: PASS` یا `STATUS: FAIL` باشد و سپس جدولی با ستون‌های «شکل | کیفیت حرفه‌ای | محتوای واقعی/منبع | خوانایی و RTL | تناسب با استدلال | صفحهٔ PDF | نتیجه» بده.
@@ -179,6 +196,7 @@ def run(context: dict[str, Any], services: Any) -> None:
     rules = json.loads((services.workspace / context["artifacts"]["university_rules"]).read_text(encoding="utf-8"))
     enforce_visual_policy(context, services, source, docx)
     complete_page_target(context, services, source, docx, rules)
+    enforce_visual_policy(context, services, source, docx)
     repair_attempts: list[dict[str, Any]] = []
     for attempt in range(1, 4):
         try:
@@ -203,6 +221,18 @@ def run(context: dict[str, Any], services: Any) -> None:
         word_name.write_bytes(docx.read_bytes())
     pdf_font = rules["font"]["persian"]
     services.export_pdf(word_name, pdf, pdf_font)
+    budget = page_budget(context["order"])
+    if budget:
+        from pypdf import PdfReader
+        pdf_pages = len(PdfReader(str(pdf)).pages)
+        write_json(services.workspace / "reports" / "stage_checks" / "final_pdf_page_budget.json", {
+            "passed": budget["minimum"] <= pdf_pages <= budget["maximum"],
+            "actual_pages": pdf_pages,
+            "minimum_pages": budget["minimum"],
+            "maximum_pages": budget["maximum"],
+        })
+        if not budget["minimum"] <= pdf_pages <= budget["maximum"]:
+            raise RuntimeError(f"Final PDF page count outside order budget ({pdf_pages}; expected {budget['minimum']}–{budget['maximum']})")
     audit_visual_quality(context, services, pdf)
     sample_docx = services.workspace / "final" / "sample.docx"
     sample_pdf = services.workspace / "final" / "sample.pdf"

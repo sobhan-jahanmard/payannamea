@@ -64,14 +64,33 @@ function readUsage() {
   catch { return {}; }
 }
 
+function readResearch() {
+  const file = path.join(workspace(), "research", "evidence.json");
+  try {
+    if (!existsSync(file)) return {};
+    const validation = path.join(workspace(), "reports", "stage_checks", "research_evidence.json");
+    if (!existsSync(validation) || JSON.parse(readFileSync(validation, "utf8")).passed !== true) return {};
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    if (!Array.isArray(data.deliverables)) return {};
+    const items: unknown[] = data.deliverables;
+    return { research: {
+      total: items.length,
+      direct: items.filter((item: any) => item?.status === "direct").length,
+      proxy: items.filter((item: any) => item?.status === "proxy").length,
+      assumption: items.filter((item: any) => item?.status === "assumption").length,
+      sourceCount: new Set(items.flatMap((item: any) => Array.isArray(item?.sources) ? item.sources.map((source: any) => String(source?.url || "")).filter(Boolean) : [])).size,
+    } };
+  } catch { return {}; }
+}
+
 function state() {
   const catalog = path.join(workspace(), "reports", "workflow_artifacts.json");
   let workflow: unknown;
   try { if (existsSync(catalog)) workflow = JSON.parse(readFileSync(catalog, "utf8")); } catch { /* Atomic writer may be replacing the projection. */ }
-  const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
+  const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx", "report_1.pdf", "report_1.docx", "report_2.pdf", "report_2.docx", "report_3.pdf", "report_3.docx"];
   const outputs = Object.fromEntries(outputNames.map(name => [name, existsSync(path.join(workspace(), "final", name))]));
   if (!existsSync(contextFile())) return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
-  try { return { running: Boolean(child), cleaning, context: { ...JSON.parse(readFileSync(contextFile(), "utf8")), ...readUsage() }, workflow, workspace: workspace(), outputs, logs: logBuffer }; }
+  try { return { running: Boolean(child), cleaning, context: { ...JSON.parse(readFileSync(contextFile(), "utf8")), ...readUsage(), ...readResearch() }, workflow, workspace: workspace(), outputs, logs: logBuffer }; }
   catch { return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer }; }
 }
 
@@ -203,6 +222,12 @@ app.whenReady().then(() => {
     return true;
   });
   ipcMain.handle("worker:open-workspace", async () => { await shell.openPath(workspace()); });
+  ipcMain.handle("worker:open-final-folder", async () => {
+    const target = path.join(workspace(), "final");
+    if (!existsSync(target)) throw new Error("پوشهٔ فایل‌های نهایی هنوز ساخته نشده است.");
+    const result = await shell.openPath(target);
+    if (result) throw new Error(result);
+  });
   ipcMain.handle("worker:open-report", async (_event, relativePath: string) => {
     const root = path.resolve(workspace());
     const target = path.resolve(root, relativePath);
@@ -220,8 +245,13 @@ app.whenReady().then(() => {
     if (result) throw new Error(result);
   });
   ipcMain.handle("worker:open-output", async (_event, name: string) => {
-    const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx"]);
+    const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx", "report_1.pdf", "report_1.docx", "report_2.pdf", "report_2.docx", "report_3.pdf", "report_3.docx"]);
     if (!allowed.has(name)) throw new Error("نام فایل خروجی معتبر نیست.");
+    const context = JSON.parse(readFileSync(contextFile(), "utf8"));
+    const completed = new Set<string>(context.completed_steps || []);
+    if (name.startsWith("report_") && !completed.has("09c_package_interim_reports")) throw new Error("گزارش میانی این اجرا هنوز تأیید نشده است.");
+    const finished = ["dry_run_complete", "worker_done_pending_approval", "sample_pending_customer_approval", "completed"].includes(context.status);
+    if (!name.startsWith("report_") && (!completed.has("10_validate_and_publish") || (context.finalization_state !== "FINALIZED" && !finished))) throw new Error("بستهٔ نهایی این اجرا هنوز تأیید نشده است.");
     const target = path.join(workspace(), "final", name);
     if (!existsSync(target)) throw new Error(`فایل ${name} هنوز ساخته نشده است.`);
     const result = await shell.openPath(target);

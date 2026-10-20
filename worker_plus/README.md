@@ -12,7 +12,9 @@ Each supported order type has its own folder containing only its profile and any
 
 Run the single worker with `python run.py`. After it claims or resumes an order, it selects the matching profile from that order’s `order_type`. Only the profiles listed above are supported.
 
-To generate a local package from a real order without changing its backend status, lock, run history, or outputs, use `python run.py --offline --order-id <order-id>`. This performs only GET requests for the order and its input files.
+Before planning or writing, stage `05c_research_evidence` searches the web for each required deliverable. It records the Iranian search, opened source URLs, extracted facts, geography, an executed calculation or comparison, a result, and limitations in `research/evidence.json` and `research/analysis.md`. If comparable Iranian data is unavailable, it uses a clearly labelled foreign or adjacent-context proxy; only after both searches fail may it use an explicit design assumption. An incomplete ledger blocks drafting. The Electron app shows the evidence counts and opens both files.
+
+To generate a local package from a real order without changing its backend status, lock, run history, or outputs, use `python run.py --offline --order-id <order-id>`. Backend access is read-only; the worker still searches external websites for research evidence.
 
 ## Codex account
 
@@ -32,7 +34,7 @@ worker_plus/
 ├── .env
 └── ui/
     └── release-portable-final/
-        └── Worker Plus 0.1.0.exe
+        └── Daneshyar 0.1.0.exe
 ```
 
 After one rebuild containing this feature, edit `worker_plus/.env` whenever the
@@ -70,7 +72,7 @@ npm run build:portable
 ```
 
 The portable executable is created at
-`worker_plus/ui/release-portable-final/Worker Plus 0.1.0.exe`. The portable
+`worker_plus/ui/release-portable-final/Daneshyar 0.1.0.exe`. The portable
 build command first force-closes running Worker Plus processes, builds in a new
 uniquely named staging directory, and publishes the resulting EXE to the final
 directory. This keeps externally locked stale `app.asar` files from blocking

@@ -9,6 +9,7 @@ electron_1.contextBridge.exposeInMainWorld("workerPlus", {
     stopRun: () => electron_1.ipcRenderer.invoke("worker:stop"),
     resetRun: (options) => electron_1.ipcRenderer.invoke("worker:reset", options),
     openWorkspace: () => electron_1.ipcRenderer.invoke("worker:open-workspace"),
+    openFinalFolder: () => electron_1.ipcRenderer.invoke("worker:open-final-folder"),
     openReport: (relativePath) => electron_1.ipcRenderer.invoke("worker:open-report", relativePath),
     openArtifact: (relativePath) => electron_1.ipcRenderer.invoke("worker:open-artifact", relativePath),
     openOutput: (name) => electron_1.ipcRenderer.invoke("worker:open-output", name),

@@ -5,7 +5,7 @@ TITLE = "Extract university rules"
 
 def run(context: dict[str, Any], services: Any) -> None:
     order = context["order"]
-    rules = services.profile.resolve_rules(context["artifacts"].get("input_files", []), order.get("academic_style"))
+    rules = services.profile.resolve_rules(context["artifacts"].get("input_files", []))
     admin_notes = [
         {
             "id": note.get("id"),

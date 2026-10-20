@@ -4,6 +4,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot\user_fonts.ps1"
+$loadedFonts = @(Register-WorkerUserFonts)
 $word = $null
 $source = $null
 $sample = $null
@@ -43,5 +45,6 @@ finally {
   foreach ($object in @($sample, $source, $word)) {
     if ($object) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($object) }
   }
+  Unregister-WorkerUserFonts $loadedFonts
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 }

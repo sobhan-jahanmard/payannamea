@@ -75,6 +75,30 @@ function readUsage() {
         return {};
     }
 }
+function readResearch() {
+    const file = node_path_1.default.join(workspace(), "research", "evidence.json");
+    try {
+        if (!(0, node_fs_1.existsSync)(file))
+            return {};
+        const validation = node_path_1.default.join(workspace(), "reports", "stage_checks", "research_evidence.json");
+        if (!(0, node_fs_1.existsSync)(validation) || JSON.parse((0, node_fs_1.readFileSync)(validation, "utf8")).passed !== true)
+            return {};
+        const data = JSON.parse((0, node_fs_1.readFileSync)(file, "utf8"));
+        if (!Array.isArray(data.deliverables))
+            return {};
+        const items = data.deliverables;
+        return { research: {
+                total: items.length,
+                direct: items.filter((item) => item?.status === "direct").length,
+                proxy: items.filter((item) => item?.status === "proxy").length,
+                assumption: items.filter((item) => item?.status === "assumption").length,
+                sourceCount: new Set(items.flatMap((item) => Array.isArray(item?.sources) ? item.sources.map((source) => String(source?.url || "")).filter(Boolean) : [])).size,
+            } };
+    }
+    catch {
+        return {};
+    }
+}
 function state() {
     const catalog = node_path_1.default.join(workspace(), "reports", "workflow_artifacts.json");
     let workflow;
@@ -83,12 +107,12 @@ function state() {
             workflow = JSON.parse((0, node_fs_1.readFileSync)(catalog, "utf8"));
     }
     catch { /* Atomic writer may be replacing the projection. */ }
-    const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx"];
+    const outputNames = ["sample.pdf", "sample.docx", "final.pdf", "final.docx", "report_1.pdf", "report_1.docx", "report_2.pdf", "report_2.docx", "report_3.pdf", "report_3.docx"];
     const outputs = Object.fromEntries(outputNames.map(name => [name, (0, node_fs_1.existsSync)(node_path_1.default.join(workspace(), "final", name))]));
     if (!(0, node_fs_1.existsSync)(contextFile()))
         return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
     try {
-        return { running: Boolean(child), cleaning, context: { ...JSON.parse((0, node_fs_1.readFileSync)(contextFile(), "utf8")), ...readUsage() }, workflow, workspace: workspace(), outputs, logs: logBuffer };
+        return { running: Boolean(child), cleaning, context: { ...JSON.parse((0, node_fs_1.readFileSync)(contextFile(), "utf8")), ...readUsage(), ...readResearch() }, workflow, workspace: workspace(), outputs, logs: logBuffer };
     }
     catch {
         return { running: Boolean(child), cleaning, context: null, workspace: workspace(), outputs, logs: logBuffer };
@@ -245,6 +269,14 @@ electron_1.app.whenReady().then(() => {
         return true;
     });
     electron_1.ipcMain.handle("worker:open-workspace", async () => { await electron_1.shell.openPath(workspace()); });
+    electron_1.ipcMain.handle("worker:open-final-folder", async () => {
+        const target = node_path_1.default.join(workspace(), "final");
+        if (!(0, node_fs_1.existsSync)(target))
+            throw new Error("پوشهٔ فایل‌های نهایی هنوز ساخته نشده است.");
+        const result = await electron_1.shell.openPath(target);
+        if (result)
+            throw new Error(result);
+    });
     electron_1.ipcMain.handle("worker:open-report", async (_event, relativePath) => {
         const root = node_path_1.default.resolve(workspace());
         const target = node_path_1.default.resolve(root, relativePath);
@@ -266,9 +298,16 @@ electron_1.app.whenReady().then(() => {
             throw new Error(result);
     });
     electron_1.ipcMain.handle("worker:open-output", async (_event, name) => {
-        const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx"]);
+        const allowed = new Set(["sample.pdf", "sample.docx", "final.pdf", "final.docx", "report_1.pdf", "report_1.docx", "report_2.pdf", "report_2.docx", "report_3.pdf", "report_3.docx"]);
         if (!allowed.has(name))
             throw new Error("نام فایل خروجی معتبر نیست.");
+        const context = JSON.parse((0, node_fs_1.readFileSync)(contextFile(), "utf8"));
+        const completed = new Set(context.completed_steps || []);
+        if (name.startsWith("report_") && !completed.has("09c_package_interim_reports"))
+            throw new Error("گزارش میانی این اجرا هنوز تأیید نشده است.");
+        const finished = ["dry_run_complete", "worker_done_pending_approval", "sample_pending_customer_approval", "completed"].includes(context.status);
+        if (!name.startsWith("report_") && (!completed.has("10_validate_and_publish") || (context.finalization_state !== "FINALIZED" && !finished)))
+            throw new Error("بستهٔ نهایی این اجرا هنوز تأیید نشده است.");
         const target = node_path_1.default.join(workspace(), "final", name);
         if (!(0, node_fs_1.existsSync)(target))
             throw new Error(`فایل ${name} هنوز ساخته نشده است.`);

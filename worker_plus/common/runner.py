@@ -26,20 +26,34 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
-STEPS = [
-    "01_fetch_order", "02_prepare_workspace", "03_check_intake",
-    "04_extract_university_rules", "04a_build_order_contract", "05_collect_sources", "05a_analyze_customer_sources", "05b_resolve_source_rules", "06_build_thesis_plan", "06a_plan_visuals", "06b_generate_visual_assets",
-    "07_generate_content", "07a_validate_visual_placement", "08_review_content", "08b_audit_source_compliance", "09_package_docx", "09b_polish_cover", "10b_finalize_persian_pagination", "10c_verify_persian_pagination", "10_validate_and_publish",
-]
+STEPS = [item["id"] for item in json.loads((Path(__file__).with_name("stages.json")).read_text(encoding="utf-8"))]
 FAILURE_STEP = "11_handle_failure"
 TOTAL_STEPS = len(STEPS) + 1
 WORKER_LABEL = "Order workflow"
 MAX_RECOVERY_CYCLES = 12
 
+
+def selected_workspace(root: Path, continuing: bool) -> Path:
+    """Use the same active run that Electron displays when resuming work."""
+    if continuing:
+        pointer = root / "active.json"
+        if pointer.is_file():
+            try:
+                relative = json.loads(pointer.read_text(encoding="utf-8"))["path"]
+                selected = (root / relative).resolve()
+                if selected.is_relative_to(root.resolve()) and (selected / "order_context.json").is_file():
+                    return selected
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+    return root / "in_progress"
+
 # A failed quality gate usually means that an earlier artifact needs correction,
 # not that the order itself has failed.  Restart from the earliest owner of that
 # artifact and replay every dependent step.
 RECOVERY_RESTARTS = {
+    "06_build_thesis_plan": "05c_research_evidence",
+    "06a_plan_visuals": "06a_plan_visuals",
+    "06b_generate_visual_assets": "06b_generate_visual_assets",
     "07a_validate_visual_placement": "07_generate_content",
     "08_review_content": "07_generate_content",
     "08b_audit_source_compliance": "07_generate_content",
@@ -52,15 +66,25 @@ RECOVERY_RESTARTS = {
 
 
 def recovery_start(step_name: str, error: Exception | None = None) -> int:
-    if step_name == "10_validate_and_publish" and error and "Visual policy gate failed" in str(error):
+    if step_name == "08_review_content" and error and any(
+        marker in str(error) for marker in ("missing deliverable:", "direct/proxy result needs", "source lacks URL")
+    ):
+        return STEPS.index("05c_research_evidence")
+    if step_name == "10_validate_and_publish" and error and (
+        "Visual policy gate failed" in str(error) or "AI visual quality audit failed" in str(error)
+    ):
         return STEPS.index("06a_plan_visuals")
+    if step_name == "10_validate_and_publish" and error and any(
+        marker in str(error) for marker in ("page window", "page count outside order budget", "page count exceeds order budget", "Page-budget")
+    ):
+        return STEPS.index("07_generate_content")
     return STEPS.index(RECOVERY_RESTARTS.get(step_name, step_name))
 
 
 def error_fingerprint(step_name: str, error: Exception) -> str:
-    # Numbers and generated paths vary between attempts; the stable message is
-    # what tells us whether recovery is actually making progress.
-    message = re.sub(r"\d+", "#", str(error).lower())
+    # Normalize standalone counts, but keep identifiers such as V01 distinct.
+    # Otherwise defects in different visuals are mistaken for one repeated bug.
+    message = re.sub(r"(?<![a-z0-9])\d+(?![a-z0-9])", "#", str(error).lower())
     message = re.sub(r"\s+", " ", message).strip()
     return f"{step_name}:{message[:500]}"
 
@@ -70,6 +94,7 @@ def is_deferred_service_error(error: Exception) -> bool:
     message = str(error).lower()
     return any(marker in message for marker in (
         "usage limit", "purchase more credits", "try again at", "rate limit", "temporarily unavailable",
+        "out of credits", "refill", "token_revoked", "invalidated oauth token", "missing bearer", "unauthorized",
         "pdf font verification failed", "required font is not installed",
     ))
 
@@ -93,6 +118,7 @@ class Services:
     workspace: Path
     token_usage: dict[str, int] = None  # type: ignore[assignment]
     profile: Any = None
+    recovery_feedback: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.token_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
@@ -144,6 +170,15 @@ class Services:
         if self.args.dry_run:
             write_text(target, "# خروجی آزمایشی\n\nاین خروجی فقط برای dry-run ساخته شده است.\n")
             return
+        if self.recovery_feedback:
+            feedback = self.recovery_feedback
+            prompt += (
+                "\n\n## بازخورد اعتبارسنجی اجرای قبلی\n"
+                f"مرحلهٔ خطادار: {feedback.get('failed_step', '')}\n"
+                f"خطای دقیق: {str(feedback.get('error', ''))[:2000]}\n"
+                "قبل از تولید خروجی، artifactهای موجود و علت خطا را بررسی کن؛ "
+                "با کمترین تغییر لازم همان علت را رفع کن و داده یا منبع جعل نکن.\n"
+            )
         operator_note = str(getattr(self.args, "operator_note", "") or "").strip()
         if operator_note:
             failure_context = str(getattr(self.args, "failure_context", "") or "").strip()
@@ -160,6 +195,7 @@ class Services:
             "--json",
             "--output-last-message", str(target),
             "--skip-git-repo-check", "--ignore-user-config",
+            "--enable", "browser_use",
             "--dangerously-bypass-approvals-and-sandbox",
             "-C", str(self.workspace), "-",
         ]
@@ -169,7 +205,28 @@ class Services:
         if self.config.codex_home is not None:
             codex_env["CODEX_HOME"] = str(self.config.codex_home)
         result = subprocess.run(command, cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
-        print(result.stdout, end="", flush=True)
+        # CLI JSON events can contain the full contents of every file read by
+        # the agent. Keep the worker console useful without echoing megabytes
+        # of source material or private order data into the Electron log.
+        final_messages: list[str] = []
+        service_errors: list[str] = []
+        for line in result.stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            item = event.get("item") if isinstance(event.get("item"), dict) else {}
+            if event.get("type") == "item.completed" and item.get("type") == "agent_message":
+                final_messages.append(str(item.get("text") or ""))
+            if event.get("type") in {"error", "turn.failed"}:
+                detail = event.get("error") or event.get("message") or ""
+                if isinstance(detail, dict):
+                    detail = detail.get("message") or str(detail)
+                service_errors.append(str(detail))
+        if final_messages:
+            print("[Codex] " + final_messages[-1][:1500], flush=True)
+        if service_errors:
+            print("[Codex error] " + service_errors[-1][:1500], flush=True)
         # A single `codex exec` can emit several cumulative usage events. Keep
         # only the final/highest value for this invocation, then add it to the
         # order-wide usage below. Taking max directly on self.token_usage would
@@ -191,7 +248,7 @@ class Services:
         for usage_field, amount in invocation_usage.items():
             self.token_usage[usage_field] += amount
         if result.returncode:
-            raise RuntimeError(f"Codex exited with code {result.returncode}")
+            raise RuntimeError(f"Codex exited with code {result.returncode}: {(service_errors[-1] if service_errors else result.stdout[-500:]).strip()[:1000]}")
         deadline = time.monotonic() + 1800
         while time.monotonic() < deadline:
             if target.exists() and target.read_text(encoding="utf-8").strip():
@@ -441,44 +498,60 @@ class Services:
         # packaging-only quality gate three times.
         has_markdown_toc = any(normalize_persian(item.strip()) == "# فهرست مطالب" for item in lines)
         if not has_markdown_toc:
-            toc_entries: list[str] = []
-            for item in lines:
-                candidate = normalize_persian(item.strip())
-                prefix = next((value for value in ("## ", "# ") if candidate.startswith(value)), None)
-                if prefix is None:
-                    continue
-                heading = normalize_persian(candidate[len(prefix):])
-                if heading and heading not in {"فهرست مطالب", "منابع"}:
-                    toc_entries.append(f"- {heading}")
-            if toc_entries:
-                lines = ["# فهرست مطالب", *toc_entries, "", *lines]
+            lines = ["# فهرست مطالب", "", *lines]
         index = 0
         chapter_count = 0
         redundant_cover_headings = {"عنوان پژوهش", "عنوان پایان نامه", "عنوان پایان‌نامه", "عنوان پروژه"}
         heading_anchors: dict[int, str] = {}
-        anchor_for_heading: dict[str, str] = {}
+        heading_entries: list[tuple[int, str, str]] = []
+        figure_entries: list[tuple[str, str]] = []
+        table_entries: list[tuple[str, str]] = []
+        caption_anchors: dict[int, str] = {}
         anchor_number = 1
+
+        def index_label(value: str) -> str:
+            # Keep the full source and caveat on the body caption, but put only
+            # its short identifying title in the list of figures/tables.
+            title_only = re.split(r"\s*(?:[—–-]\s*منبع\s*:|؛|؛\s*منبع\s*:)", normalize_persian(value), maxsplit=1)[0]
+            if len(title_only) <= 105:
+                return title_only
+            return title_only[:105].rsplit(" ", 1)[0].rstrip(" ،؛:") + "…"
+
         for source_index, source_line in enumerate(lines):
             candidate = normalize_persian(source_line.strip())
             prefix = next((value for value in ("### ", "## ", "# ") if candidate.startswith(value)), None)
-            if prefix is None:
-                continue
-            heading_text = normalize_persian(candidate[len(prefix):])
-            if heading_text in redundant_cover_headings or heading_text == "فهرست مطالب":
-                continue
-            anchor = f"toc_{anchor_number}"
-            heading_anchors[source_index] = anchor
-            anchor_for_heading.setdefault(heading_text, anchor)
-            anchor_number += 1
+            if prefix is not None:
+                heading_text = normalize_persian(candidate[len(prefix):])
+                if heading_text not in redundant_cover_headings and heading_text != "فهرست مطالب":
+                    anchor = f"toc_{anchor_number}"
+                    heading_anchors[source_index] = anchor
+                    if prefix != "### ":
+                        heading_entries.append((1 if prefix == "# " else 2, heading_text, anchor))
+                    anchor_number += 1
+            image = re.fullmatch(r"!\[(.+?)\]\(([^)]+)\)", source_line.strip())
+            if image:
+                anchor = f"figure_{anchor_number}"
+                figure_entries.append((index_label(image.group(1)), anchor))
+                caption_anchors[source_index] = anchor
+                anchor_number += 1
+            elif re.match(r"^جدول\s+[0-9۰-۹]+", candidate):
+                anchor = f"table_{anchor_number}"
+                table_entries.append((index_label(candidate), anchor))
+                caption_anchors[source_index] = anchor
+                anchor_number += 1
+
+        bookmark_id = 1
 
         def add_bookmark(paragraph: Any, anchor: str) -> None:
+            nonlocal bookmark_id
             start = OxmlElement("w:bookmarkStart")
-            start.set(qn("w:id"), str(len(heading_anchors) + len(document.paragraphs)))
+            start.set(qn("w:id"), str(bookmark_id))
             start.set(qn("w:name"), anchor)
             end = OxmlElement("w:bookmarkEnd")
             end.set(qn("w:id"), start.get(qn("w:id")))
             paragraph._p.insert(0, start)
             paragraph._p.append(end)
+            bookmark_id += 1
 
         def add_toc_link(paragraph: Any, text: str, anchor: str) -> None:
             run = paragraph.add_run(text)
@@ -489,8 +562,7 @@ class Services:
             paragraph._p.remove(run._r)
             hyperlink.append(run._r)
             paragraph._p.append(hyperlink)
-            tab = paragraph.add_run("\t")
-            apply_persian_run(tab)
+        def add_page_reference(paragraph: Any, anchor: str) -> None:
             page_run = paragraph.add_run()
             begin = OxmlElement("w:fldChar"); begin.set(qn("w:fldCharType"), "begin")
             instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve"); instr.text = f" PAGEREF {anchor} \\h "
@@ -500,15 +572,36 @@ class Services:
             page_run._r.extend([begin, instr, separate, result, end])
             apply_persian_run(page_run)
 
-        def add_toc_field(paragraph: Any, instruction: str) -> None:
-            run = paragraph.add_run()
-            begin = OxmlElement("w:fldChar"); begin.set(qn("w:fldCharType"), "begin")
-            instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve"); instr.text = instruction
-            separate = OxmlElement("w:fldChar"); separate.set(qn("w:fldCharType"), "separate")
-            result = OxmlElement("w:t"); result.text = "برای به‌روزرسانی فهرست، فیلدها را به‌روزرسانی کنید."
-            end = OxmlElement("w:fldChar"); end.set(qn("w:fldCharType"), "end")
-            run._r.extend([begin, instr, separate, result, end])
-            apply_persian_run(run)
+        def add_index_table(entries: list[tuple[str, str]], levels: list[int] | None = None) -> None:
+            # A fixed right title column and left page-number column prevent
+            # Word's bidirectional tab stops from putting numbers mid-line.
+            table = document.add_table(rows=0, cols=2)
+            table.autofit = False
+            rtl_table(table)
+            table.columns[0].width = Cm(13.0)
+            table.columns[1].width = Cm(2.0)
+            for row_index, (label, anchor) in enumerate(entries):
+                title_cell, number_cell = table.add_row().cells
+                title_cell.width, number_cell.width = Cm(13.0), Cm(2.0)
+                title_paragraph = title_cell.paragraphs[0]
+                title_paragraph.style = document.styles["TOC Entry"]
+                # Word mirrors physical alignment in an RTL table: LEFT puts
+                # the title against the right edge of this wide cell.
+                title_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                title_paragraph.paragraph_format.first_line_indent = Cm(0)
+                title_paragraph.paragraph_format.right_indent = Cm(0.35 if levels and levels[row_index] == 2 else 0)
+                title_paragraph.paragraph_format.space_after = Pt(3)
+                title_paragraph.paragraph_format.line_spacing = 1.15
+                bidi(title_paragraph)
+                add_toc_link(title_paragraph, label, anchor)
+                page_paragraph = number_cell.paragraphs[0]
+                page_paragraph.style = document.styles["TOC Entry"]
+                page_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                page_paragraph.paragraph_format.first_line_indent = Cm(0)
+                page_paragraph.paragraph_format.space_after = Pt(3)
+                page_paragraph.paragraph_format.line_spacing = 1.15
+                bidi(page_paragraph)
+                add_page_reference(page_paragraph, anchor)
 
         while index < len(lines):
             raw_line = lines[index]
@@ -542,35 +635,21 @@ class Services:
                     toc_line = normalize_persian(lines[index].strip())
                     if toc_line.startswith("# "):
                         break
-                    item_match = re.match(r"^(?:-|\*)\s+(.+)$", toc_line)
-                    if item_match:
-                        item_text = normalize_persian(item_match.group(1))
-                        anchor = anchor_for_heading.get(item_text)
-                        if anchor:
-                            toc_item = document.add_paragraph(style="TOC Entry")
-                            toc_item.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                            toc_item.paragraph_format.first_line_indent = Cm(0)
-                            toc_item.paragraph_format.right_indent = Cm(0.6 if lines[index].startswith((" ", "\t")) else 0)
-                            bidi(toc_item)
-                            add_toc_link(toc_item, item_text, anchor)
                     index += 1
-                # Separate lists are dynamic Word fields and receive page
-                # numbers during the existing Word pagination/finalization step.
-                if any(re.fullmatch(r"!\[(.+?)\]\(([^)]+)\)", item.strip()) for item in lines):
+                add_index_table([(label, anchor) for level, label, anchor in heading_entries], [level for level, _, _ in heading_entries])
+                if figure_entries:
                     figures_heading = document.add_paragraph("فهرست شکل‌ها", style="Heading 1")
                     figures_heading.paragraph_format.page_break_before = True
                     figures_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(figures_heading)
                     for run in figures_heading.runs: apply_persian_run(run)
-                    field_paragraph = document.add_paragraph(style="TOC Entry"); bidi(field_paragraph)
-                    add_toc_field(field_paragraph, ' TOC \\h \\z \\t "Figure Caption,1" ')
+                    add_index_table(figure_entries)
                     chapter_count += 1
-                if any(re.match(r"^\s*جدول\s+[0-9۰-۹]+", normalize_persian(item.strip())) for item in lines):
+                if table_entries:
                     tables_heading = document.add_paragraph("فهرست جدول‌ها", style="Heading 1")
                     tables_heading.paragraph_format.page_break_before = True
                     tables_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(tables_heading)
                     for run in tables_heading.runs: apply_persian_run(run)
-                    field_paragraph = document.add_paragraph(style="TOC Entry"); bidi(field_paragraph)
-                    add_toc_field(field_paragraph, ' TOC \\h \\z \\t "Table Caption,1" ')
+                    add_index_table(table_entries)
                     chapter_count += 1
                 continue
             if line.startswith("|") and index + 1 < len(lines) and set(lines[index + 1].strip()) <= {"|", "-", ":", " "}:
@@ -615,6 +694,8 @@ class Services:
                 bidi(caption_paragraph)
                 for run in caption_paragraph.runs:
                     apply_persian_run(run, rules["captions"]["font_pt"])
+                if index in caption_anchors:
+                    add_bookmark(caption_paragraph, caption_anchors[index])
                 index += 1
                 continue
             if line.startswith("# "):
@@ -628,12 +709,12 @@ class Services:
                     add_bookmark(paragraph, heading_anchors[index])
             elif line.startswith("## "):
                 paragraph = document.add_paragraph(line[3:], style="Heading 2")
-                anchor = anchor_for_heading.get(normalize_persian(line[3:]))
+                anchor = heading_anchors.get(index)
                 if anchor:
                     add_bookmark(paragraph, anchor)
             elif line.startswith("### "):
                 paragraph = document.add_paragraph(line[4:], style="Heading 3")
-                anchor = anchor_for_heading.get(normalize_persian(line[4:]))
+                anchor = heading_anchors.get(index)
                 if anchor:
                     add_bookmark(paragraph, anchor)
             elif line.startswith(("- ", "* ")):
@@ -644,6 +725,8 @@ class Services:
                 paragraph = document.add_paragraph(line, style="Table Caption")
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 paragraph.paragraph_format.first_line_indent = Cm(0)
+                if index in caption_anchors:
+                    add_bookmark(paragraph, caption_anchors[index])
             else:
                 paragraph = document.add_paragraph(line, style="Normal")
             if paragraph.style.name == "Normal":
@@ -843,7 +926,9 @@ class Services:
         warnings: list[str] = []
         # `--sample` controls submission status only; every run generates the
         # same complete package and its first-half excerpt.
-        min_words = rules["quality"]["min_full_words"]
+        from common.page_budget import planned_page_budget
+        budget = planned_page_budget(order, self.workspace / "planning" / "visual_plan.json", rules)
+        min_words = min(rules["quality"]["min_full_words"], budget["minimum_content_words"]) if budget else rules["quality"]["min_full_words"]
         if len(re.findall(r"[آ-یA-Za-z]{2,}", text)) < min_words: errors.append(f"content below minimum word target ({min_words})")
         if not re.search(r"^# .*?(منابع|References)", text, re.M | re.I): errors.append("missing references section")
         citations = set(re.findall(r"\[([0-9۰-۹]+)\]", text))
@@ -880,6 +965,8 @@ class Services:
         actual_pages = self.count_docx_pages(docx)
         if required_pages and actual_pages < required_pages:
             errors.append(f"page count below order requirement ({actual_pages}/{required_pages})")
+        if budget and actual_pages > budget["word_maximum"]:
+            errors.append(f"page count exceeds order budget ({actual_pages}/{budget['word_maximum']} Word pages)")
         persian_runs = 0
         wrong_font_runs = 0
         missing_rtl_runs = 0
@@ -1009,8 +1096,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--offline", action="store_true", help="Run all steps with a local mock order; no backend changes")
     parser.add_argument("--repackage", action="store_true", help="Restart at Step 12 (Package DOCX) using the saved source, without invoking Codex")
     parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from a terminal step number; the final step validates, visually audits, and publishes the package")
-    parser.add_argument("--operator-note", default="", help="Operator guidance that every AI-assisted step must analyze and apply during this run")
+    note_source = parser.add_mutually_exclusive_group()
+    note_source.add_argument("--operator-note", default="", help="Operator guidance that every AI-assisted step must analyze and apply during this run")
+    note_source.add_argument("--operator-note-stdin", action="store_true", help="Read operator guidance from standard input, as sent by the desktop app")
     return parser
+
+
+def read_operator_note(args: argparse.Namespace, stream: Any) -> str:
+    if args.operator_note_stdin:
+        # Electron writes UTF-8 bytes. On Windows, a redirected Python stdin
+        # can use the local ANSI code page and decode continuation bytes as
+        # surrogate escapes, which cannot be saved to UTF-8 JSON later.
+        raw = stream.read(262_145)
+        if len(raw) > 262_144:
+            raise SystemExit("Operator note exceeds 262,144 bytes")
+        try:
+            note = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SystemExit("Operator note must be valid UTF-8") from exc
+        if len(note) > 65_536:
+            raise SystemExit("Operator note exceeds 65,536 characters")
+        return note.strip()
+    return str(args.operator_note or "").strip()
 
 
 def header(index: int, title: str, context: dict[str, Any]) -> None:
@@ -1024,9 +1131,14 @@ def header(index: int, title: str, context: dict[str, Any]) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
+    args.operator_note = read_operator_note(args, sys.stdin.buffer)
     config = load_config()
-    workspace = config.workspace_root / "in_progress"
+    workspace = selected_workspace(config.workspace_root, bool(args.resume or args.step or args.repackage))
     workspace.mkdir(parents=True, exist_ok=True)
+    if args.order_id or (args.step == 1):
+        # A fresh run uses the legacy preparation path, while the previously
+        # selected isolated run remains on disk and can be inspected later.
+        write_json(config.workspace_root / "active.json", {"path": str(workspace.relative_to(config.workspace_root)).replace("\\", "/")})
     if args.repackage and (args.resume or args.order_id or args.step):
         raise SystemExit("--repackage uses the saved workspace; do not combine it with --resume or --order-id.")
     if args.step and args.order_id:
@@ -1066,6 +1178,8 @@ def main() -> None:
                 heartbeat(config, context["order_id"], f"Worker Plus resumed from step {args.step}.")
             context["status"] = "in_progress"
             context["errors"] = []
+            context.pop("active_failure", None)
+            context.pop("pause_reason", None)
             context["completed_steps"] = STEPS[:args.step - 1]
 
             # A deliberate re-run from generation must not silently reuse a stale
@@ -1083,6 +1197,11 @@ def main() -> None:
                         stale.unlink()
     else:
         context = load(workspace) if args.resume else new_context(workspace, "sample" if args.sample else "full")
+    if args.resume:
+        context["status"] = "in_progress"
+        context["errors"] = []
+        context.pop("active_failure", None)
+        context.pop("pause_reason", None)
     args.operator_note = args.operator_note.strip()
     latest_recovery = (context.get("recovery_history") or [{}])[-1]
     args.failure_context = str(latest_recovery.get("error") or ((context.get("errors") or [""])[-1])).strip()
@@ -1096,28 +1215,20 @@ def main() -> None:
         })
     save(workspace, context)
     services = Services(config, args, workspace)
+    if args.resume or args.step:
+        next_step = STEPS[args.step - 1] if args.step else next(
+            (step for step in STEPS if step not in context["completed_steps"]), None
+        )
+        if latest_recovery.get("error") and latest_recovery.get("restart_step") == next_step:
+            services.recovery_feedback = latest_recovery
     if context.get("order"):
         services.profile = profile_for(context["order"])
 
-    # A retry note must be acted on even when the selected step is a purely
-    # deterministic validator/packager that would not normally invoke Codex.
-    # Let AI inspect and minimally repair the existing upstream artifacts first;
-    # the real step still runs afterwards and remains the final authority.
-    if args.operator_note and context.get("completed_steps"):
-        next_step_index = min(len(context["completed_steps"]), len(STEPS) - 1)
-        next_step = STEPS[next_step_index]
-        analysis_report = workspace / "reports" / "operator_note_analysis.md"
-        analysis_report.parent.mkdir(parents=True, exist_ok=True)
-        if analysis_report.exists():
-            analysis_report.unlink()
-        preflight_prompt = f"""پیش از اجرای مجدد مرحله `{next_step}`، نقش تحلیل‌گر بازیابی workflow را انجام بده.
-
-فایل `order_context.json`، گزارش‌های `reports/` و artifactهای مرتبط موجود در workspace را بخوان. علت خطای قبلی و یادداشت اپراتور که در انتهای این prompt آمده را تحلیل کن. اگر برای جلوگیری از تکرار خطا لازم است یکی از artifactهای موجود اصلاح شود، همان فایل را مستقیم و با کمترین تغییر لازم ویرایش کن. validatorها را حذف یا دور نزن، نتیجه جعلی PASS نساز، داده یا منبع جعل نکن و فایل‌های سالم نامرتبط را تغییر نده.
-
-در خروجی Markdown کوتاه بنویس: علت محتمل، فایل‌های بررسی‌شده، تغییرهای انجام‌شده و اینکه مرحله `{next_step}` اکنون چه چیزی را باید اعتبارسنجی کند."""
-        services.run_codex(preflight_prompt, analysis_report)
-        context["artifacts"]["operator_note_analysis"] = str(analysis_report.relative_to(workspace))
-        save(workspace, context)
+    # Keep the note preflight inside the step's normal progress/error handling.
+    # Previously it ran before current_step was set, making a live run look idle
+    # and allowing preflight exceptions to bypass recovery reporting entirely.
+    preflight_step = next((step for step in STEPS if step not in context["completed_steps"]), None)
+    pending_note_preflight = bool(args.operator_note and context.get("completed_steps") and preflight_step)
 
     terminal_error: Exception | None = None
     recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])
@@ -1135,6 +1246,21 @@ def main() -> None:
             context["current_step"] = name
             save(workspace, context)
             try:
+                if pending_note_preflight and name == preflight_step:
+                    analysis_report = workspace / "reports" / "operator_note_analysis.md"
+                    analysis_report.parent.mkdir(parents=True, exist_ok=True)
+                    if analysis_report.exists():
+                        analysis_report.unlink()
+                    preflight_prompt = f"""پیش از اجرای مجدد مرحله `{name}`، نقش تحلیل‌گر بازیابی workflow را انجام بده.
+
+فایل `order_context.json`، گزارش‌های `reports/` و artifactهای مرتبط موجود در workspace را بخوان. علت خطای قبلی و یادداشت اپراتور که در انتهای این prompt آمده را تحلیل کن. اگر برای جلوگیری از تکرار خطا لازم است یکی از artifactهای موجود اصلاح شود، همان فایل را مستقیم و با کمترین تغییر لازم ویرایش کن. validatorها را حذف یا دور نزن، نتیجه جعلی PASS نساز، داده یا منبع جعل نکن و فایل‌های سالم نامرتبط را تغییر نده.
+
+در خروجی Markdown کوتاه بنویس: علت محتمل، فایل‌های بررسی‌شده، تغییرهای انجام‌شده و اینکه مرحله `{name}` اکنون چه چیزی را باید اعتبارسنجی کند."""
+                    print(f"Preparing step {cursor + 1:02}: analyzing operator note and prior failure.", flush=True)
+                    services.run_codex(preflight_prompt, analysis_report)
+                    context["artifacts"]["operator_note_analysis"] = str(analysis_report.relative_to(workspace))
+                    save(workspace, context)
+                    pending_note_preflight = False
                 module.run(context, services)
             except Exception as exc:
                 recovery_cycles += 1
@@ -1149,6 +1275,7 @@ def main() -> None:
                     "error": str(exc),
                 }
                 recovery_history.append(event)
+                services.recovery_feedback = event
                 context.setdefault("errors", []).append(str(exc))
                 context["status"] = "in_progress"
                 context["current_step"] = None
@@ -1157,9 +1284,12 @@ def main() -> None:
                     # Keep the claimed order resumable and avoid an irreversible
                     # backend `failed` status or a wasteful rapid retry loop.
                     context["deferred_error"] = event
+                    context["active_failure"] = event
+                    context["status"] = "paused"
+                    context["pause_reason"] = str(exc)
                     context["errors"] = []
                     save(workspace, context)
-                    print("Result: PAUSED — model capacity is unavailable; order remains in_progress.", flush=True)
+                    print("Result: PAUSED — required service or runtime is unavailable; order remains in_progress.", flush=True)
                     return
                 # Invalidate the failed artifact and everything derived from it.
                 context["completed_steps"] = [step for step in context["completed_steps"] if STEPS.index(step) < restart]
@@ -1171,13 +1301,16 @@ def main() -> None:
                 )
                 # Three identical failures are useful evidence, but still leave
                 # room for broader replay cycles before declaring a terminal fault.
-                if recovery_cycles >= MAX_RECOVERY_CYCLES or repeated_errors[fingerprint] >= 6:
+                if "made no progress" in str(exc).lower() or recovery_cycles >= MAX_RECOVERY_CYCLES or repeated_errors[fingerprint] >= 6:
                     terminal_error = exc
                     break
                 cursor = restart
                 continue
             if name not in context["completed_steps"]:
                 context["completed_steps"].append(name)
+            context.pop("active_failure", None)
+            context.pop("pause_reason", None)
+            services.recovery_feedback = None
             context["current_step"] = None
             context["status"] = "in_progress" if cursor + 1 < len(STEPS) else context["status"]
             save(workspace, context)
@@ -1187,6 +1320,10 @@ def main() -> None:
             raise terminal_error
         # Recovered errors are diagnostic history, not a failed run.
         context["errors"] = []
+        if context.get("status") in {"dry_run_complete", "worker_done_pending_approval", "sample_pending_customer_approval", "completed"}:
+            context.pop("operator_note", None)
+            context.pop("active_failure", None)
+            context.pop("pause_reason", None)
         save(workspace, context)
     except Exception as exc:
         context.setdefault("errors", []).append(str(exc))

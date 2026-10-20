@@ -30,9 +30,6 @@ import { formatBytes } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
 import {
   academicDetailLabels,
-  citationStyleDescriptions,
-  citationStyleNotRequiredValue,
-  citationStyleOptions,
   degreeOptions,
   languageOptions,
   majorOptions,
@@ -63,7 +60,6 @@ const formSchema = z.object({
   order_type: z.enum(orderTypeOptions as [string, ...string[]], { message: "نوع سفارش معتبر نیست" }),
   methodology: z.string().min(1, "روش یا رویکرد انجام الزامی است"),
   language: z.string().min(1, "زبان الزامی است"),
-  academic_style: z.string().optional(),
   field_of_study: z.string().optional(),
   faculty: z.string().optional(),
   department: z.string().optional(),
@@ -99,14 +95,6 @@ const formSchema = z.object({
       code: "custom",
       path: ["quantity_type"],
       message: "واحد حجم با نوع سفارش هم‌خوان نیست"
-    });
-  }
-
-  if (fieldConfig.requiresCitationStyle && !compact(values.academic_style)) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["academic_style"],
-      message: "شیوه ارجاع برای این نوع سفارش الزامی است"
     });
   }
 });
@@ -284,7 +272,6 @@ function OrderForm() {
       order_type: orderTypeOptions[0],
       methodology: methodologyOptions[0],
       language: languageOptions[0],
-      academic_style: citationStyleOptions[0],
       field_of_study: "",
       faculty: "",
       department: "",
@@ -308,7 +295,6 @@ function OrderForm() {
   const requiredMark = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.required.includes(field) ? " *" : "";
   const quantityTypes = selectedFieldConfig.quantityTypes;
   const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length;
-  const showCitationStyle = selectedFieldConfig.requiresCitationStyle;
 
   useEffect(() => {
     if (!quantityTypes.includes(watched.quantity_type as QuantityType)) {
@@ -319,16 +305,6 @@ function OrderForm() {
   useEffect(() => {
     setValue("degree", selectedFieldConfig.defaultDegree, { shouldDirty: true });
   }, [selectedFieldConfig.defaultDegree, setValue]);
-
-  useEffect(() => {
-    if (selectedFieldConfig.requiresCitationStyle) {
-      if (!compact(watched.academic_style) || watched.academic_style === citationStyleNotRequiredValue) {
-        setValue("academic_style", citationStyleOptions[0]);
-      }
-    } else {
-      setValue("academic_style", citationStyleNotRequiredValue);
-    }
-  }, [selectedFieldConfig.requiresCitationStyle, setValue, watched.academic_style]);
 
   const stepFields = useMemo<Record<number, (keyof FormValues)[]>>(
     () => ({
@@ -342,7 +318,6 @@ function OrderForm() {
         "correspondence_email",
         "methodology",
         "language",
-        "academic_style",
         "faculty",
         "department",
         "advisor_name",
@@ -426,7 +401,6 @@ function OrderForm() {
       order_type: values.order_type,
       methodology: values.methodology,
       language: values.language,
-      academic_style: selectedFieldConfig.requiresCitationStyle ? compact(values.academic_style) || citationStyleOptions[0] : citationStyleNotRequiredValue,
       field_of_study: compact(values.field_of_study),
       faculty: compact(values.faculty),
       department: compact(values.department),
@@ -674,13 +648,6 @@ function OrderForm() {
                 <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
                   <Select {...register("methodology")}>{methodologyOptions.map((option) => <option key={option}>{option}</option>)}</Select>
                 </Field>
-                {showCitationStyle ? (
-                  <Field label="شیوه ارجاع‌دهی" error={errors.academic_style?.message}>
-                    <Select {...register("academic_style")}>
-                      {citationStyleOptions.map((option) => <option key={option} value={option}>{option} — {citationStyleDescriptions[option]}</option>)}
-                    </Select>
-                  </Field>
-                ) : null}
                 <Field label="زبان" error={errors.language?.message}>
                   <Select {...register("language")}>
                     {languageOptions.map((option) => <option key={option}>{option}</option>)}
@@ -799,12 +766,6 @@ function OrderForm() {
                     <dt className="text-muted-foreground">روش یا رویکرد انجام</dt>
                     <dd className="font-medium">{watched.methodology}</dd>
                   </div>
-                  {showCitationStyle ? (
-                    <div>
-                      <dt className="text-muted-foreground">شیوه ارجاع‌دهی</dt>
-                      <dd className="font-medium">{watched.academic_style || "-"}</dd>
-                    </div>
-                  ) : null}
                   <div>
                     <dt className="text-muted-foreground">حجم موردنیاز</dt>
                     <dd className="font-medium">

@@ -15,7 +15,7 @@ const Module = require('node:module');
   fs.mkdirSync(compiledRoot, { recursive: true });
   fs.mkdirSync(commonRoot, { recursive: true });
   for (const file of ['main.js', 'cleanup.js']) fs.copyFileSync(path.join(__dirname, '../dist-electron', file), path.join(compiledRoot, file));
-  for (const file of ['workspace_cleanup.py', 'workflow_state.py', 'helpers.py']) fs.copyFileSync(path.join(__dirname, '../../common', file), path.join(commonRoot, file));
+  for (const file of ['workspace_cleanup.py', 'execution_lock.py']) fs.copyFileSync(path.join(__dirname, '../../common', file), path.join(commonRoot, file));
   fs.writeFileSync(path.join(workerRoot, '.env'), 'BACKEND_URL=http://127.0.0.1:1\n');
   // A local waiting process exercises the real stop/start guards without an order claim.
   fs.writeFileSync(path.join(workerRoot, 'run.py'), 'import sys, time\nfrom pathlib import Path\nsys.stdin.reconfigure(encoding="utf-8")\nnote = sys.stdin.read()\nPath("received-note.txt").write_text(note, encoding="utf-8")\nprint("isolated-worker-ready", flush=True)\ntime.sleep(45)\n');
@@ -34,11 +34,12 @@ const Module = require('node:module');
   write(archive, 'archive'); write(otherRun, 'other'); write(legacy, JSON.stringify({ order_id: 'legacy-order' }));
   const handlers = new Map();
   const events = [];
+  const openedPaths = [];
   const fakeElectron = {
     app: { isPackaged: false, whenReady: async () => {}, on() {}, quit() {} },
     BrowserWindow: class { constructor() { this.webContents = { send: (_channel, event) => events.push(event) }; } loadFile() {} static getAllWindows() { return []; } },
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
-    shell: { openPath: async () => '' }
+    shell: { openPath: async target => { openedPaths.push(target); return ''; } }
   };
   const originalLoader = Module._load;
   const originalFetch = global.fetch;
@@ -61,6 +62,13 @@ const Module = require('node:module');
     assert(fs.existsSync(context));
     assert.equal(fs.readFileSync(archive, 'utf8'), 'archive');
     fs.unlinkSync(linkedArchive);
+    await assert.rejects(async () => invoke('worker:open-output', 'final.pdf'), /تأیید/);
+    write(context, JSON.stringify({ order_id: 'test-order', status: 'dry_run_complete', completed_steps: ['10_validate_and_publish'] }));
+    await invoke('worker:open-output', 'final.pdf');
+    await invoke('worker:open-final-folder');
+    assert(openedPaths.includes(path.join(run, 'final', 'final.pdf')));
+    assert(openedPaths.includes(path.join(run, 'final')));
+    write(context, JSON.stringify({ order_id: 'test-order', status: 'paused' }));
     const largeNote = 'راهنمای اصلاح '.repeat(10000) + 'END_OF_NOTE';
     invoke('worker:start', { orderId: 'test-order', offline: true, sample: false, step: 5, note: largeNote });
     stopped = false;

@@ -18,7 +18,7 @@ def run(context: dict[str, Any], services: Any) -> None:
                 "id": "offline-test-order", "title": "نمونهٔ آزمایشی پایان‌نامه کارشناسی",
                 "faculty": "دانشکده آزمایشی", "advisor_name": "استاد راهنما",
                 "university": "دانشگاه آزمایشی", "language": "فارسی",
-                "academic_style": "APA 7", "order_type": "پایان‌نامه کارشناسی", "files": [], "references": [],
+                "order_type": "پایان‌نامه کارشناسی", "files": [], "references": [],
             },
             "status": "in_progress",
         })
