@@ -47,6 +47,14 @@ atomically to `reports/execution_graph.json`. Resume preserves it, fresh runs
 start a new trace, and completed archives include the final graph. This applies
 to every order profile. Older contexts can reconstruct paths from recovery
 records, explicitly labelled as inferred and without invented timestamps.
+Each Codex turn is attached to its stage attempt. The worker saves its prompt,
+JSONL events, final response or error, and thread ID under
+`reports/codex_calls/`. A later turn for the same stage resumes that thread;
+different stages keep separate threads while the order graph links their
+attempts. Select a graph node to inspect these records and any tested code
+repair triggered by **اصلاح و ادامه از مرحلهٔ پیشنهادی**. If the local Codex
+session has disappeared, the worker records that break and starts a new turn
+with the saved stage history and workspace artifacts.
 `node scripts/test-execution-graph.cjs` checks directed retry paths, scrolling,
 diagnostics and order isolation with a safe browser fixture.
 
@@ -102,8 +110,8 @@ button to start again. Reset does not restore an older legacy workspace.
 
 Browser verification uses an isolated preload fixture and performs no backend
 or worker mutations. Run `tests/manual_refactor_smoke.py analysis` from the worker
-first, start Vite on port 5174, then run `scripts/test-artifact-ui.cjs` with
-Playwright available on `NODE_PATH`. `WORKER_UI_TEST_BROWSER` defaults to an
+first, start Vite on port 5174, then run `scripts/test-artifact-ui.cjs`.
+Playwright is a dev dependency. `WORKER_UI_TEST_BROWSER` defaults to an
 installed Chrome channel and can be set to `msedge`; `WORKER_UI_TEST_URL` overrides
 the URL. This tests filters, stale evidence, output gating, order isolation,
 cleanup guards, automatic note generation, Python/UI plan parity, suggested-run

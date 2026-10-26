@@ -42,11 +42,15 @@ class ExecutionTraceTests(unittest.TestCase):
         context = {"order_id": "trace-order"}
         session = begin_session(context, STEPS, "run")
         first = begin_attempt(context, STEPS, STEPS[6], session)
+        context["execution_trace"]["nodes"][-1]["codex_calls"] = [{"status": "running"}]
+        context["execution_trace"]["repair_events"] = [{"status": "running"}]
         session = begin_session(context, STEPS, "resume")
         second = begin_attempt(context, STEPS, STEPS[6], session)
         finish_attempt(context, second, "paused", "file locked")
         self.assertNotEqual(first, second)
         self.assertEqual(["interrupted", "paused"], [node["status"] for node in context["execution_trace"]["nodes"]])
+        self.assertEqual("interrupted", context["execution_trace"]["nodes"][0]["codex_calls"][0]["status"])
+        self.assertEqual("interrupted", context["execution_trace"]["repair_events"][0]["status"])
         self.assertEqual("resume", context["execution_trace"]["edges"][-1]["kind"])
 
     def test_legacy_recovery_is_marked_inferred_and_not_duplicated(self):

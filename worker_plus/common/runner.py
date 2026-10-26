@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from common.order_context import load, new_context, save
 from common.config import Config, load_config
@@ -20,6 +21,7 @@ from common.helpers import write_text, write_json
 from common.api import claim_oldest, heartbeat, record_run
 from common.profiles import profile_for
 from common.execution_trace import begin_attempt, begin_session, finish_attempt
+from common.codex_history import begin_call, finish_call, remember_thread
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -133,6 +135,8 @@ class Services:
     token_usage: dict[str, int] = None  # type: ignore[assignment]
     profile: Any = None
     recovery_feedback: dict[str, Any] | None = None
+    context: dict[str, Any] | None = None
+    active_attempt_id: str | None = None
 
     def __post_init__(self) -> None:
         self.token_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
@@ -204,21 +208,49 @@ class Services:
             )
             if failure_context:
                 prompt += f"\nخطای ثبت‌شده در اجرای قبلی:\n{failure_context}\n"
-        command = [
-            self.config.codex_bin, "exec", "--model", self.config.codex_model,
-            "--json",
-            "--output-last-message", str(target),
-            "--skip-git-repo-check", "--ignore-user-config",
-            *([] if getattr(self.profile, "ORDER_TYPE", None) == "ارائه و پاورپوینت" else ["--enable", "browser_use"]),
-            "--dangerously-bypass-approvals-and-sandbox",
-            "-C", str(self.workspace), "-",
-        ]
-        if os.name == "nt":
-            command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
+        step = str(self.context.get("current_step") or "") if self.context else ""
+        call = begin_call(self.context, self.workspace, self.active_attempt_id, step, target, prompt) if self.context and self.active_attempt_id and step else None
+        resumed_thread = str(call.get("thread_id") or "") if call else ""
+        def command_for(thread_id: str) -> list[str]:
+            command = [
+                self.config.codex_bin, "exec", *(["resume"] if thread_id else []), "--model", self.config.codex_model,
+                "--json", "--output-last-message", str(target),
+                "--skip-git-repo-check", "--ignore-user-config",
+                *([] if getattr(self.profile, "ORDER_TYPE", None) == "ارائه و پاورپوینت" else ["--enable", "browser_use"]),
+                "--dangerously-bypass-approvals-and-sandbox",
+                *([] if thread_id else ["-C", str(self.workspace)]),
+                *([thread_id] if thread_id else []), "-",
+            ]
+            return ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)] if os.name == "nt" else command
         codex_env = os.environ.copy()
         if self.config.codex_home is not None:
             codex_env["CODEX_HOME"] = str(self.config.codex_home)
-        result = subprocess.run(command, cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+        try:
+            result = subprocess.run(command_for(resumed_thread), cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+            missing_session = bool(resumed_thread and result.returncode and re.search(
+                r"(?:thread|session|rollout).{0,90}(?:not found|does not exist|missing|could not be found|failed to load)",
+                result.stdout, re.I))
+            if missing_session and call and self.context:
+                history = [item for node in self.context["execution_trace"]["nodes"]
+                           for item in node.get("codex_calls", []) if item.get("scope") == step and item["id"] != call["id"]]
+                digest = "\n".join(f"- {item.get('target')}: {str(item.get('error') or item.get('response') or '')[:600]}"
+                                   for item in history[-6:])
+                prompt += ("\n\n## سابقهٔ بازیابی‌شدهٔ این مرحله\n"
+                           "فایل جلسهٔ قبلی Codex در این دستگاه موجود نیست. خروجی‌ها و گزارش‌های workspace را بررسی کن.\n"
+                           + digest)
+                write_text(self.workspace / call["prompt_path"], prompt)
+                call.update(continued=False, resumed_from=resumed_thread, thread_id=None)
+                self.context["codex_threads"].pop(step, None)
+                save(self.workspace, self.context)
+                first_output = result.stdout
+                result = subprocess.run(command_for(""), cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
+                write_text(self.workspace / call["events_path"], first_output + "\n" + result.stdout)
+        except Exception as exc:
+            if call and self.context:
+                finish_call(self.context, self.workspace, call, status="failed", error=str(exc))
+            raise
+        if call and self.context and not missing_session:
+            write_text(self.workspace / call["events_path"], result.stdout)
         # CLI JSON events can contain the full contents of every file read by
         # the agent. Keep the worker console useful without echoing megabytes
         # of source material or private order data into the Electron log.
@@ -229,6 +261,10 @@ class Services:
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if call and self.context and event.get("type") == "thread.started":
+                thread_id = event.get("thread_id")
+                if isinstance(thread_id, str) and thread_id:
+                    remember_thread(self.context, self.workspace, call, thread_id)
             item = event.get("item") if isinstance(event.get("item"), dict) else {}
             if event.get("type") == "item.completed" and item.get("type") == "agent_message":
                 final_messages.append(str(item.get("text") or ""))
@@ -262,13 +298,21 @@ class Services:
         for usage_field, amount in invocation_usage.items():
             self.token_usage[usage_field] += amount
         if result.returncode:
-            raise RuntimeError(f"Codex exited with code {result.returncode}: {(service_errors[-1] if service_errors else result.stdout[-500:]).strip()[:1000]}")
+            message = f"Codex exited with code {result.returncode}: {(service_errors[-1] if service_errors else result.stdout[-500:]).strip()[:1000]}"
+            if call and self.context:
+                finish_call(self.context, self.workspace, call, status="failed", response=final_messages[-1] if final_messages else "", error=message)
+            raise RuntimeError(message)
         deadline = time.monotonic() + 1800
         while time.monotonic() < deadline:
             if target.exists() and target.read_text(encoding="utf-8").strip():
+                if call and self.context:
+                    finish_call(self.context, self.workspace, call, status="succeeded", response=final_messages[-1] if final_messages else "")
                 return
             time.sleep(5)
-        raise RuntimeError(f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes")
+        message = f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes"
+        if call and self.context:
+            finish_call(self.context, self.workspace, call, status="failed", error=message)
+        raise RuntimeError(message)
 
     def render_pdf_pages(self, pdf: Path, output_dir: Path) -> list[Path]:
         """Render final pages without relying on a machine-specific Poppler PATH."""
@@ -1241,22 +1285,55 @@ def main() -> None:
         })
     save(workspace, context)
     services = Services(config, args, workspace)
+    services.context = context
     if args.resume or args.step:
         next_step = STEPS[args.step - 1] if args.step else next(
             (step for step in STEPS if step not in context["completed_steps"]), None
         )
         if latest_recovery.get("error") and latest_recovery.get("restart_step") == next_step:
             services.recovery_feedback = latest_recovery
+    trace_session = begin_session(context, STEPS, "manual" if args.step else "repackage" if args.repackage else "resume" if args.resume else "run")
+    save(workspace, context)
     if args.auto_repair and services.recovery_feedback:
         from common.auto_repair import repair_worker_code
+        trace = context["execution_trace"]
+        failed_attempt = next((node for node in reversed(trace["nodes"]) if node["status"] in {"failed", "paused"} and node["step"] == latest_recovery.get("failed_step")), None)
+        repair_event = {"id": str(uuid4()), "step": next_step, "after_attempt_id": failed_attempt["id"] if failed_attempt else None,
+                        "status": "running", "thread_id": None, "note": args.operator_note,
+                        "started_at": datetime.now(timezone.utc).isoformat(), "finished_at": None, "files": [], "reason": "", "turns": []}
+        trace.setdefault("repair_events", []).append(repair_event)
+        save(workspace, context)
+
+        def remember_repair_thread(thread_id: str) -> None:
+            threads = context.setdefault("code_repair_threads", {})
+            if thread_id:
+                threads[next_step] = thread_id
+            else:
+                threads.pop(next_step, None)
+            repair_event["thread_id"] = thread_id or None
+            save(workspace, context)
+        def record_repair_turn(number: int, prompt: str, output: str, exit_code: int) -> None:
+            prefix = f"reports/codex_calls/repair-{repair_event['id']}-{number}"
+            write_text(workspace / f"{prefix}.prompt.md", prompt)
+            write_text(workspace / f"{prefix}.events.jsonl", output or "")
+            repair_event["turns"].append({"prompt_path": f"{prefix}.prompt.md", "events_path": f"{prefix}.events.jsonl",
+                                          "exit_code": exit_code})
+            save(workspace, context)
         try:
             decision = repair_worker_code(Path(__file__).resolve().parents[1], workspace,
                                           str(context.get("order", {}).get("order_type") or ""),
-                                          next_step, latest_recovery, config.codex_bin,
-                                          config.codex_model, config.codex_home)
+                                          next_step, {**latest_recovery, "operator_note": args.operator_note}, config.codex_bin,
+                                          config.codex_model, config.codex_home,
+                                          thread_id=context.get("code_repair_threads", {}).get(next_step),
+                                          on_thread=remember_repair_thread, on_turn=record_repair_turn)
         except Exception as error:
             decision = {"status": "skipped", "reason": str(error)[:1000]}
+        repair_event.update(status=decision["status"], thread_id=context.get("code_repair_threads", {}).get(next_step),
+                            files=decision.get("files", []), reason=decision.get("reason", ""),
+                            finished_at=datetime.now(timezone.utc).isoformat())
+        save(workspace, context)
         decision.update({"order_id": context.get("order_id"), "stage": next_step,
+                         "thread_id": repair_event["thread_id"],
                          "checked_at": datetime.now(timezone.utc).isoformat()})
         write_json(workspace / "reports" / "stage_checks" / "auto_code_repair.json", decision)
         print(f"Auto code repair: {decision['status']} — {decision.get('reason', ', '.join(decision.get('files', [])))[:500]}", flush=True)
@@ -1275,7 +1352,6 @@ def main() -> None:
     terminal_error: Exception | None = None
     recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])
     repeated_errors: dict[str, int] = {}
-    trace_session = begin_session(context, STEPS, "manual" if args.step else "repackage" if args.repackage else "resume" if args.resume else "run")
     try:
         cursor = 0
         recovery_cycles = 0
@@ -1291,6 +1367,7 @@ def main() -> None:
             header(cursor + 1, presentation_labels.get(name, module.TITLE) if presentation_order else module.TITLE, context)
             context["current_step"] = name
             trace_attempt = begin_attempt(context, STEPS, name, trace_session)
+            services.active_attempt_id = trace_attempt
             save(workspace, context)
             try:
                 if pending_note_preflight and name == preflight_step:

@@ -18,13 +18,14 @@ const { chromium } = require('playwright');
         window.workerPlus = {
           readState: async () => structuredClone(state),
           startRun: async options => { window.__suggestedFixture.calls.push(options); },
-          lookupOrder: harmless, resumeRun: harmless, stopRun: harmless, openWorkspace: harmless,
+          lookupOrder: async () => ({ id: 'test-order', order: state.context.order }), listAiReviews: async () => [],
+          resumeRun: harmless, stopRun: harmless, openWorkspace: harmless,
           openReport: harmless, openArtifact: harmless, openOutput: harmless,
           onEvent: () => () => {}
         };
       }, orderType);
       await page.goto(process.env.WORKER_UI_TEST_URL || 'http://127.0.0.1:5175/');
-      const suggested = page.getByRole('button', { name: 'اجرا از مرحلهٔ پیشنهادی' });
+      const suggested = page.getByRole('button', { name: 'اصلاح و ادامه از مرحلهٔ پیشنهادی' });
       await suggested.waitFor();
       assert.equal(await page.getByText('آخرین بررسی خودکار کد: اصلاح آزموده اعمال شد').count(), 1, orderType);
       await page.waitForFunction(() => document.querySelector('#operator-note')?.value.includes('C3: evidence does not address topic product'));

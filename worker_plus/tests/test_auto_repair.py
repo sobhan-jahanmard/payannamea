@@ -79,6 +79,25 @@ class AutoRepairTests(unittest.TestCase):
         self.assertIn("failed verification", calls[1])
         self.assertIn("return 2", self.module.read_text(encoding="utf-8"))
 
+    def test_verification_retry_keeps_the_same_codex_thread(self):
+        commands = []
+        remembered = []
+        thread = "22222222-2222-4222-8222-222222222222"
+
+        def agent(command, sandbox, _prompt, _env):
+            commands.append(command)
+            value = 3 if len(commands) == 1 else 2
+            self._write(sandbox / "presentation" / "assurance.py", f"def value():\n    return {value}\n")
+            return subprocess.CompletedProcess(command, 0, json.dumps({"type": "thread.started", "thread_id": thread}))
+
+        result = repair_worker_code(self.source, self.workspace, "ارائه و پاورپوینت",
+                                    "05c_research_evidence", {"error": "fixture validation failed"},
+                                    "codex", "test-model", invoke=agent, on_thread=remembered.append)
+        self.assertEqual("applied", result["status"])
+        self.assertEqual([thread, thread], remembered)
+        self.assertNotIn("resume", commands[0])
+        self.assertIn("resume", commands[1])
+
     def test_review_repair_uses_inline_code_and_exact_tested_edits(self):
         prompts = []
         def agent(command, _sandbox, prompt, _env):

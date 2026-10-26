@@ -73,6 +73,12 @@ def begin_session(context: dict[str, Any], stages: list[str], mode: str) -> str:
     for node in trace["nodes"]:
         if node["status"] == "running":
             node.update(status="interrupted", finished_at=now())
+        for call in node.get("codex_calls", []):
+            if call.get("status") == "running":
+                call.update(status="interrupted", finished_at=now(), error="Worker stopped before this Codex turn finished")
+    for repair in trace.get("repair_events", []):
+        if repair.get("status") == "running":
+            repair.update(status="interrupted", finished_at=now(), reason="Worker stopped before code repair finished")
     session = {"id": str(uuid4()), "started_at": now(), "mode": mode}
     trace["sessions"].append(session)
     return session["id"]
