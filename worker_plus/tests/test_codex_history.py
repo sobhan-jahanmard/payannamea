@@ -9,11 +9,67 @@ import unittest
 from unittest.mock import patch
 
 from common.execution_trace import begin_attempt, begin_session, finish_attempt
-from common.order_context import load, new_context
+from common.order_context import load, new_context, save
 from common.runner import STEPS, Services
 
 
 class CodexHistoryTests(unittest.TestCase):
+    def test_protected_input_guard_accepts_host_history_but_rejects_model_edits(self):
+        from presentation.recovery import guard_inputs, PresentationIntegrityError
+
+        for tamper, failed in ((False, False), (True, False), (False, True)):
+            with self.subTest(tamper=tamper, failed=failed), TemporaryDirectory() as directory:
+                workspace = Path(directory)
+                context = new_context(workspace, "full")
+                context.update(order_id="guarded-order", order={"title": "original"})
+                session = begin_session(context, STEPS, "run")
+                context["current_step"] = STEPS[8]
+                attempt = begin_attempt(context, STEPS, STEPS[8], session)
+                save(workspace, context)
+                with patch.object(Services, "automation_word_pids", return_value=set()):
+                    services = Services(SimpleNamespace(codex_bin="codex", codex_model="test", codex_home=None),
+                                        SimpleNamespace(dry_run=False, operator_note=""), workspace)
+                services.context = context
+                services.active_attempt_id = attempt
+                services.profile = SimpleNamespace(ORDER_TYPE="ارائه و پاورپوینت")
+                target = workspace / "reports" / "response.md"
+                source = workspace / "customer_input.json"
+                source.write_text('{"title":"original"}', encoding="utf-8")
+
+                def invoke(command, **kwargs):
+                    self.assertEqual([], load(workspace)["execution_trace"]["nodes"][-1].get("codex_calls", []))
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text("response", encoding="utf-8")
+                    if tamper:
+                        disk = load(workspace)
+                        disk["order"]["title"] = "tampered"
+                        save(workspace, disk)
+                        source.write_text("tampered", encoding="utf-8")
+                    events = json.dumps({"type": "thread.started", "thread_id": "guarded-thread"})
+                    if failed:
+                        events += '\n' + json.dumps({"type": "error", "message": "service unavailable"})
+                    return subprocess.CompletedProcess(command, int(failed), events)
+
+                def guarded_turn():
+                    with guard_inputs(services):
+                        with guard_inputs(services):
+                            services.run_codex("check protected source", target)
+
+                with patch("common.runner.subprocess.run", side_effect=invoke):
+                    if tamper or failed:
+                        with self.assertRaises(PresentationIntegrityError if tamper else RuntimeError) as raised:
+                            guarded_turn()
+                        if failed:
+                            self.assertNotIn("protected inputs", str(raised.exception))
+                    else:
+                        guarded_turn()
+                saved = load(workspace)
+                self.assertEqual("original", saved["order"]["title"])
+                self.assertEqual('{"title":"original"}', source.read_text(encoding="utf-8"))
+                self.assertEqual("guarded-thread", saved["codex_threads"][STEPS[8]])
+                self.assertEqual("failed" if failed else "succeeded", saved["execution_trace"]["nodes"][-1]["codex_calls"][0]["status"])
+                self.assertEqual(0, services.context_write_depth)
+
     def test_related_attempt_resumes_saved_thread_and_keeps_audit_files(self):
         with TemporaryDirectory() as directory:
             workspace = Path(directory)

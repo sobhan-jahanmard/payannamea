@@ -160,6 +160,7 @@ class Services:
     recovery_feedback: dict[str, Any] | None = None
     context: dict[str, Any] | None = None
     active_attempt_id: str | None = None
+    context_write_depth: int = 0
 
     def __post_init__(self) -> None:
         self.token_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0, "reasoningTokens": 0, "totalTokens": 0}
@@ -232,7 +233,8 @@ class Services:
             if failure_context:
                 prompt += f"\nخطای ثبت‌شده در اجرای قبلی:\n{failure_context}\n"
         step = str(self.context.get("current_step") or "") if self.context else ""
-        call = begin_call(self.context, self.workspace, self.active_attempt_id, step, target, prompt) if self.context and self.active_attempt_id and step else None
+        persist_context = self.context_write_depth == 0
+        call = begin_call(self.context, self.workspace, self.active_attempt_id, step, target, prompt, persist=persist_context) if self.context and self.active_attempt_id and step else None
         resumed_thread = str(call.get("thread_id") or "") if call else ""
         def command_for(thread_id: str) -> list[str]:
             command = [
@@ -264,13 +266,14 @@ class Services:
                 write_text(self.workspace / call["prompt_path"], prompt)
                 call.update(continued=False, resumed_from=resumed_thread, thread_id=None)
                 self.context["codex_threads"].pop(step, None)
-                save(self.workspace, self.context)
+                if persist_context:
+                    save(self.workspace, self.context)
                 first_output = result.stdout
                 result = subprocess.run(command_for(""), cwd=str(self.workspace), env=codex_env, input=prompt, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False)
                 write_text(self.workspace / call["events_path"], first_output + "\n" + result.stdout)
         except Exception as exc:
             if call and self.context:
-                finish_call(self.context, self.workspace, call, status="failed", error=str(exc))
+                finish_call(self.context, self.workspace, call, status="failed", error=str(exc), persist=persist_context)
             raise
         if call and self.context and not missing_session:
             write_text(self.workspace / call["events_path"], result.stdout)
@@ -287,7 +290,7 @@ class Services:
             if call and self.context and event.get("type") == "thread.started":
                 thread_id = event.get("thread_id")
                 if isinstance(thread_id, str) and thread_id:
-                    remember_thread(self.context, self.workspace, call, thread_id)
+                    remember_thread(self.context, self.workspace, call, thread_id, persist=persist_context)
             item = event.get("item") if isinstance(event.get("item"), dict) else {}
             if event.get("type") == "item.completed" and item.get("type") == "agent_message":
                 final_messages.append(str(item.get("text") or ""))
@@ -323,18 +326,18 @@ class Services:
         if result.returncode:
             message = f"Codex exited with code {result.returncode}: {(service_errors[-1] if service_errors else result.stdout[-500:]).strip()[:1000]}"
             if call and self.context:
-                finish_call(self.context, self.workspace, call, status="failed", response=final_messages[-1] if final_messages else "", error=message)
+                finish_call(self.context, self.workspace, call, status="failed", response=final_messages[-1] if final_messages else "", error=message, persist=persist_context)
             raise RuntimeError(message)
         deadline = time.monotonic() + 1800
         while time.monotonic() < deadline:
             if target.exists() and target.read_text(encoding="utf-8").strip():
                 if call and self.context:
-                    finish_call(self.context, self.workspace, call, status="succeeded", response=final_messages[-1] if final_messages else "")
+                    finish_call(self.context, self.workspace, call, status="succeeded", response=final_messages[-1] if final_messages else "", persist=persist_context)
                 return
             time.sleep(5)
         message = f"Codex did not create {target.relative_to(self.workspace)} within 30 minutes"
         if call and self.context:
-            finish_call(self.context, self.workspace, call, status="failed", error=message)
+            finish_call(self.context, self.workspace, call, status="failed", error=message, persist=persist_context)
         raise RuntimeError(message)
 
     def render_pdf_pages(self, pdf: Path, output_dir: Path) -> list[Path]:
@@ -1363,6 +1366,12 @@ def main() -> None:
                          "checked_at": datetime.now(timezone.utc).isoformat()})
         write_json(workspace / "reports" / "stage_checks" / "auto_code_repair.json", decision)
         print(f"Auto code repair: {decision['status']} — {decision.get('reason', ', '.join(decision.get('files', [])))[:500]}", flush=True)
+        if decision["status"] not in {"applied", "no_code_change"}:
+            context.update(status="paused", current_step=None, errors=[], active_failure=latest_recovery,
+                           pause_reason="بررسی و اصلاح کامل نشد؛ جزئیات مانع را در گزارش اصلاح کد ببینید.")
+            save(workspace, context)
+            print("Result: PAUSED — code repair was blocked or unverified; the failed stage was not replayed.", flush=True)
+            return
     if context.get("order"):
         services.profile = profile_for(context["order"])
 
@@ -1378,6 +1387,18 @@ def main() -> None:
     terminal_error: Exception | None = None
     recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])
     repeated_errors: dict[str, int] = {}
+    # Keep the active failure streak across manual retries from the desktop UI.
+    previous_fingerprint = None
+    for failure in reversed(recovery_history):
+        latest_attempt = next((node for node in reversed(context["execution_trace"]["nodes"])
+                               if node["step"] == failure.get("failed_step")), None)
+        if latest_attempt and latest_attempt["status"] == "succeeded":
+            break
+        fingerprint = error_fingerprint(str(failure.get("failed_step") or ""), RuntimeError(str(failure.get("error") or "")))
+        if previous_fingerprint and fingerprint != previous_fingerprint:
+            break
+        repeated_errors[fingerprint] = repeated_errors.get(fingerprint, 0) + 1
+        previous_fingerprint = fingerprint
     try:
         cursor = 0
         recovery_cycles = 0
@@ -1502,6 +1523,7 @@ def main() -> None:
             if name not in context["completed_steps"]:
                 context["completed_steps"].append(name)
             finish_attempt(context, trace_attempt, "succeeded")
+            repeated_errors = {key: count for key, count in repeated_errors.items() if not key.startswith(name + ":")}
             context.pop("active_failure", None)
             context.pop("deferred_error", None)
             context.pop("pause_reason", None)

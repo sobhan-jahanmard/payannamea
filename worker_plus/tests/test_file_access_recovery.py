@@ -13,6 +13,51 @@ from common.order_context import load, new_context, save
 
 
 class FileAccessRecoveryTests(unittest.TestCase):
+    def test_manual_retry_keeps_the_consecutive_error_count(self) -> None:
+        class StopError(RuntimeError):
+            retryable = False
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "in_progress"
+            workspace.mkdir()
+            failure = {"failed_step": runner.STEPS[8], "restart_step": runner.STEPS[8], "error": "Protected input changed"}
+            context = new_context(workspace, "full")
+            context.update(order_id="repeat-fixture", status="failed", completed_steps=runner.STEPS[:8],
+                           errors=[failure["error"]], recovery_history=[dict(failure), dict(failure)])
+            save(workspace, context)
+            services = Mock()
+            services.cleanup_run.return_value = {"released_docx_targets": [], "terminated_automation_word_pids": []}
+            stage = Mock(TITLE="Evidence")
+            stage.run.side_effect = StopError(failure["error"])
+            handler = SimpleNamespace(TITLE="Handle failure", run=lambda context, _services: context.update(status="failed"))
+            def module(name):
+                return handler if name.endswith(runner.FAILURE_STEP) else stage
+            with patch.object(runner, "load_config", return_value=SimpleNamespace(workspace_root=root)), patch.object(runner, "Services", return_value=services), patch.object(runner.sys, "argv", ["run.py", "--step", "9", "--offline"]), patch.object(runner.importlib, "import_module", side_effect=module):
+                with self.assertRaises(SystemExit):
+                    runner.main()
+            self.assertEqual(3, load(workspace)["recovery_history"][-1]["same_error_count"])
+
+    def test_blocked_code_repair_does_not_replay_the_failed_stage(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "in_progress"
+            workspace.mkdir()
+            failure = {"failed_step": runner.STEPS[8], "restart_step": runner.STEPS[8], "error": "Protected input changed"}
+            context = new_context(workspace, "full")
+            context.update(order_id="blocked-repair", status="failed", completed_steps=runner.STEPS[:8],
+                           errors=[failure["error"]], active_failure=failure, recovery_history=[failure])
+            save(workspace, context)
+            config = SimpleNamespace(workspace_root=root, codex_bin="codex", codex_model="test", codex_home=None)
+            with patch.object(runner, "load_config", return_value=config), patch.object(runner, "Services"), patch.object(runner.sys, "argv", ["run.py", "--step", "9", "--offline", "--auto-repair"]), patch("common.auto_repair.repair_worker_code", return_value={"status": "blocked", "reason": "Required evidence is unavailable"}), patch.object(runner.importlib, "import_module") as execute:
+                runner.main()
+            saved = load(workspace)
+            self.assertEqual("paused", saved["status"])
+            self.assertEqual(failure, saved["active_failure"])
+            self.assertEqual("blocked", saved["execution_trace"]["repair_events"][-1]["status"])
+            self.assertEqual([], saved["errors"])
+            execute.assert_not_called()
+
     def test_locked_file_does_not_rewind_any_stage(self) -> None:
         for step in ("09_package_docx", "10_validate_and_publish"):
             with self.subTest(step=step):

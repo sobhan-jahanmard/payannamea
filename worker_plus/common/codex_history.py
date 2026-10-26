@@ -14,7 +14,7 @@ def _now() -> str:
 
 
 def begin_call(context: dict[str, Any], workspace: Path, attempt_id: str, step: str,
-               target: Path, prompt: str) -> dict[str, Any]:
+               target: Path, prompt: str, *, persist: bool = True) -> dict[str, Any]:
     trace = context["execution_trace"]
     attempt = next(node for node in trace["nodes"] if node["id"] == attempt_id)
     call_id = str(uuid4())
@@ -35,21 +35,24 @@ def begin_call(context: dict[str, Any], workspace: Path, attempt_id: str, step: 
     }
     attempt.setdefault("codex_calls", []).append(call)
     trace["updated_at"] = _now()
-    save(workspace, context)
+    if persist:
+        save(workspace, context)
     return call
 
 
-def remember_thread(context: dict[str, Any], workspace: Path, call: dict[str, Any], thread_id: str) -> None:
+def remember_thread(context: dict[str, Any], workspace: Path, call: dict[str, Any], thread_id: str, *, persist: bool = True) -> None:
     if call.get("thread_id") == thread_id:
         return
     call["thread_id"] = thread_id
     context.setdefault("codex_threads", {})[call["scope"]] = thread_id
     context["execution_trace"]["updated_at"] = _now()
-    save(workspace, context)
+    if persist:
+        save(workspace, context)
 
 
 def finish_call(context: dict[str, Any], workspace: Path, call: dict[str, Any], *,
-                status: str, response: str = "", error: str = "") -> None:
+                status: str, response: str = "", error: str = "", persist: bool = True) -> None:
     call.update(status=status, response=response[:3000], error=error[:3000], finished_at=_now())
     context["execution_trace"]["updated_at"] = _now()
-    save(workspace, context)
+    if persist:
+        save(workspace, context)

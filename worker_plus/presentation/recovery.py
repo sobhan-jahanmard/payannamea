@@ -105,9 +105,16 @@ def guard_inputs(services, extra=()):
     for directory in ("input", "extracted/source_media", "extracted/paginated_sources"):
         paths.update(path for path in (root / directory).rglob("*") if path.is_file())
     before = {path: path.read_bytes() if path.is_file() else None for path in paths}
+    # The orchestrator records Codex turns in memory while the model runs.
+    # Flush that trusted state only after checking the protected disk snapshot.
+    previous_depth = getattr(services, "context_write_depth", 0)
+    if not isinstance(previous_depth, int):
+        previous_depth = 0
+    services.context_write_depth = previous_depth + 1
     try:
         yield
     finally:
+        services.context_write_depth = previous_depth
         changed = []
         for path, original in before.items():
             current = path.read_bytes() if path.is_file() else None
@@ -118,6 +125,10 @@ def guard_inputs(services, extra=()):
                 else:
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(original)
+        context = getattr(services, "context", None)
+        if previous_depth == 0 and isinstance(context, dict):
+            from common.order_context import save
+            save(root, context)
         if changed:
             raise PresentationIntegrityError("Presentation model changed protected inputs; originals restored: " + ", ".join(sorted(changed)))
 

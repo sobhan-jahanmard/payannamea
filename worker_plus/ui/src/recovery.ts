@@ -3,6 +3,10 @@ import presentationHints from "../../presentation/recovery_hints.json";
 import stages from "../../common/stages.json";
 import type { FailureRecord, WorkerState } from "./global";
 
+export function repairWasBlocked(status: string, reason = ""): boolean {
+  return status === "blocked" || (status === "no_code_change" && /rejected by policy|blocked by[\s\S]{0,100}(?:policy|permission)|could not (?:inspect|read|access)|unable to (?:inspect|read|access)|permission[\s\S]{0,50}denied|restricted\/read-only/i.test(reason));
+}
+
 export function failureForContext(context?: WorkerState["context"]): FailureRecord | undefined {
   if (!context) return undefined;
   if (context.active_failure?.error) return context.active_failure;

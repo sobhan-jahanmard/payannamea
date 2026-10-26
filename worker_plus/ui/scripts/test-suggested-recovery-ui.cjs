@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
           ? { failed_step: '03_check_intake', restart_step: '03_check_intake', error: '[WinError 5] Access is denied: order_context.json.tmp -> order_context.json' }
           : { failed_step: '05c_research_evidence', restart_step: '05c_research_evidence', error: 'C3: evidence does not address topic product' };
         const state = { running: false, workspace: 'C:\\fixture\\workspace\\in_progress', outputs: {}, logs: '',
-          autoRepair: { status: 'applied', order_id: 'test-order', stage: '05c_research_evidence', files: ['presentation/workflow.py'] },
+          autoRepair: { status: raw ? 'no_code_change' : 'applied', order_id: 'test-order', stage: '05c_research_evidence', files: raw ? [] : ['presentation/workflow.py'], reason: raw ? 'Repair remains blocked by the managed workspace policy. I could not inspect the source.' : 'Verified fix' },
           context: { order_id: 'test-order', order: { id: 'test-order', title: 'سفارش آزمایشی', order_type: type },
             status: 'failed', completed_steps: ['01_fetch_order', '02_prepare_workspace'],
             ...(raw ? { current_step: '03_check_intake', errors: [failure.error] } : { active_failure: failure, recovery_history: [failure] }) } };
@@ -31,7 +31,8 @@ const { chromium } = require('playwright');
       await page.goto(process.env.WORKER_UI_TEST_URL || 'http://127.0.0.1:5175/');
       const suggested = page.getByRole('button', { name: 'اصلاح و ادامه از مرحلهٔ پیشنهادی' });
       await suggested.waitFor();
-      assert.equal(await page.getByText('آخرین بررسی خودکار کد: اصلاح آزموده اعمال شد').count(), 1, orderType);
+      assert.equal(await page.getByText(raw ? 'آخرین بررسی خودکار کد: بررسی اصلاح مسدود شد' : 'آخرین بررسی خودکار کد: اصلاح آزموده اعمال شد').count(), 1, orderType);
+      if (raw) assert.equal(await page.getByText('آخرین بررسی خودکار کد: تغییر کد لازم نبود').count(), 0);
       const expectedError = raw ? '[WinError 5] Access is denied' : 'C3: evidence does not address topic product';
       await page.waitForFunction(error => document.querySelector('#operator-note')?.value.includes(error), expectedError);
       assert.equal(await page.evaluate(() => window.__suggestedFixture.calls.length), 0);

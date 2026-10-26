@@ -55,6 +55,11 @@ attempts. Select a graph node to inspect these records and any tested code
 repair triggered by **اصلاح و ادامه از مرحلهٔ پیشنهادی**. If the local Codex
 session has disappeared, the worker records that break and starts a new turn
 with the saved stage history and workspace artifacts.
+Protected presentation calls buffer orchestrator context writes until the
+input guard has checked and restored any actual model edits. Code repair falls
+back to a supplied source packet when file tools are blocked; the host applies
+exact edits and runs tests. Blocked or unverified repair pauses the workflow
+instead of replaying the failed stage. Packaged builds include verification tests.
 `node scripts/test-execution-graph.cjs` checks directed retry paths, scrolling,
 diagnostics and order isolation with a safe browser fixture.
 

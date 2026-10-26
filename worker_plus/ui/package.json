@@ -41,6 +41,7 @@
       { "from": "../run.py", "to": "worker_plus/run.py" },
       { "from": "../ai_review.py", "to": "worker_plus/ai_review.py" },
       { "from": "../requirements.txt", "to": "worker_plus/requirements.txt" },
+      { "from": "../tests", "to": "worker_plus/tests", "filter": ["test*.py", "__init__.py"] },
       { "from": "../common", "to": "worker_plus/common", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../.agents/skills", "to": "worker_plus/.agents/skills", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../bachelor_thesis", "to": "worker_plus/bachelor_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },

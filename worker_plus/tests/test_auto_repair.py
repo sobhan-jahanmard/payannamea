@@ -59,10 +59,46 @@ class AutoRepairTests(unittest.TestCase):
         self.assertFalse((self.source / "common" / "runner.py").exists())
 
     def test_artifact_only_diagnosis_keeps_code_untouched(self):
-        def agent(_command, _sandbox, _prompt, _env):
+        def agent(command, _sandbox, _prompt, _env):
+            report = Path(command[command.index("--output-last-message") + 1])
+            report.write_text("Inspected the stage code; only the order artifact requires correction.", encoding="utf-8")
             return subprocess.CompletedProcess([], 0, "")
 
         self.assertEqual("no_code_change", self._repair(agent)["status"])
+        self.assertIn("return 1", self.module.read_text(encoding="utf-8"))
+
+    def test_blocked_file_tools_fall_back_to_supplied_code_and_host_verification(self):
+        prompts = []
+
+        def agent(command, _sandbox, prompt, _env):
+            prompts.append(prompt)
+            report = Path(command[command.index("--output-last-message") + 1])
+            if len(prompts) == 1:
+                reply = "Diagnosis is blocked by the managed workspace policy. I could not inspect the source."
+            else:
+                self.assertIn("Do not call tools", prompt)
+                self.assertIn("def value():", prompt)
+                reply = json.dumps({"status": "ready", "edits": [{"file": "presentation/assurance.py", "old": "    return 1", "new": "    return 2"}], "explanation": "Fix the supplied reusable function."})
+            report.write_text(reply, encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "")
+
+        self.assertEqual("applied", self._repair(agent)["status"])
+        self.assertEqual(2, len(prompts))
+        self.assertIn("return 2", self.module.read_text(encoding="utf-8"))
+
+    def test_unavailable_diagnosis_is_blocked_not_no_code_change(self):
+        calls = []
+
+        def agent(command, _sandbox, _prompt, _env):
+            calls.append(command)
+            report = Path(command[command.index("--output-last-message") + 1])
+            report.write_text("I could not inspect the source because of policy." if len(calls) == 1 else
+                              json.dumps({"status": "blocked", "edits": [], "explanation": "The necessary module is absent from the packet."}), encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "")
+
+        result = self._repair(agent)
+        self.assertEqual("blocked", result["status"])
+        self.assertEqual(2, len(calls))
         self.assertIn("return 1", self.module.read_text(encoding="utf-8"))
 
     def test_failed_verification_is_fed_back_and_retried(self):
