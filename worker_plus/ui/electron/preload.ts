@@ -2,8 +2,17 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("workerPlus", {
   lookupOrder: (value: string) => ipcRenderer.invoke("order:lookup", value),
+  downloadOrderFile: (orderId: string, collection: "files" | "final_outputs" | "payment_notes", fileId: string) => ipcRenderer.invoke("order:download-file", orderId, collection, fileId),
+  listAiReviews: (orderId: string) => ipcRenderer.invoke("ai-review:list", orderId),
+  requestAiReview: (orderId: string) => ipcRenderer.invoke("ai-review:start", orderId),
+  requestAiFix: (orderId: string, reviewId: string, prompt: string) => ipcRenderer.invoke("ai-review:fix", orderId, reviewId, prompt),
   readState: () => ipcRenderer.invoke("worker:state"),
-  startRun: (options: { orderId: string; offline: boolean; sample: boolean; step?: number; note?: string }) => ipcRenderer.invoke("worker:start", options),
+  presentationPreview: (orderId: string, number?: number) => ipcRenderer.invoke("presentation:preview", orderId, number),
+  resizeDesktopWidget: (size: { width: number; height: number }) => ipcRenderer.invoke("widget:resize", size),
+  toggleDesktopWidget: () => ipcRenderer.invoke("widget:toggle"),
+  showMainWindow: () => ipcRenderer.invoke("widget:show-main"),
+  startRun: (options: { orderId: string; offline: boolean; sample: boolean; step?: number; note?: string; autoRepair?: boolean }) => ipcRenderer.invoke("worker:start", options),
+  publishLocal: (orderId: string) => ipcRenderer.invoke("worker:publish-local", orderId),
   resumeRun: (note?: string) => ipcRenderer.invoke("worker:resume", note),
   stopRun: () => ipcRenderer.invoke("worker:stop"),
   resetRun: (options: { orderId: string; workspace: string }) => ipcRenderer.invoke("worker:reset", options),

@@ -175,10 +175,15 @@ export async function resetPassword(token: string, newPassword: string): Promise
   });
 }
 
-export async function createOrder(payload: OrderCreatePayload): Promise<Order> {
+export async function createOrder(payload: OrderCreatePayload, informationSource?: File): Promise<Order> {
+  const form = informationSource ? new FormData() : null;
+  if (form && informationSource) {
+    form.append("payload", JSON.stringify(payload));
+    form.append("information_source", informationSource);
+  }
   return request<Order>("/api/orders", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: form || JSON.stringify(payload)
   });
 }
 

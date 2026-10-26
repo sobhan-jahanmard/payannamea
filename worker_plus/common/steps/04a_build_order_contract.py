@@ -43,6 +43,7 @@ def run(context: dict[str, Any], services: Any) -> None:
     active = {key: order.get(key) for key in CONTENT_FIELDS if order.get(key) not in (None, "", False, 0)}
     visual_policy = visual_requirements(order)
     deliverables = deliverable_contract(order)
+    course_research = deliverables["project_type"] == "course_research"
     rules_path = services.workspace / context["artifacts"].get("university_rules", "extracted/university_rules.json")
     rules = json.loads(rules_path.read_text(encoding="utf-8")) if rules_path.exists() else None
     budget = page_budget(order, rules=rules)
@@ -63,9 +64,9 @@ def run(context: dict[str, Any], services: Any) -> None:
         "page_budget": budget,
         "research_policy": {
             "web_research_required": True,
-            "search_order": ["exact Iranian data", "relevant foreign or adjacent-context data", "explicit design assumption"],
+            "search_order": (["direct sources matching the question and specified geography", "adjacent-context proxy with transfer limit", "explicit labelled assumption"] if course_research else ["exact Iranian data", "relevant foreign or adjacent-context data", "explicit design assumption"]),
             "source_record": ["URL", "publisher", "geography", "year", "retrieved date", "extracted fact and unit"],
-            "proxy_disclosure": "If Iranian data is unavailable, state that explicitly and name the proxy country and transfer limit.",
+            "proxy_disclosure": ("Disclose when evidence comes from a different context and state the transfer limit." if course_research else "If Iranian data is unavailable, state that explicitly and name the proxy country and transfer limit."),
             "completion": "Execute the calculations and decisions; a method description alone is insufficient.",
         },
     }
@@ -76,7 +77,8 @@ def run(context: dict[str, Any], services: Any) -> None:
     if budget:
         lines.extend(["", "## بودجهٔ صفحات تحویلی", f"- حداقل: {budget['minimum']} صفحهٔ PDF واقعی", f"- سقف مجاز: {budget['maximum']} صفحهٔ PDF واقعی، با احتساب جلد، فهرست‌ها، شکل‌ها، جدول‌ها و منابع", f"- برآورد صفحات: {budget['reserved_nonbody_pages']} صفحه برای جلد، چکیده، فهرست‌ها و منابع؛ {budget['reserved_visual_pages']} صفحه برای شکل‌ها؛ {budget['reserved_table_pages']} صفحه برای جدول‌ها؛ {budget['estimated_text_pages']} صفحه برای متن اصلی", f"- برآورد متن: حدود {budget['suggested_content_words']} واژه برای کل Markdown و سقف اولیهٔ {budget['maximum_content_words']} واژه", "- پس از نهایی‌شدن نقشهٔ بصری، سهم متن با تعداد واقعی شکل‌ها دوباره محاسبه می‌شود. شمارش صفحات Word و PDF پس از صفحه‌آرایی معیار نهایی است.", "- حجم مازاد با ادغام و تلخیص تکرارها اصلاح می‌شود؛ شاهد، محاسبه و نتیجهٔ خروجی‌های اجباری نباید حذف شوند."])
     lines.extend(["", "## قرارداد خروجی تصمیم‌محور", f"- نوع پروژه: `{deliverables['project_type']}`", f"- سطح علمی: `{deliverables['academic_level']}`", f"- قاعده تکمیل: {deliverables['completion_rule']}", f"- کمبود داده: {deliverables['missing_data_rule']}"])
-    lines.extend(["", "## الزام پژوهش وب", "- دادهٔ هر خروجی ابتدا از صفحهٔ واقعی وب استخراج و با URL، ناشر، سال، جغرافیا و واحد ثبت شود.", "- نبود دادهٔ ایران باید با جست‌وجوی ثبت‌شده اثبات و در متن اعلام شود؛ دادهٔ کشور دیگر با نام کشور و محدودیت تعمیم به‌کار رود.", "- پس از استخراج، محاسبه/مقایسه و نتیجهٔ مشخص اجرا شود؛ شرح روش به‌تنهایی خروجی نیست."])
+    geography_rule = ("- منبع مستقیم باید با پرسش و جغرافیای تعیین‌شده در سفارش هم‌خوان باشد؛ دادهٔ جانشین با تفاوت زمینه و محدودیت تعمیم به‌کار رود." if course_research else "- نبود دادهٔ ایران باید با جست‌وجوی ثبت‌شده اثبات و در متن اعلام شود؛ دادهٔ کشور دیگر با نام کشور و محدودیت تعمیم به‌کار رود.")
+    lines.extend(["", "## الزام پژوهش وب", "- دادهٔ هر خروجی ابتدا از صفحهٔ واقعی وب استخراج و با URL، ناشر، سال، جغرافیا و واحد ثبت شود.", geography_rule, "- پس از استخراج، محاسبه/مقایسه و نتیجهٔ مشخص اجرا شود؛ شرح روش به‌تنهایی خروجی نیست."])
     for item in deliverables["deliverables"]:
         lines.append(f"- **{item['id']}** — پرسش: {item['question']} | شاهد: {item['evidence']} | روش: {item['method']} | خروجی: {item['output']}")
     write_text(services.workspace / "planning" / "order_execution_contract.md", "\n".join(lines) + "\n")

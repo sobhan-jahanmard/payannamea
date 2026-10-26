@@ -185,6 +185,8 @@ export interface Order {
   quantity_type?: string | null;
   quantity_value?: number | null;
   requires_charts: boolean;
+  presentation_style?: string | null;
+  presentation_font?: string | null;
   deadline?: string | null;
   notes?: string | null;
   moarref_code?: string | null;
@@ -235,6 +237,8 @@ export interface OrderCreatePayload {
   quantity_type?: string;
   quantity_value?: number;
   requires_charts: boolean;
+  presentation_style?: string;
+  presentation_font?: string;
   deadline?: string;
   notes?: string;
   moarref_code?: string;

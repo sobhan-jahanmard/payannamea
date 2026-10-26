@@ -19,6 +19,7 @@ from common.config import Config, load_config
 from common.helpers import write_text, write_json
 from common.api import claim_oldest, heartbeat, record_run
 from common.profiles import profile_for
+from common.execution_trace import begin_attempt, begin_session, finish_attempt
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -66,6 +67,9 @@ RECOVERY_RESTARTS = {
 
 
 def recovery_start(step_name: str, error: Exception | None = None) -> int:
+    if error and is_file_access_error(error):
+        # A locked output does not make any upstream artifact invalid.
+        return STEPS.index(step_name)
     if step_name == "08_review_content" and error and any(
         marker in str(error) for marker in ("missing deliverable:", "direct/proxy result needs", "source lacks URL")
     ):
@@ -96,6 +100,16 @@ def is_deferred_service_error(error: Exception) -> bool:
         "usage limit", "purchase more credits", "try again at", "rate limit", "temporarily unavailable",
         "out of credits", "refill", "token_revoked", "invalidated oauth token", "missing bearer", "unauthorized",
         "pdf font verification failed", "required font is not installed",
+    ))
+
+
+def is_file_access_error(error: Exception) -> bool:
+    """Wait for a file/permission problem instead of regenerating valid work."""
+    if isinstance(error, PermissionError) or (isinstance(error, OSError) and getattr(error, "winerror", None) in {32, 33}):
+        return True
+    message = str(error).lower()
+    return any(marker in message for marker in (
+        "permission denied", "sharing violation", "being used by another process", "file is locked for editing",
     ))
 
 
@@ -195,7 +209,7 @@ class Services:
             "--json",
             "--output-last-message", str(target),
             "--skip-git-repo-check", "--ignore-user-config",
-            "--enable", "browser_use",
+            *([] if getattr(self.profile, "ORDER_TYPE", None) == "ارائه و پاورپوینت" else ["--enable", "browser_use"]),
             "--dangerously-bypass-approvals-and-sandbox",
             "-C", str(self.workspace), "-",
         ]
@@ -448,8 +462,10 @@ class Services:
         faculty = order.get("faculty") or ""
         department = order.get("department") or ""
         faculty_line = " — ".join(part for part in (f"دانشکده {faculty}" if faculty else "", f"گروه {department}" if department else "") if part)
-        degree_line = f"پروژه طراحی برای دریافت درجه {order.get('degree') or 'کارشناسی'}"
-        if order.get("field_of_study"):
+        research_report = order.get("order_type") == "تحقیق دانشگاهی"
+        degree_line = (f"گزارش تحقیق درس {order.get('course_name') or ''}" if research_report
+                       else f"پروژه طراحی برای دریافت درجه {order.get('degree') or 'کارشناسی'}")
+        if order.get("field_of_study") and not research_report:
             degree_line += f" در رشته {order['field_of_study']}"
         cover_lines = [
             (order.get("university") or "", cover.get("institution_pt", 21), True, cover.get("institution_after_pt", 32)),
@@ -457,8 +473,8 @@ class Services:
             (degree_line, cover.get("degree_pt", 15), True, cover.get("degree_after_pt", 48)),
             (title, cover.get("title_pt", 28), True, cover.get("title_after_pt", 54)),
             (order.get("student_name") or "", cover.get("student_pt", 19), True, cover.get("student_after_pt", 48)),
-            (f"استاد راهنما: {order['advisor_name']}" if order.get("advisor_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
-            (f"استاد مشاور: {order['consultant_name']}" if order.get("consultant_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
+            (f"استاد درس: {order['instructor_name']}" if research_report and order.get("instructor_name") else f"استاد راهنما: {order['advisor_name']}" if not research_report and order.get("advisor_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
+            (f"استاد مشاور: {order['consultant_name']}" if not research_report and order.get("consultant_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
         ]
         for cover_index, (text, size, bold, space_after) in enumerate(cover_lines):
             if text:
@@ -627,7 +643,7 @@ class Services:
                 # audit: the heading's own Persian run must carry w:rtl too.
                 for toc_run in toc_heading.runs:
                     apply_persian_run(toc_run)
-                if chapter_count:
+                if chapter_count and not research_report:
                     toc_heading.paragraph_format.page_break_before = True
                 chapter_count += 1
                 index += 1
@@ -639,14 +655,14 @@ class Services:
                 add_index_table([(label, anchor) for level, label, anchor in heading_entries], [level for level, _, _ in heading_entries])
                 if figure_entries:
                     figures_heading = document.add_paragraph("فهرست شکل‌ها", style="Heading 1")
-                    figures_heading.paragraph_format.page_break_before = True
+                    figures_heading.paragraph_format.page_break_before = not research_report
                     figures_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(figures_heading)
                     for run in figures_heading.runs: apply_persian_run(run)
                     add_index_table(figure_entries)
                     chapter_count += 1
                 if table_entries:
                     tables_heading = document.add_paragraph("فهرست جدول‌ها", style="Heading 1")
-                    tables_heading.paragraph_format.page_break_before = True
+                    tables_heading.paragraph_format.page_break_before = not research_report
                     tables_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(tables_heading)
                     for run in tables_heading.runs: apply_persian_run(run)
                     add_index_table(table_entries)
@@ -702,7 +718,7 @@ class Services:
                 paragraph = document.add_paragraph(line[2:], style="Heading 1")
                 # Every top-level section starts on a fresh page.  The first one
                 # already follows the cover's explicit page break.
-                if chapter_count:
+                if chapter_count and not research_report:
                     paragraph.paragraph_format.page_break_before = True
                 chapter_count += 1
                 if index in heading_anchors:
@@ -799,7 +815,7 @@ class Services:
                 role = "student"
             elif text.startswith("دانشکده "):
                 role = "faculty"
-            elif text.startswith("پروژه طراحی برای دریافت درجه"):
+            elif text.startswith("پروژه طراحی برای دریافت درجه") or text.startswith("گزارش تحقیق درس "):
                 role = "degree"
             size, bold, gap = values[role]
             paragraph.paragraph_format.line_spacing = cover.get("line_spacing", 1.5)
@@ -1067,7 +1083,7 @@ class Services:
         missing_section_breaks = sum(
             1 for paragraph in section_headings[1:]
             if not paragraph.paragraph_format.page_break_before
-        )
+        ) if order.get("order_type") != "تحقیق دانشگاهی" else 0
         if cover_spacing_issues:
             errors.append(f"cover page spacing audit failed ({cover_spacing_issues} issue(s))")
         cover_sizes = [run.font.size.pt for paragraph in cover_paragraphs for run in paragraph.runs if run.font.size is not None]
@@ -1094,8 +1110,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", action="store_true", help="Resume workspace/in_progress from its saved context")
     parser.add_argument("--dry-run", action="store_true", help="Avoid Codex and create a tiny test source")
     parser.add_argument("--offline", action="store_true", help="Run all steps with a local mock order; no backend changes")
+    parser.add_argument("--publish-local", metavar="ORDER_ID", help="Upload the completed local package for this order without rebuilding it or calling AI")
     parser.add_argument("--repackage", action="store_true", help="Restart at Step 12 (Package DOCX) using the saved source, without invoking Codex")
     parser.add_argument("--step", type=int, choices=range(1, len(STEPS) + 1), help="Resume from a terminal step number; the final step validates, visually audits, and publishes the package")
+    parser.add_argument("--auto-repair", action="store_true", help="Diagnose a saved failure, test an isolated stage-code repair if needed, then rerun the selected step")
     note_source = parser.add_mutually_exclusive_group()
     note_source.add_argument("--operator-note", default="", help="Operator guidance that every AI-assisted step must analyze and apply during this run")
     note_source.add_argument("--operator-note-stdin", action="store_true", help="Read operator guidance from standard input, as sent by the desktop app")
@@ -1132,8 +1150,16 @@ def header(index: int, title: str, context: dict[str, Any]) -> None:
 def main() -> None:
     args = build_parser().parse_args()
     args.operator_note = read_operator_note(args, sys.stdin.buffer)
+    if args.auto_repair and not args.step:
+        raise SystemExit("--auto-repair requires --step for a saved failed order")
     config = load_config()
-    workspace = selected_workspace(config.workspace_root, bool(args.resume or args.step or args.repackage))
+    workspace = selected_workspace(config.workspace_root, bool(args.resume or args.step or args.repackage or args.publish_local))
+    if args.publish_local:
+        if args.resume or args.step or args.repackage or args.order_id or args.offline or args.sample or args.dry_run or args.redo or args.operator_note:
+            raise SystemExit("--publish-local cannot be combined with run options.")
+        from common.local_publish import publish_local
+        publish_local(config, workspace, args.publish_local)
+        return
     workspace.mkdir(parents=True, exist_ok=True)
     if args.order_id or (args.step == 1):
         # A fresh run uses the legacy preparation path, while the previously
@@ -1221,6 +1247,19 @@ def main() -> None:
         )
         if latest_recovery.get("error") and latest_recovery.get("restart_step") == next_step:
             services.recovery_feedback = latest_recovery
+    if args.auto_repair and services.recovery_feedback:
+        from common.auto_repair import repair_worker_code
+        try:
+            decision = repair_worker_code(Path(__file__).resolve().parents[1], workspace,
+                                          str(context.get("order", {}).get("order_type") or ""),
+                                          next_step, latest_recovery, config.codex_bin,
+                                          config.codex_model, config.codex_home)
+        except Exception as error:
+            decision = {"status": "skipped", "reason": str(error)[:1000]}
+        decision.update({"order_id": context.get("order_id"), "stage": next_step,
+                         "checked_at": datetime.now(timezone.utc).isoformat()})
+        write_json(workspace / "reports" / "stage_checks" / "auto_code_repair.json", decision)
+        print(f"Auto code repair: {decision['status']} — {decision.get('reason', ', '.join(decision.get('files', [])))[:500]}", flush=True)
     if context.get("order"):
         services.profile = profile_for(context["order"])
 
@@ -1228,11 +1267,15 @@ def main() -> None:
     # Previously it ran before current_step was set, making a live run look idle
     # and allowing preflight exceptions to bypass recovery reporting entirely.
     preflight_step = next((step for step in STEPS if step not in context["completed_steps"]), None)
-    pending_note_preflight = bool(args.operator_note and context.get("completed_steps") and preflight_step)
+    pending_note_preflight = bool(
+        args.operator_note and context.get("completed_steps") and preflight_step
+        and not is_file_access_error(RuntimeError(args.failure_context))
+    )
 
     terminal_error: Exception | None = None
     recovery_history: list[dict[str, Any]] = context.setdefault("recovery_history", [])
     repeated_errors: dict[str, int] = {}
+    trace_session = begin_session(context, STEPS, "manual" if args.step else "repackage" if args.repackage else "resume" if args.resume else "run")
     try:
         cursor = 0
         recovery_cycles = 0
@@ -1242,8 +1285,12 @@ def main() -> None:
                 cursor += 1
                 continue
             module = importlib.import_module(f"common.steps.{name}")
-            header(cursor + 1, module.TITLE, context)
+            presentation_order = context.get("order", {}).get("order_type") == "ارائه و پاورپوینت"
+            if presentation_order:
+                from presentation.workflow import LABELS as presentation_labels, run_step as run_presentation_step
+            header(cursor + 1, presentation_labels.get(name, module.TITLE) if presentation_order else module.TITLE, context)
             context["current_step"] = name
+            trace_attempt = begin_attempt(context, STEPS, name, trace_session)
             save(workspace, context)
             try:
                 if pending_note_preflight and name == preflight_step:
@@ -1257,16 +1304,46 @@ def main() -> None:
 
 در خروجی Markdown کوتاه بنویس: علت محتمل، فایل‌های بررسی‌شده، تغییرهای انجام‌شده و اینکه مرحله `{name}` اکنون چه چیزی را باید اعتبارسنجی کند."""
                     print(f"Preparing step {cursor + 1:02}: analyzing operator note and prior failure.", flush=True)
-                    services.run_codex(preflight_prompt, analysis_report)
+                    if presentation_order:
+                        from presentation.recovery import guard_inputs
+                        preflight_prompt = f"""پیش از ادامه مرحله `{name}`، فقط `order_context.json` و گزارش خطای قبلی را بخوان و علت و پیشنهاد اصلاح را گزارش کن. هیچ فایل، منبع، locator، متن نقل‌شده یا پیش‌نویسی را ویرایش نکن. اصلاح اسلاید در مرحله تولید و پس از اعتبارسنجی انجام می‌شود. پاسخ Markdown کوتاه باشد."""
+                        with guard_inputs(services):
+                            services.run_codex(preflight_prompt, analysis_report)
+                    else:
+                        services.run_codex(preflight_prompt, analysis_report)
                     context["artifacts"]["operator_note_analysis"] = str(analysis_report.relative_to(workspace))
                     save(workspace, context)
                     pending_note_preflight = False
-                module.run(context, services)
+                if not presentation_order or not run_presentation_step(name, context, services):
+                    module.run(context, services)
             except Exception as exc:
+                deferred = is_deferred_service_error(exc) or is_file_access_error(exc)
+                finish_attempt(context, trace_attempt, "paused" if deferred else "failed", str(exc))
                 recovery_cycles += 1
                 fingerprint = error_fingerprint(name, exc)
                 repeated_errors[fingerprint] = repeated_errors.get(fingerprint, 0) + 1
                 restart = recovery_start(name, exc)
+                if presentation_order and not is_file_access_error(exc):
+                    # Content/layout faults return to the slide model; renderer
+                    # outages stay at rendering and never rebuild thesis prose.
+                    presentation_restart = {
+                        "07a_validate_visual_placement": "07_generate_content",
+                        "08_review_content": "07_generate_content",
+                        "08b_audit_source_compliance": "07_generate_content",
+                        "09_package_docx": "07_generate_content",
+                        "09b_polish_cover": "09_package_docx",
+                        "09c_package_interim_reports": "09c_package_interim_reports",
+                        "10b_finalize_persian_pagination": "10b_finalize_persian_pagination",
+                        "10c_verify_persian_pagination": "09_package_docx",
+                        "10_validate_and_publish": "07_generate_content",
+                    }
+                    restart = STEPS.index(presentation_restart.get(name, name))
+                    if getattr(exc, "restart_step", None) in STEPS:
+                        restart = STEPS.index(exc.restart_step)
+                    if getattr(exc, "report_path", None) and not getattr(exc, "repair_slides", None):
+                        # An audit without a located defect must clarify its
+                        # report before any healthy slide is regenerated.
+                        restart = STEPS.index(name)
                 event = {
                     "cycle": recovery_cycles,
                     "failed_step": name,
@@ -1274,41 +1351,56 @@ def main() -> None:
                     "same_error_count": repeated_errors[fingerprint],
                     "error": str(exc),
                 }
+                if presentation_order:
+                    for field in ("report_path", "issues", "repair_slides", "repair_kind"):
+                        if getattr(exc, field, None):
+                            event[field] = getattr(exc, field)
+                    context["active_failure"] = event
+                if is_file_access_error(exc):
+                    event["kind"] = "file_access"
                 recovery_history.append(event)
                 services.recovery_feedback = event
                 context.setdefault("errors", []).append(str(exc))
                 context["status"] = "in_progress"
                 context["current_step"] = None
-                if is_deferred_service_error(exc):
-                    # This is an external capacity pause, not an order defect.
-                    # Keep the claimed order resumable and avoid an irreversible
-                    # backend `failed` status or a wasteful rapid retry loop.
+                if is_deferred_service_error(exc) or is_file_access_error(exc):
+                    # Service availability and file access require an external
+                    # change. Preserve validated work and pause on this step.
                     context["deferred_error"] = event
                     context["active_failure"] = event
                     context["status"] = "paused"
                     context["pause_reason"] = str(exc)
                     context["errors"] = []
                     save(workspace, context)
-                    print("Result: PAUSED — required service or runtime is unavailable; order remains in_progress.", flush=True)
+                    if is_file_access_error(exc):
+                        print("Result: PAUSED — output file is locked or access is denied; close the file or resolve permissions, then resume this same step. Validated upstream work is preserved.", flush=True)
+                    else:
+                        print("Result: PAUSED — required service or runtime is unavailable; order remains in_progress.", flush=True)
                     return
                 # Invalidate the failed artifact and everything derived from it.
+                if presentation_order and getattr(exc, "validated_checkpoint", False):
+                    context["completed_steps"] = STEPS[:restart]
                 context["completed_steps"] = [step for step in context["completed_steps"] if STEPS.index(step) < restart]
                 save(workspace, context)
-                print(
-                    f"Result: RETRY — {exc}\nRecovery {recovery_cycles}/{MAX_RECOVERY_CYCLES}: "
-                    f"restarting from {restart + 1:02} ({STEPS[restart]})",
-                    flush=True,
-                )
                 # Three identical failures are useful evidence, but still leave
                 # room for broader replay cycles before declaring a terminal fault.
-                if "made no progress" in str(exc).lower() or recovery_cycles >= MAX_RECOVERY_CYCLES or repeated_errors[fingerprint] >= 6:
+                must_stop = getattr(exc, "retryable", True) is False or (presentation_order and name in {"03_check_intake", "05a_analyze_customer_sources"}) or "made no progress" in str(exc).lower() or recovery_cycles >= MAX_RECOVERY_CYCLES or repeated_errors[fingerprint] >= (3 if presentation_order else 6)
+                print(
+                    f"Result: {'STOP' if must_stop else 'RETRY'} — {exc}\nRecovery {recovery_cycles}/{MAX_RECOVERY_CYCLES}: "
+                    + (f"after fixing the reported issue, resume manually from {restart + 1:02} ({STEPS[restart]})" if must_stop
+                       else f"restarting from {restart + 1:02} ({STEPS[restart]})"),
+                    flush=True,
+                )
+                if must_stop:
                     terminal_error = exc
                     break
                 cursor = restart
                 continue
             if name not in context["completed_steps"]:
                 context["completed_steps"].append(name)
+            finish_attempt(context, trace_attempt, "succeeded")
             context.pop("active_failure", None)
+            context.pop("deferred_error", None)
             context.pop("pause_reason", None)
             services.recovery_feedback = None
             context["current_step"] = None

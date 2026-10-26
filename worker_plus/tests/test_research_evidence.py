@@ -38,6 +38,13 @@ class ResearchEvidenceTests(unittest.TestCase):
         self.assertTrue(any("concrete result" in issue for issue in issues))
         self.assertTrue(any("completed calculation" in issue for issue in issues))
 
+    def test_course_research_accepts_direct_international_evidence(self) -> None:
+        entry = dict(self.entry, id="method_application", status="direct", transfer_limit="")
+        entry.pop("iran_search")
+        deliverables = [{"id": "method_application"}]
+        self.assertEqual([], self.stage.evidence_issues({"deliverables": [entry]}, deliverables, iran_required=False))
+        self.assertTrue(self.stage.evidence_issues({"deliverables": [entry]}, deliverables, iran_required=True))
+
     def test_supplementary_research_does_not_replace_required_ids(self) -> None:
         extra = dict(self.entry, id="extra_context")
         issues = self.stage.evidence_issues({"deliverables": [extra]}, self.deliverables)
@@ -84,6 +91,12 @@ class ResearchEvidenceTests(unittest.TestCase):
             5: "# ۵. نتیجه‌گیری\nمتن",
         }
         self.assertEqual(((1,), (2, 3), (4, 5)), stage.report_chapter_groups(chapters))
+
+    def test_course_interim_reports_do_not_require_market_or_finance_chapters(self) -> None:
+        stage = importlib.import_module("common.steps.09c_package_interim_reports")
+        source = "# چکیده\nخلاصه\n# ۱ مسئله\nمتن\n# ۲ روش\nمتن\n# ۳ یافته‌ها\nمتن\n# ۴ نتیجه\nمتن\n# منابع\n[1] منبع"
+        _, chapters, _ = stage.split_chapters(source)
+        self.assertEqual(((1, 2), (3,), (4,)), stage.report_chapter_groups(chapters, research_report=True))
 
     def test_credit_and_auth_errors_pause_instead_of_retrying(self) -> None:
         self.assertTrue(is_deferred_service_error(RuntimeError("Your workspace is out of credits")))

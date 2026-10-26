@@ -21,11 +21,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser(request);
-    const payload = await request.json();
+    const multipart = request.headers.get("content-type")?.startsWith("multipart/form-data");
+    const form = multipart ? await request.formData() : null;
+    const payload = form ? JSON.parse(String(form.get("payload") || "{}")) : await request.json();
+    const source = form?.get("information_source");
     const customer = isStaffRole(user.role)
       ? await findOrCreateCustomerByPhone(z.object({ customer_phone: z.string().min(1).max(40) }).parse(payload).customer_phone)
       : user;
-    const order = await createCustomerOrder(customer, payload, isStaffRole(user.role) ? user : undefined);
+    const order = await createCustomerOrder(customer, payload, isStaffRole(user.role) ? user : undefined, source instanceof File ? source : undefined);
     return json(serializeOrder(order, true, user.role === "customer" ? "customer" : "admin"), 201);
   } catch (error) {
     return errorResponse(error);

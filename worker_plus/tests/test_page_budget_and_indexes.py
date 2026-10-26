@@ -197,6 +197,29 @@ class PageBudgetAndIndexesTests(unittest.TestCase):
             self.assertTrue(any(anchor.startswith("table_") for anchor in links))
             self.assertEqual(len(links), len([item for item in document._element.iter(qn("w:instrText")) if "PAGEREF" in (item.text or "")]))
 
+    def test_course_research_cover_and_sections_use_report_format(self) -> None:
+        from docx import Document
+        from university_research.profile import resolve_rules
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.md"
+            source.write_text("# چکیده\nخلاصه.\n# فهرست مطالب\n# ۱ مقدمه\nمتن.\n# ۲ یافته‌ها\nنتیجه.\n# منابع\n[1] منبع.\n", encoding="utf-8")
+            output = root / "report.docx"
+            order = {"order_type": "تحقیق دانشگاهی", "title": "عنوان تحقیق", "university": "دانشگاه نمونه", "student_name": "دانشجو", "course_name": "تحقیق در عملیات", "instructor_name": "استاد درس"}
+            services = Services.__new__(Services)
+            services.release_docx_lock = lambda _: None
+            rules = resolve_rules([])
+            services.write_docx(source, output, order["title"], rules, order)
+            services.polish_cover(output, rules, order)
+            document = Document(output)
+            cover = [p.text for p in document.paragraphs if p.style.name == "Title"]
+            self.assertIn("گزارش تحقیق درس تحقیق در عملیات", cover)
+            self.assertIn("استاد درس: استاد درس", cover)
+            self.assertFalse(any("دریافت درجه" in line or "استاد راهنما" in line for line in cover))
+            sections = [p for p in document.paragraphs if p.style.name == "Heading 1"]
+            self.assertTrue(all(not p.paragraph_format.page_break_before for p in sections[1:]))
+
 
 if __name__ == "__main__":
     unittest.main()

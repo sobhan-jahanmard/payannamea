@@ -40,6 +40,7 @@ import {
   statusLabel,
 } from "../../../../lib/format";
 import { quantityLabel } from "../../../../lib/order-options";
+import { isPresentationOrder, presentationStyleLabel, DEFAULT_PRESENTATION_FONT } from "../../../../lib/presentation";
 import type { Order, OrderFile, OrderStatus, PaymentNote, PaymentNoteType, PaymentStatus, WorkerRun } from "../../../../types/api";
 
 type ToastState = {
@@ -414,6 +415,7 @@ function AdminOrderDetail() {
                 <dt className="text-muted-foreground">گراف و چارت</dt>
                 <dd className="font-medium">{order.requires_charts ? "نیاز است" : "نیاز نیست"}</dd>
               </div>
+              {isPresentationOrder(order) && <><div><dt className="text-muted-foreground">سبک ارائه</dt><dd className="font-medium">{presentationStyleLabel(order.presentation_style)}</dd></div><div><dt className="text-muted-foreground">فونت ارائه</dt><dd className="font-medium">{order.presentation_font || DEFAULT_PRESENTATION_FONT}</dd></div></>}
               <div>
                 <dt className="text-muted-foreground">روش یا رویکرد انجام</dt>
                 <dd className="font-medium">{order.methodology}</dd>
@@ -659,6 +661,7 @@ function OrderFilesSection({ files, onDelete }: { files?: OrderFile[]; onDelete:
   const groups = [
     { type: "university_guideline", label: "شیوه‌نامه و قالب" },
     { type: "reference_file", label: "منابع و مقالات" },
+    { type: "information_source", label: "منبع اطلاعات ارائه" },
     { type: "supporting_material", label: "فایل‌های تکمیلی" }
   ].map((group) => ({
     ...group,

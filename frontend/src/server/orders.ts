@@ -30,7 +30,9 @@ import {
   WorkerLockSchema
 } from "./db/entities";
 import { ApiError, compact } from "./http";
-import { deleteStoredUpload } from "./files";
+import { deleteStoredUpload, saveUpload } from "./files";
+import { isInformationSource, isPresentationOrder, PRESENTATION_STYLES, PRESENTATION_FONTS, DEFAULT_PRESENTATION_STYLE, DEFAULT_PRESENTATION_FONT } from "../lib/presentation";
+import { assertPresentationSource, validateInformationSource } from "./presentation";
 import { email } from "./email";
 import {
   academicDetailLabels,
@@ -92,6 +94,9 @@ function orderFieldsRefinement(
   }
 
   const quantityType = (payload.quantity_type ?? fieldConfig.defaultQuantityType) as QuantityType;
+  if (isPresentationOrder(payload) && payload.quantity_value != null && (payload.quantity_value < 5 || payload.quantity_value > 100)) {
+    ctx.addIssue({ code: "custom", path: ["quantity_value"], message: "تعداد اسلاید باید بین ۵ و ۱۰۰ باشد" });
+  }
   if (!quantityTypeOptions.includes(quantityType) || !fieldConfig.quantityTypes.includes(quantityType)) {
     ctx.addIssue({
       code: "custom",
@@ -116,6 +121,8 @@ export const orderCreateSchema = z.object({
   quantity_type: z.enum(quantityTypeOptions as [QuantityType, ...QuantityType[]]).optional().nullable(),
   quantity_value: optionalQuantity,
   requires_charts: z.boolean().default(false),
+  presentation_style: z.enum(PRESENTATION_STYLES.map(style => style.id) as [string, ...string[]]).optional().nullable(),
+  presentation_font: z.enum(PRESENTATION_FONTS.map(font => font.id) as [string, ...string[]]).optional().nullable(),
   deadline: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   moarref_code: z.string().max(120).optional().nullable(),
@@ -269,7 +276,7 @@ export function serializeFinalOutput(output: FinalOutputEntity) {
   };
 }
 
-const CUSTOMER_OUTPUT_PRIORITY = ["sample", "sample_pdf", "docx", "pdf"];
+const CUSTOMER_OUTPUT_PRIORITY = ["sample", "sample_pdf", "pptx", "docx", "pdf"];
 const CUSTOMER_SAMPLE_ONLY_STATUSES: OrderStatus[] = [
   "submitted",
   "approved",
@@ -303,7 +310,7 @@ export function customerVisibleFinalOutputs(
 
 export function customerOutputFileName(output: FinalOutputEntity): string {
   const fixedNames: Record<string, string> = {
-    sample: "sample.docx",
+    sample: output.original_name.toLowerCase().endsWith(".pptx") ? "sample.pptx" : "sample.docx",
     sample_pdf: "sample.pdf",
     docx: "final.docx",
     pdf: "final.pdf",
@@ -395,6 +402,8 @@ export function serializeOrder(order: OrderEntity, detail = true, audience: "adm
     quantity_type: order.quantity_type,
     quantity_value: order.quantity_value,
     requires_charts: order.requires_charts,
+    presentation_style: isPresentationOrder(order) ? order.presentation_style || DEFAULT_PRESENTATION_STYLE : null,
+    presentation_font: isPresentationOrder(order) ? order.presentation_font || DEFAULT_PRESENTATION_FONT : null,
     deadline: iso(order.deadline),
     notes: order.notes,
     moarref_code: order.moarref_code,
@@ -483,6 +492,11 @@ export async function setOrderStatus(
   if (!ORDER_STATUSES.includes(toStatus)) {
     throw new ApiError(422, `Unknown order status '${toStatus}'`);
   }
+  if (isPresentationOrder(order) && ["approved", "in_progress", "approved_pending_for_final_execution"].includes(toStatus)) {
+    // Query the current files, including claims that loaded only an order row.
+    const files = await manager.getRepository(OrderFileSchema).findBy({ order_id: order.id });
+    assertPresentationSource({ ...order, files });
+  }
   if (order.status === toStatus) {
     return;
   }
@@ -507,12 +521,17 @@ export async function setOrderStatus(
   });
 }
 
-export async function createCustomerOrder(user: UserEntity, rawPayload: unknown, createdBy?: UserEntity): Promise<OrderEntity> {
+export async function createCustomerOrder(user: UserEntity, rawPayload: unknown, createdBy?: UserEntity, informationSource?: File, options: { notify?: boolean } = {}): Promise<OrderEntity> {
   const payload = orderCreateSchema.parse(rawPayload);
-  const dataSource = await getDataSource();
   const orderId = randomUUID();
+  if (isPresentationOrder(payload) && !informationSource) {
+    throw new ApiError(422, "ثبت سفارش ارائه و پاورپوینت به فایل «منبع اطلاعات» نیاز دارد.");
+  }
+  if (informationSource) await validateInformationSource(informationSource);
+  const dataSource = await getDataSource();
+  const storedSource = informationSource ? await saveUpload(informationSource, `orders/${orderId}/input`) : null;
 
-  await dataSource.transaction(async (manager) => {
+  try { await dataSource.transaction(async (manager) => {
     const order = manager.getRepository(OrderSchema).create({
       id: orderId,
       user_id: user.id,
@@ -542,11 +561,16 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown,
       quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
       quantity_value: payload.quantity_value ?? null,
       requires_charts: payload.requires_charts,
+      presentation_style: isPresentationOrder(payload) ? payload.presentation_style || DEFAULT_PRESENTATION_STYLE : null,
+      presentation_font: isPresentationOrder(payload) ? payload.presentation_font || DEFAULT_PRESENTATION_FONT : null,
       deadline: parseDeadline(payload.deadline),
       notes: compact(payload.notes),
       moarref_code: compact(payload.moarref_code)
     });
     await manager.getRepository(OrderSchema).save(order);
+    if (storedSource) {
+      await manager.getRepository(OrderFileSchema).save({ id: randomUUID(), order_id: orderId, file_type: "information_source", uploaded_by: "customer", ...storedSource });
+    }
 
     for (const reference of payload.references) {
       await manager.getRepository(OrderReferenceSchema).save({
@@ -570,10 +594,13 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown,
       actor: createdBy?.role ?? "customer",
       notes: createdBy ? "سفارش توسط کارکنان ثبت شد و برای بررسی مدیر ارسال شد." : "سفارش ثبت شد و برای بررسی مدیر ارسال شد."
     });
-  });
+  }); } catch (error) {
+    if (storedSource) await deleteStoredUpload(storedSource.storage_path);
+    throw error;
+  }
 
   const order = await getOrderOr404(orderId);
-  await email.sendNewOrder(order);
+  if (options.notify !== false) await email.sendNewOrder(order);
   return order;
 }
 
@@ -616,6 +643,8 @@ export async function updateCustomerOrder(order: OrderEntity, rawPayload: unknow
         quantity_type: payload.quantity_type ?? orderTypeFieldConfig(payload.order_type).defaultQuantityType,
         quantity_value: payload.quantity_value ?? null,
         requires_charts: payload.requires_charts,
+        presentation_style: isPresentationOrder(payload) ? payload.presentation_style || DEFAULT_PRESENTATION_STYLE : null,
+        presentation_font: isPresentationOrder(payload) ? payload.presentation_font || DEFAULT_PRESENTATION_FONT : null,
         deadline: parseDeadline(payload.deadline),
         notes: compact(payload.notes),
         moarref_code: compact(payload.moarref_code),
@@ -675,6 +704,10 @@ export async function deleteOrderFile(order: OrderEntity, fileId: string): Promi
   if (!file) {
     throw new ApiError(404, "Order file not found");
   }
+  if (isPresentationOrder(order) && isInformationSource(file)) {
+    const remaining = await repository.findBy({ order_id: order.id });
+    assertPresentationSource({ ...order, files: remaining.filter(item => item.id !== fileId) });
+  }
   await repository.delete({ id: file.id });
   await deleteStoredUpload(file.storage_path);
   return getOrderOr404(order.id);
@@ -685,6 +718,8 @@ export async function deleteOrderFileAsAdmin(orderId: string, fileId: string): P
   const repository = dataSource.getRepository(OrderFileSchema);
   const file = await repository.findOneBy({ id: fileId, order_id: orderId });
   if (!file) throw new ApiError(404, "Order file not found");
+  const order = await getOrderOr404(orderId);
+  assertPresentationSource({ ...order, files: (order.files ?? []).filter(item => item.id !== fileId) });
   await repository.delete({ id: file.id });
   await deleteStoredUpload(file.storage_path);
   return getOrderOr404(orderId);

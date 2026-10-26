@@ -16,6 +16,7 @@ import {
 import { deleteStoredUpload } from "./files";
 import { ApiError, compact } from "./http";
 import { estimateOpenAiTextCost } from "./openai-pricing";
+import { isPresentationOrder } from "../lib/presentation";
 import { deleteWorkerLock, getOrderOr404, serializeOrder, setOrderStatus } from "./orders";
 
 export const workerActionSchema = z.object({
@@ -322,16 +323,8 @@ export async function submitSamplePackage(
   return getOrderOr404(orderId);
 }
 
-function isPresentationOrder(order: Pick<OrderEntity, "order_type" | "quantity_type">): boolean {
-  const orderType = compact(order.order_type) ?? "";
-  return order.quantity_type === "slides" || orderType.includes("پاورپوینت") || orderType.includes("ارائه");
-}
-
-function requiredFinalOutputTypes(order: OrderEntity): string[] {
-  const required = new Set<string>(baseFinalOutputTypes);
-  if (isPresentationOrder(order)) {
-    required.add("pptx");
-  }
+export function requiredFinalOutputTypes(order: Pick<OrderEntity, "order_type">): string[] {
+  const required = new Set<string>(isPresentationOrder(order) ? ["pptx", "pdf", "sample", "sample_pdf"] : baseFinalOutputTypes);
   return [...required];
 }
 

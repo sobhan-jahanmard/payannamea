@@ -1,0 +1,45 @@
+.ai-review-panel{margin-top:18px;line-height:1.8}
+.ai-review-heading{display:flex;align-items:center;gap:24px}
+.ai-review-heading-copy{min-width:0}
+.ai-review-eyebrow{font-size:12px;font-weight:800;color:#137a57}
+.ai-review-heading h3{display:flex;align-items:center;gap:9px;margin:4px 0;font-size:20px;color:#183c2d}
+.ai-review-heading p{margin:0;color:#65756c;font-size:13px}
+.ai-review-start{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;white-space:nowrap}
+.ai-review-empty,.ai-review-muted{background:#f7f9f7;border:1px dashed #d7e3da;border-radius:10px;padding:16px;margin:18px 0 0;color:#66766c;font-size:14px}
+.ai-review-error{display:flex;align-items:start;gap:8px;background:#fff0ef;border:1px solid #f1d1cd;border-radius:9px;color:#a33129;padding:10px 12px;margin-top:15px;font-size:14px}
+.ai-review-progress{display:flex;align-items:center;gap:8px;background:#ecf5ef;border-radius:9px;color:#195a3d;padding:10px 14px;margin-top:16px;font-size:14px;font-weight:700}
+.ai-review-result{display:grid;grid-template-columns:190px minmax(0,1fr);gap:16px;margin-top:18px}
+.ai-review-score{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#edf7ef;border:1px solid #d7e9dc;border-radius:11px;padding:20px 12px;color:#195b3d;text-align:center}
+.ai-review-score span{font-size:13px;font-weight:700}
+.ai-review-score strong{font-size:43px;line-height:1.3}
+.ai-review-score strong small{font-size:14px;font-weight:500}
+.ai-review-score time{font-size:11px;color:#668176}
+.ai-review-report{background:#f8faf8;border:1px solid #e3eae4;border-radius:11px;padding:14px 16px;min-width:0}
+.ai-review-report h4,.ai-review-history h4{margin:0 0 8px;font-size:15px;color:#273a30}
+.ai-review-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;font-size:14px;color:#34443a}
+.ai-review-fix{grid-column:1/-1}
+.ai-review-fix label{display:block;font-size:14px;font-weight:800;margin-bottom:7px}
+.ai-review-fix textarea{width:100%;min-height:130px;resize:vertical;border:1px solid #cddbd1;border-radius:10px;padding:12px 14px;font:14px/1.9 Vazirmatn,Tahoma,sans-serif;color:#213b2d;background:white;outline:none}
+.ai-review-fix textarea:focus{border-color:#16845e;box-shadow:0 0 0 3px #e0f3eb}
+.ai-review-fix-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:8px}
+.ai-review-fix-footer small{font-size:12px;color:#697b70}
+.ai-review-fix-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 17px;border:1px solid #137a57;border-radius:9px;background:white;color:#137a57;font-weight:800;white-space:nowrap}
+.ai-review-fix-button:hover:not(:disabled){background:#eef7f0}
+.ai-review-history{border-top:1px solid #e3e9e4;margin-top:20px;padding-top:14px}
+.ai-review-history h4{display:flex;align-items:center;gap:7px}
+.ai-review-history ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ai-review-history-item{border:1px solid #e0e8e1;background:#fbfcfb;border-radius:9px;padding:9px 12px;font-size:13px}
+.ai-review-history-item.failed{border-color:#f0cbc7;background:#fff9f8}
+.ai-review-history-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ai-review-history-top b{font-size:14px}
+.ai-review-history-top span{color:#446b52}
+.ai-review-history-top time{color:#79877d;font-size:11px}
+.ai-review-history-top strong{margin-right:auto;color:#146d4b}
+.ai-review-history-item p{margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-review-history-error{color:#a33129}
+.ai-review-history-item details{margin-top:4px}
+.ai-review-history-item summary{cursor:pointer;color:#176b4b;font-weight:700}
+.ai-review-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #dce6df;margin-top:18px;padding-top:14px}
+.ai-review-actions>span{font-size:12px;font-weight:800;color:#4b6856;margin-left:auto}
+.ai-review-actions .ai-review-start,.ai-review-actions .ai-review-fix-button{min-height:44px}
+@media(max-width:1100px){.ai-review-heading{align-items:start;flex-direction:column}.ai-review-result{grid-template-columns:150px minmax(0,1fr)}}

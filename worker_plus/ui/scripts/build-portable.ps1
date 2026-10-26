@@ -22,7 +22,7 @@ try {
 
     Push-Location $uiRoot
     try {
-        & npx.cmd tsc -p tsconfig.electron.json
+        & npx.cmd tsc -p tsconfig.electron.json --noEmit false
         if ($LASTEXITCODE -ne 0) { throw "Electron TypeScript compilation failed with exit code $LASTEXITCODE" }
 
         & npx.cmd vite build

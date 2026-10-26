@@ -61,6 +61,8 @@ export interface OrderEntity {
   quantity_type: string | null;
   quantity_value: number | null;
   requires_charts: boolean;
+  presentation_style: string | null;
+  presentation_font: string | null;
   service_type: string | null;
   project_stage: string | null;
   proposal_status: string | null;
@@ -82,6 +84,29 @@ export interface OrderEntity {
   final_outputs?: FinalOutputEntity[];
   review_notes?: ReviewNoteEntity[];
   payment_notes?: PaymentNoteEntity[];
+  ai_reviews?: AiReviewEntity[];
+}
+
+export interface AiReviewEntity {
+  id: string;
+  order_id: string;
+  action: "review" | "fix";
+  status: "queued" | "running" | "completed" | "failed";
+  parent_review_id: string | null;
+  output_file_ids: string[];
+  input_file_ids: string[];
+  requested_prompt: string | null;
+  score: number | null;
+  report: string | null;
+  fix_prompt: string | null;
+  applied_files: string[];
+  restart_step: number | null;
+  error: string | null;
+  worker_id: string | null;
+  created_at: Date;
+  started_at: Date | null;
+  finished_at: Date | null;
+  order?: OrderEntity;
 }
 
 export interface OtpChallengeEntity {
@@ -296,6 +321,8 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     quantity_type: { type: String, length: 40, nullable: true },
     quantity_value: { type: Number, nullable: true },
     requires_charts: { type: Boolean, default: false },
+    presentation_style: { type: String, length: 64, nullable: true },
+    presentation_font: { type: String, length: 100, nullable: true },
     service_type: { type: String, length: 160, nullable: true },
     project_stage: { type: String, length: 160, nullable: true },
     proposal_status: { type: String, length: 160, nullable: true },
@@ -334,6 +361,7 @@ export const OrderSchema = new EntitySchema<OrderEntity>({
     worker_submissions: { type: "one-to-many", target: "WorkerSubmission", inverseSide: "order" },
     final_outputs: { type: "one-to-many", target: "FinalOutput", inverseSide: "order" },
     review_notes: { type: "one-to-many", target: "ReviewNote", inverseSide: "order" },
+    ai_reviews: { type: "one-to-many", target: "AiReview", inverseSide: "order" },
     payment_notes: { type: "one-to-many", target: "PaymentNote", inverseSide: "order" }
   }
 });
@@ -556,6 +584,35 @@ export const ReviewNoteSchema = new EntitySchema<ReviewNoteEntity>({
   }
 });
 
+export const AiReviewSchema = new EntitySchema<AiReviewEntity>({
+  name: "AiReview",
+  tableName: "ai_reviews",
+  columns: {
+    id: idColumn,
+    order_id: { type: String, length: 36 },
+    action: { type: String, length: 16 },
+    status: { type: String, length: 16, default: "queued" },
+    parent_review_id: { type: String, length: 36, nullable: true },
+    output_file_ids: { type: "jsonb", default: [] },
+    input_file_ids: { type: "jsonb", default: [] },
+    requested_prompt: { type: "text", nullable: true },
+    score: { type: "numeric", precision: 5, scale: 2, nullable: true },
+    report: { type: "text", nullable: true },
+    fix_prompt: { type: "text", nullable: true },
+    applied_files: { type: "jsonb", default: [] },
+    restart_step: { type: Number, nullable: true },
+    error: { type: "text", nullable: true },
+    worker_id: { type: String, length: 255, nullable: true },
+    created_at: createdAtColumn,
+    started_at: { type: "timestamptz", nullable: true },
+    finished_at: { type: "timestamptz", nullable: true }
+  },
+  indices: [{ name: "ix_ai_reviews_order_created", columns: ["order_id", "created_at"] },
+            { name: "ix_ai_reviews_status_created", columns: ["status", "created_at"] }],
+  relations: { order: { type: "many-to-one", target: "Order", inverseSide: "ai_reviews",
+                        joinColumn: { name: "order_id" }, onDelete: "CASCADE" } }
+});
+
 export const PaymentNoteSchema = new EntitySchema<PaymentNoteEntity>({
   name: "PaymentNote",
   tableName: "payment_notes",
@@ -616,6 +673,7 @@ export const entities = [
   WorkerSubmissionSchema,
   FinalOutputSchema,
   ReviewNoteSchema,
+  AiReviewSchema,
   PaymentNoteSchema,
   AnalyticsEventSchema
 ];

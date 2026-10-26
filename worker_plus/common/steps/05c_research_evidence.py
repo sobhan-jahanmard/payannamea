@@ -28,7 +28,7 @@ def research_deliverables(base: list[dict[str, str]], source_rules: str) -> list
     return result
 
 
-def evidence_issues(data: Any, deliverables: list[dict[str, str]]) -> list[str]:
+def evidence_issues(data: Any, deliverables: list[dict[str, str]], iran_required: bool = True) -> list[str]:
     if not isinstance(data, dict):
         return ["research/evidence.json must be a JSON object"]
     entries = data.get("deliverables")
@@ -52,7 +52,7 @@ def evidence_issues(data: Any, deliverables: list[dict[str, str]]) -> list[str]:
         if status not in {"direct", "proxy", "assumption"}:
             issues.append(f"{key}: status must be direct, proxy, or assumption")
         iran = entry.get("iran_search")
-        if not isinstance(iran, dict) or not isinstance(iran.get("queries"), list) or not iran["queries"] or not str(iran.get("finding") or "").strip():
+        if iran_required and (not isinstance(iran, dict) or not isinstance(iran.get("queries"), list) or not iran["queries"] or not str(iran.get("finding") or "").strip()):
             issues.append(f"{key}: record Iranian search queries and finding")
         sources = entry.get("sources")
         if not isinstance(sources, list):
@@ -67,7 +67,7 @@ def evidence_issues(data: Any, deliverables: list[dict[str, str]]) -> list[str]:
                 issues.append(f"{key}: source URL is invalid")
         if status in {"direct", "proxy"} and not sources:
             issues.append(f"{key}: direct/proxy result needs an actual web source")
-        if status == "direct" and sources and not any("iran" in str(source.get("geography") or "").lower() or "ایران" in str(source.get("geography") or "") for source in sources if isinstance(source, dict)):
+        if iran_required and status == "direct" and sources and not any("iran" in str(source.get("geography") or "").lower() or "ایران" in str(source.get("geography") or "") for source in sources if isinstance(source, dict)):
             issues.append(f"{key}: direct Iranian result has no Iranian source")
         if status == "proxy" and not str(entry.get("transfer_limit") or "").strip():
             issues.append(f"{key}: foreign or other-context proxy needs an explicit transfer limit")
@@ -89,6 +89,7 @@ def run(context: dict[str, Any], services: Any) -> None:
     target = workspace / "research" / "evidence.json"
     report = workspace / "research" / "research_report.md"
     contract = deliverable_contract(context["order"])
+    course_research = contract["project_type"] == "course_research"
     source_rules = context["artifacts"]["resolved_source_rules"]
     deliverables = research_deliverables(contract["deliverables"], (workspace / source_rules).read_text(encoding="utf-8"))
     order_contract = context["artifacts"]["order_execution_contract"]
@@ -102,6 +103,17 @@ def run(context: dict[str, Any], services: Any) -> None:
             else:
                 stale.unlink()
     feedback = ""
+    search_guidance = (
+        "برای هر خروجی، منابع مستقیم و مرتبط با پرسش، درس و روش تحقیق را جست‌وجو و صفحهٔ منبع را باز کن. اگر سفارش محدودهٔ جغرافیایی مشخصی دارد، همان محدوده را رعایت کن؛ در موضوع بدون محدودهٔ جغرافیایی، پژوهش معتبر بین‌المللی نیز منبع مستقیم است. دادهٔ جانشین از زمینه‌ای متفاوت را با تفاوت زمینه و محدودیت تعمیم ثبت کن. منبع نظری یا روش‌شناختی را آمار میدانی معرفی نکن."
+        if course_research else
+        "برای تک‌تک خروجی‌ها، اول دادهٔ دقیق و هم‌موضوع ایران را جست‌وجو و صفحهٔ منبع را باز کن. اگر نبود، جست‌وجو را به دادهٔ معتبر کشور دیگر یا صنعت/فناوری نزدیک گسترش بده. جغرافیا، سال، واحد، تفاوت زمینه و محدودیت انتقال را ثبت کن. مثلاً اگر آمار کارخانه‌های پلی‌استر پلی‌ال ایران پیدا نشد، آمار کشور دیگر را با نام همان کشور و هشدار «دادهٔ ایران یافت نشد» استفاده کن؛ آن را به ایران نسبت نده. فقط اگر جست‌وجوی هر دو سطح نتیجه نداد، فرض طراحی شفاف با سناریو و روش محاسبه بساز. مجهول را مقدار مشاهده‌شده جا نزن."
+    )
+    analysis_guidance = (
+        "پرسش پژوهش و روش اعلام‌شده در سفارش را بر شواهد اجرا کن: برای ادعای کمی، ورودی، فرمول، واحد و نتیجه را بیاور؛ برای ادعای نظری، معیار و نتیجهٔ مقایسهٔ مستدل را ثبت کن. مثال محاسباتی با دادهٔ فرضی را صریحاً از یافتهٔ تجربی جدا کن."
+        if course_research else
+        "تحقیق را به اجرای کار برسان: دادهٔ عددی را از متن/جدول صفحه استخراج کن، محاسبه یا مقایسه را با ورودی، فرمول، واحد و نتیجه انجام بده و برای هر خروجی انتخاب/نتیجه مشخص بده. هیچ بخشی را با شرح اینکه چگونه باید تحقیق، مکان‌یابی، ظرفیت‌سنجی، انتخاب تجهیزات یا اقتصادسنجی انجام شود تمام نکن. ادعای فراتحلیل تجربی بدون مطالعات و دادهٔ قابل‌تجمیع نکن."
+    )
+    proxy_guidance = ("برای status=proxy علت نبود منبع مستقیم و محدودیت تعمیم زمینهٔ جانشین روشن باشد." if course_research else "برای status=proxy باید علت نبود دادهٔ مستقیم ایران و محدودیت انتقال روشن باشد.")
     for attempt in range(1, 4):
         # A stale conversational report must never cause run_codex to skip a
         # missing or invalid evidence ledger on resume.
@@ -109,11 +121,11 @@ def run(context: dict[str, Any], services: Any) -> None:
             report.unlink()
         prompt = f"""پژوهش واقعی سفارش «{context['order'].get('title')}» را اکنون انجام بده. قرارداد `{order_contract}`، قواعد منابع `{source_rules}` و فایل‌های ورودی را بخوان. ابزار جست‌وجو/مرور وب و در صورت لزوم بازیابی صفحات را به کار ببر؛ از حافظهٔ مدل، عنوان نتایج جست‌وجو یا متن سفارش به‌عنوان دادهٔ مشاهده‌شده استفاده نکن.
 
-برای تک‌تک خروجی‌های زیر، اول دادهٔ دقیق و هم‌موضوع ایران را جست‌وجو و صفحهٔ منبع را باز کن. اگر نبود، جست‌وجو را به دادهٔ معتبر کشور دیگر یا صنعت/فناوری نزدیک گسترش بده. جغرافیا، سال، واحد، تفاوت زمینه و محدودیت انتقال را ثبت کن. مثلاً اگر آمار کارخانه‌های پلی‌استر پلی‌ال ایران پیدا نشد، آمار کشور دیگر را با نام همان کشور و هشدار «دادهٔ ایران یافت نشد» استفاده کن؛ آن را به ایران نسبت نده. فقط اگر جست‌وجوی هر دو سطح نتیجه نداد، فرض طراحی شفاف با سناریو و روش محاسبه بساز. مجهول را مقدار مشاهده‌شده جا نزن.
+{search_guidance}
 
-تحقیق را به اجرای کار برسان: دادهٔ عددی را از متن/جدول صفحه استخراج کن، محاسبه یا مقایسه را با ورودی، فرمول، واحد و نتیجه انجام بده و برای هر خروجی انتخاب/نتیجه مشخص بده. هیچ بخشی را با شرح اینکه چگونه باید تحقیق، مکان‌یابی، ظرفیت‌سنجی، انتخاب تجهیزات یا اقتصادسنجی انجام شود تمام نکن. ادعای فراتحلیل تجربی بدون مطالعات و دادهٔ قابل‌تجمیع نکن.
+{analysis_guidance}
 
-فایل `research/evidence.json` را با این ساختار بساز: {{"deliverables":[{{"id":"...","status":"direct|proxy|assumption","iran_search":{{"queries":["..."],"finding":"..."}},"failed_searches":"...","sources":[{{"url":"https://...","title":"...","publisher":"...","geography":"...","retrieved_at":"YYYY-MM-DD","extracted_fact":"عدد/واقعیت دقیق و واحد","source_year":"..."}}],"method_executed":"...","calculation_or_comparison":"ورودی‌ها، فرمول/معیار، نتیجه و واحد","result":"پاسخ مشخص","transfer_limit":"...","limitations":"..."}}]}}. هر id دقیقاً یک بار بیاید. برای status=proxy باید علت نبود دادهٔ مستقیم ایران و محدودیت انتقال روشن باشد؛ برای assumption جست‌وجوهای ناموفق را ثبت کن. URL ساختگی، منبعی که باز نکرده‌ای و اعداد بی‌منشأ ممنوع‌اند.
+فایل `research/evidence.json` را با این ساختار بساز: {{"deliverables":[{{"id":"...","status":"direct|proxy|assumption","iran_search":{{"queries":["..."],"finding":"..."}},"failed_searches":"...","sources":[{{"url":"https://...","title":"...","publisher":"...","geography":"...","retrieved_at":"YYYY-MM-DD","extracted_fact":"عدد/واقعیت دقیق و واحد","source_year":"..."}}],"method_executed":"...","calculation_or_comparison":"ورودی‌ها، فرمول/معیار، نتیجه و واحد","result":"پاسخ مشخص","transfer_limit":"...","limitations":"..."}}]}}. هر id دقیقاً یک بار بیاید. {proxy_guidance} برای assumption جست‌وجوهای ناموفق را ثبت کن. URL ساختگی، منبعی که باز نکرده‌ای و اعداد بی‌منشأ ممنوع‌اند.
 
 در `research/analysis.md` برای هر id جدول ورودی‌های استخراج‌شده، محاسبهٔ قابل‌بازتولید، نتیجه و محدودیت بنویس. همین فایل سند پژوهش انجام‌شده است، نه برنامهٔ کار. پاسخ نهایی کوتاه باشد.
 
@@ -124,7 +136,7 @@ def run(context: dict[str, Any], services: Any) -> None:
             data = json.loads(target.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = None
-        issues = evidence_issues(data, deliverables)
+        issues = evidence_issues(data, deliverables, iran_required=not course_research)
         analysis = workspace / "research" / "analysis.md"
         if not analysis.is_file() or not analysis.read_text(encoding="utf-8").strip():
             issues.append("research/analysis.md is missing or empty")

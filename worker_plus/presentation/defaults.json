@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "layout_version": 2,
+  "default_slide_count": 20,
+  "aspect_ratio": "16:9",
+  "font": "Vazirmatn",
+  "title_pt": 30,
+  "body_pt": 22,
+  "citation_pt": 13,
+  "max_body_words": 65,
+  "max_points": 4,
+  "sections": ["title", "problem", "objectives", "background", "method", "results", "discussion", "limitations", "conclusion", "references", "questions"],
+  "policy": "Adapt section allocation, audience, narrative and layouts to order notes, supplied evidence and requested slide count. Missing findings must be disclosed, never invented. Count includes cover, references and questions; no hidden extra slides.",
+  "guidance_sources": [
+    {"url": "https://mitcommlab.mit.edu/nse/commkit/structuring-a-slide-presentation/", "use": "Audience and central message; motivation, methods, results and implications", "checked": "2026-10-22"},
+    {"url": "https://www.northwestern.edu/climb/resources/oral-communication-skills/designing-PowerPoint-slides.html", "use": "One message per slide, simple diagrams and annotated evidence", "checked": "2026-10-22"}
+  ]
+}

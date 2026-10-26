@@ -1,0 +1,21 @@
+{
+  "03_check_intake": "کنترل منبع اطلاعات و تعداد اسلاید",
+  "04_extract_university_rules": "تنظیم قالب و خوانایی ارائه",
+  "04a_build_order_contract": "قرارداد ساخت ارائه",
+  "05a_analyze_customer_sources": "استخراج متن، جدول و تصویر منبع",
+  "05b_resolve_source_rules": "تفکیک محتوای منبع از دستور ارائه",
+  "05c_research_evidence": "نمایه شواهد و ارجاع‌های منبع",
+  "06_build_thesis_plan": "سناریو و چیدمان اسلایدها",
+  "06a_plan_visuals": "طرح شکل‌ها و نمودارهای ارائه",
+  "06b_generate_visual_assets": "کنترل دارایی‌های تصویری منبع",
+  "07_generate_content": "نوشتن اسلاید و یادداشت سخنران",
+  "07a_validate_visual_placement": "کنترل داده و چیدمان اسلایدها",
+  "08_review_content": "ممیزی روایت و صحت ارائه",
+  "08b_audit_source_compliance": "تطبیق ادعاهای اسلاید با منبع",
+  "09_package_docx": "ساخت پاورپوینت قابل ویرایش",
+  "09b_polish_cover": "کنترل جلد و فایل PPTX",
+  "09c_package_interim_reports": "ساخت نسخه نمونه اسلایدها",
+  "10b_finalize_persian_pagination": "رندر ارائه و خروجی PDF",
+  "10c_verify_persian_pagination": "کنترل بصری و راست‌به‌چپ",
+  "10_validate_and_publish": "اعتبارسنجی و تحویل ارائه"
+}

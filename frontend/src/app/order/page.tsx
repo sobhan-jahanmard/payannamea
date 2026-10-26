@@ -25,6 +25,8 @@ import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Textarea } from "../../components/ui/textarea";
 import { createOrder, uploadOrderFile } from "../../lib/api";
+import { INFORMATION_SOURCE_EXTENSIONS, isPresentationOrder, DEFAULT_PRESENTATION_STYLE, DEFAULT_PRESENTATION_FONT, PRESENTATION_STYLES, PRESENTATION_FONTS, presentationStyleLabel } from "../../lib/presentation";
+import { PresentationOptions } from "../../components/presentation-options";
 import { trackAnalyticsEvent } from "../../lib/analytics";
 import { formatBytes } from "../../lib/format";
 import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../../lib/jalali";
@@ -73,6 +75,8 @@ const formSchema = z.object({
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
   requires_charts: z.boolean(),
+  presentation_style: z.enum(PRESENTATION_STYLES.map(style => style.id) as [string, ...string[]]),
+  presentation_font: z.enum(PRESENTATION_FONTS.map(font => font.id) as [string, ...string[]]),
   deadline: z.string().optional(),
   notes: z.string().optional(),
   moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional()
@@ -248,6 +252,7 @@ function OrderForm() {
   const [guidelineFiles, setGuidelineFiles] = useState<File[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
+  const [informationSource, setInformationSource] = useState<File | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [advancingStep, setAdvancingStep] = useState(false);
@@ -285,16 +290,19 @@ function OrderForm() {
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
       requires_charts: false,
+      presentation_style: DEFAULT_PRESENTATION_STYLE,
+      presentation_font: DEFAULT_PRESENTATION_FONT,
       moarref_code: ""
     }
   });
 
   const watched = watch();
+  const presentation = isPresentationOrder(watched);
   const selectedFieldConfig = orderTypeFieldConfig(watched.order_type);
   const isDetailVisible = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.visible.includes(field);
   const requiredMark = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.required.includes(field) ? " *" : "";
   const quantityTypes = selectedFieldConfig.quantityTypes;
-  const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length;
+  const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length + (presentation && informationSource ? 1 : 0);
 
   useEffect(() => {
     if (!quantityTypes.includes(watched.quantity_type as QuantityType)) {
@@ -329,6 +337,8 @@ function OrderForm() {
         "abstract",
         "quantity_type",
         "quantity_value",
+        "presentation_style",
+        "presentation_font",
       ],
       3: ["moarref_code"]
     }),
@@ -336,6 +346,12 @@ function OrderForm() {
   );
 
   async function goNext() {
+    if (step === 2 && presentation && !informationSource) {
+      setSubmitError("برای ادامه، فایل «منبع اطلاعات» ارائه را بارگذاری کنید.");
+      document.getElementById("information-source")?.focus();
+      return;
+    }
+    setSubmitError(null);
     setAdvancingStep(true);
     try {
       const fieldsToValidate = stepFields[step];
@@ -385,6 +401,11 @@ function OrderForm() {
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
     setCreatedOrder(null);
+    if (isPresentationOrder(values) && !informationSource) {
+      setSubmitError("فایل «منبع اطلاعات» را برای ساخت پاورپوینت اضافه کنید.");
+      setStep(2);
+      return;
+    }
     if (isStaff && !compact(values.customer_phone)) {
       setSubmitError("شماره موبایل مشتری را وارد کنید.");
       return;
@@ -414,6 +435,7 @@ function OrderForm() {
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
       requires_charts: values.requires_charts,
+      ...(presentation ? { presentation_style: values.presentation_style, presentation_font: values.presentation_font } : {}),
       deadline: compact(values.deadline),
       notes: compact(values.notes),
       moarref_code: compact(values.moarref_code),
@@ -426,7 +448,7 @@ function OrderForm() {
         file_count: totalFiles,
         has_referral_code: Boolean(compact(values.moarref_code))
       });
-      const order = await createOrder(payload);
+      const order = await createOrder(payload, presentation ? informationSource ?? undefined : undefined);
       for (const file of guidelineFiles) {
         await uploadOrderFile(order.id, "university_guideline", file);
       }
@@ -643,6 +665,7 @@ function OrderForm() {
                 ) : null}
               </div>
 
+              {presentation && <PresentationOptions style={watched.presentation_style} font={watched.presentation_font} onStyle={id => setValue("presentation_style", id, { shouldDirty: true, shouldValidate: true })} onFont={id => setValue("presentation_font", id, { shouldDirty: true, shouldValidate: true })}/>}
               <div className="grid gap-4 lg:grid-cols-2">
                 <h2 className="text-base font-semibold lg:col-span-2">الزامات خروجی</h2>
                 <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
@@ -690,6 +713,20 @@ function OrderForm() {
                   شیوه‌نامه و فایل‌های منبع بیشترین اثر را روی بررسی سریع و خروجی درست دارند.
                 </p>
               </div>
+              {presentation && <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
+                <label htmlFor="information-source" className="mb-2 block font-medium">منبع اطلاعات *</label>
+                <p id="information-source-help" className="mb-3 text-sm text-muted-foreground">فایل پایان‌نامه، گزارش یا متن اصلی که ارائه باید از آن ساخته شود. DOCX، PDF متنی، PPTX، TXT یا MD؛ حداکثر ۵۰ مگابایت.</p>
+                <Input id="information-source" type="file" accept={INFORMATION_SOURCE_EXTENSIONS.join(",")} aria-required="true" aria-describedby="information-source-help" onChange={event => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (!file) return;
+                  if (!INFORMATION_SOURCE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)) || !file.size || file.size > 50 * 1024 * 1024) {
+                    setSubmitError("منبع اطلاعات باید فایل مجاز، غیرخالی و حداکثر ۵۰ مگابایت باشد."); return;
+                  }
+                  setSubmitError(null); setInformationSource(file);
+                }}/>
+                <FileSummary files={informationSource ? [informationSource] : []} onRemove={() => setInformationSource(null)}/>
+              </div>}
               <div className="grid gap-5 lg:grid-cols-3">
                 <div className="rounded-md border border-border bg-white p-4">
                   <div className="mb-3 flex items-center gap-2 font-medium">
@@ -776,6 +813,7 @@ function OrderForm() {
                     <dt className="text-muted-foreground">گراف و چارت</dt>
                     <dd className="font-medium">{watched.requires_charts ? "نیاز است" : "نیاز نیست"}</dd>
                   </div>
+                  {presentation && <><div><dt className="text-muted-foreground">سبک ارائه</dt><dd className="font-medium">{presentationStyleLabel(watched.presentation_style)}</dd></div><div><dt className="text-muted-foreground">فونت ارائه</dt><dd className="font-medium">{watched.presentation_font}</dd></div></>}
                   <div>
                     <dt className="text-muted-foreground">فایل‌ها</dt>
                     <dd className="font-medium">{totalFiles.toLocaleString("fa-IR")}</dd>

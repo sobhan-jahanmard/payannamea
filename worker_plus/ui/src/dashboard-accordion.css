@@ -1,0 +1,16 @@
+.dashboard-accordion{margin-top:18px;background:#fff;border:1px solid #dce2de;border-radius:14px;box-shadow:0 6px 25px rgba(21,44,34,.04);overflow:hidden}
+.dashboard-accordion-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;padding:15px 20px;font-size:17px;font-weight:800;color:#183c2d;cursor:pointer}
+.dashboard-accordion-summary::-webkit-details-marker{display:none}
+.dashboard-accordion-summary svg{flex-shrink:0;color:#60766a;transition:transform .2s}
+.dashboard-accordion:not([open]) .dashboard-accordion-summary svg{transform:rotate(90deg)}
+.dashboard-accordion-summary:focus-visible{outline:3px solid #16845e;outline-offset:-3px}
+.dashboard-accordion[open]>.dashboard-accordion-summary{border-bottom:1px solid #e5ebe6}
+.dashboard-accordion-body>.panel{margin:0;border:0;border-radius:0;box-shadow:none}
+.run-accordion .run-panel>h3,.workflow-accordion .workflow-overview>h3,.artifacts-accordion .artifact-header h3,.review-accordion .ai-review-heading h3{display:none}
+.review-accordion .ai-review-heading{margin-bottom:4px}
+.console-accordion{background:#17211d;border-color:#34413b}
+.console-accordion .dashboard-accordion-summary{color:#d7e4dc}
+.console-accordion .dashboard-accordion-summary svg{color:#85a092}
+.console-accordion[open]>.dashboard-accordion-summary{border-bottom-color:#34413b}
+.console-accordion .dashboard-accordion-body>.console{background:#17211d}
+@media(prefers-reduced-motion:reduce){.dashboard-accordion-summary svg{transition:none}}

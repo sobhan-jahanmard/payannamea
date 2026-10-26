@@ -88,7 +88,7 @@ export const orderTypeFieldConfigs: Record<string, OrderTypeFieldConfig> = {
   "ارائه و پاورپوینت": {
     visible: ["instructor_name", "course_name"],
     required: ["course_name"],
-    quantityTypes: ["slides", "pages"],
+    quantityTypes: ["slides"],
     defaultQuantityType: "slides",
     defaultDegree: "کارشناسی"
   }

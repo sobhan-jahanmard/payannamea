@@ -40,6 +40,8 @@ import {
   universityOptions,
 } from "../../lib/order-options";
 import type { Order, OrderFile, OrderUpdatePayload } from "../../types/api";
+import { isPresentationOrder, PRESENTATION_STYLES, PRESENTATION_FONTS, DEFAULT_PRESENTATION_STYLE, DEFAULT_PRESENTATION_FONT, presentationStyleLabel } from "../../lib/presentation";
+import { PresentationOptions } from "../../components/presentation-options";
 
 const optionalQuantity = z.preprocess((value) => {
   if (value === "" || value === null || value === undefined) {
@@ -71,6 +73,8 @@ const formSchema = z.object({
   quantity_type: z.string().min(1, "واحد حجم را انتخاب کنید"),
   quantity_value: optionalQuantity,
   requires_charts: z.boolean(),
+  presentation_style: z.enum(PRESENTATION_STYLES.map(style => style.id) as [string, ...string[]]),
+  presentation_font: z.enum(PRESENTATION_FONTS.map(font => font.id) as [string, ...string[]]),
   deadline: z.string().optional(),
   notes: z.string().optional(),
   moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional()
@@ -100,6 +104,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const fileTypeOptions = [
+  { value: "information_source", label: "منبع اطلاعات ارائه" },
   { value: "format_template", label: "قالب و فرمت Word" },
   { value: "university_guideline", label: "شیوه‌نامه دانشگاه" },
   { value: "reference_file", label: "منابع و مقالات" },
@@ -143,6 +148,8 @@ function valuesFromOrder(order: Order): FormValues {
     quantity_type: order.quantity_type ?? orderTypeFieldConfig(order.order_type).defaultQuantityType,
     quantity_value: order.quantity_value ?? undefined,
     requires_charts: order.requires_charts,
+    presentation_style: order.presentation_style || DEFAULT_PRESENTATION_STYLE,
+    presentation_font: order.presentation_font || DEFAULT_PRESENTATION_FONT,
     deadline: order.deadline ?? "",
     notes: order.notes ?? "",
     moarref_code: order.moarref_code ?? ""
@@ -330,6 +337,8 @@ function StatusContent() {
       quantity_type: orderTypeFieldConfig(orderTypeOptions[0]).defaultQuantityType,
       deadline: "",
       requires_charts: false,
+      presentation_style: DEFAULT_PRESENTATION_STYLE,
+      presentation_font: DEFAULT_PRESENTATION_FONT,
       moarref_code: ""
     }
   });
@@ -413,6 +422,7 @@ function StatusContent() {
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
       requires_charts: values.requires_charts,
+      ...(isPresentationOrder(values) ? { presentation_style: values.presentation_style, presentation_font: values.presentation_font } : {}),
       deadline: compact(values.deadline),
       notes: compact(values.notes),
       moarref_code: compact(values.moarref_code),
@@ -638,6 +648,7 @@ function StatusContent() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <h3 className="text-base font-semibold lg:col-span-2">الزامات خروجی</h3>
+                  {isPresentationOrder(watched) && <div className="sm:col-span-2"><PresentationOptions style={watched.presentation_style} font={watched.presentation_font} onStyle={id => setValue("presentation_style", id, { shouldDirty: true, shouldValidate: true })} onFont={id => setValue("presentation_font", id, { shouldDirty: true, shouldValidate: true })}/></div>}
                   <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
                     <Select {...register("methodology")}>{methodologyOptions.map((option) => <option key={option}>{option}</option>)}</Select>
                   </Field>
@@ -742,6 +753,7 @@ function StatusContent() {
                 value={order.quantity_value ? `${order.quantity_value.toLocaleString("fa-IR")} ${quantityLabel(order.quantity_type)}` : "-"}
               />
               <DetailItem label="گراف و چارت" value={order.requires_charts ? "نیاز است" : "نیاز نیست"} />
+              {isPresentationOrder(order) && <><DetailItem label="سبک ارائه" value={presentationStyleLabel(order.presentation_style)}/><DetailItem label="فونت ارائه" value={order.presentation_font || DEFAULT_PRESENTATION_FONT}/></>}
               <DetailItem label="روش یا رویکرد انجام" value={order.methodology} />
               <DetailItem label="زبان" value={order.language} />
               <DetailItem label="مهلت تحویل" value={formatDate(order.deadline)} />

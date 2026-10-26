@@ -14,7 +14,7 @@ const Module = require('node:module');
   const commonRoot = path.join(workerRoot, 'common');
   fs.mkdirSync(compiledRoot, { recursive: true });
   fs.mkdirSync(commonRoot, { recursive: true });
-  for (const file of ['main.js', 'cleanup.js']) fs.copyFileSync(path.join(__dirname, '../dist-electron', file), path.join(compiledRoot, file));
+  for (const file of ['main.js', 'cleanup.js', 'presentation-preview.js']) fs.copyFileSync(path.join(process.env.WORKER_UI_ELECTRON_DIST || path.join(__dirname, '../dist-electron'), file), path.join(compiledRoot, file));
   for (const file of ['workspace_cleanup.py', 'execution_lock.py']) fs.copyFileSync(path.join(__dirname, '../../common', file), path.join(commonRoot, file));
   fs.writeFileSync(path.join(workerRoot, '.env'), 'BACKEND_URL=http://127.0.0.1:1\n');
   // A local waiting process exercises the real stop/start guards without an order claim.
@@ -37,7 +37,15 @@ const Module = require('node:module');
   const openedPaths = [];
   const fakeElectron = {
     app: { isPackaged: false, whenReady: async () => {}, on() {}, quit() {} },
-    BrowserWindow: class { constructor() { this.webContents = { send: (_channel, event) => events.push(event) }; } loadFile() {} static getAllWindows() { return []; } },
+    BrowserWindow: class {
+      constructor() { this.webContents = { send: (_channel, event) => events.push(event), on() {} }; }
+      loadFile() { return Promise.resolve(); } on() {} once() {} isDestroyed() { return false; }
+      getBounds() { return { x: 0, y: 0, width: 1280, height: 840 }; }
+      setBounds() {} setAlwaysOnTop() {} showInactive() {} hide() {}
+      static getAllWindows() { return []; }
+    },
+    screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }), on() {} },
+    powerMonitor: { on() {} },
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
     shell: { openPath: async target => { openedPaths.push(target); return ''; } }
   };
@@ -64,13 +72,14 @@ const Module = require('node:module');
     fs.unlinkSync(linkedArchive);
     await assert.rejects(async () => invoke('worker:open-output', 'final.pdf'), /تأیید/);
     write(context, JSON.stringify({ order_id: 'test-order', status: 'dry_run_complete', completed_steps: ['10_validate_and_publish'] }));
+    await assert.rejects(async () => invoke('worker:publish-local', 'wrong-order'), /فعلی/);
     await invoke('worker:open-output', 'final.pdf');
     await invoke('worker:open-final-folder');
     assert(openedPaths.includes(path.join(run, 'final', 'final.pdf')));
     assert(openedPaths.includes(path.join(run, 'final')));
     write(context, JSON.stringify({ order_id: 'test-order', status: 'paused' }));
     const largeNote = 'راهنمای اصلاح '.repeat(10000) + 'END_OF_NOTE';
-    invoke('worker:start', { orderId: 'test-order', offline: true, sample: false, step: 5, note: largeNote });
+    invoke('worker:start', { orderId: 'test-order', offline: true, sample: false, step: 5, note: largeNote, autoRepair: true });
     stopped = false;
     const deadline = Date.now() + 8000;
     while (!events.some(event => event.type === 'log' && String(event.value).includes('isolated-worker-ready'))) {
@@ -80,6 +89,7 @@ const Module = require('node:module');
     assert.equal(fs.readFileSync(path.join(workerRoot, 'received-note.txt'), 'utf8'), largeNote);
     const startingLog = events.find(event => event.type === 'log' && String(event.value).includes('[worker] starting'));
     assert(String(startingLog.value).includes('--operator-note-stdin'));
+    assert(String(startingLog.value).includes('--auto-repair'));
     assert(!String(startingLog.value).includes(largeNote));
     await assert.rejects(async () => invoke('worker:reset', options));
     assert(fs.existsSync(context));
@@ -103,7 +113,19 @@ const Module = require('node:module');
     assert.equal(fs.readFileSync(otherRun, 'utf8'), 'other');
     assert(fs.existsSync(legacy));
     assert.equal(fs.readFileSync(path.join(workerRoot, '.env'), 'utf8'), 'BACKEND_URL=http://127.0.0.1:1\n');
-    console.log('PASS: complete 130k+ guidance over stdin, desktop IPC -> Python cleanup, worker guards, local scope and cleared desktop state');
+    // Completed orders can be the active workspace directly under workspace/order_<id>.
+    const completedId = 'completed-order';
+    const completedRun = path.join(workspaceRoot, `order_${completedId}`);
+    write(path.join(completedRun, 'order_context.json'), JSON.stringify({ order_id: completedId, status: 'dry_run_complete' }));
+    write(path.join(completedRun, 'final/final.pdf'), 'completed fixture');
+    write(pointer, JSON.stringify({ path: `order_${completedId}` }));
+    await assert.rejects(async () => invoke('worker:reset', { orderId: 'other-order', workspace: completedRun }));
+    assert(fs.existsSync(completedRun));
+    const completedResult = await invoke('worker:reset', { orderId: completedId, workspace: completedRun });
+    assert.equal(completedResult.files_removed, 2);
+    assert.equal(fs.existsSync(completedRun), false);
+    assert.equal(fs.readFileSync(archive, 'utf8'), 'archive');
+    console.log('PASS: desktop IPC -> Python cleanup for active runs and completed order folders, guards, local scope and cleared state');
   } finally {
     Module._load = originalLoader; global.fetch = originalFetch;
     if (!stopped && handlers.has('worker:stop')) await invoke('worker:stop');

@@ -1,0 +1,47 @@
+.order-details{margin-top:18px}
+.order-details-header{display:flex;justify-content:space-between;align-items:start;gap:16px}
+.order-details-header h2{font-size:21px;margin:9px 0 5px;line-height:1.6}
+.order-details-id{display:block;text-align:right;color:#76847b;font-size:11px;overflow-wrap:anywhere}
+.order-details-sync{margin:0 0 14px;padding:9px 11px;border-radius:8px;background:#fff8e8;color:#795a22;font-size:12px;line-height:1.7}
+.order-details-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+.order-detail-item{min-width:0;background:#f6f8f6;border-radius:8px;padding:9px 11px}
+.order-detail-item dt{font-size:11px;color:#748178;margin-bottom:4px}
+.order-detail-item dd{margin:0;font-size:13px;font-weight:600;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.order-details-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,35%);gap:18px;align-items:start}
+.order-detail-group{border-top:1px solid #e4eae5;padding-top:13px;margin-top:13px}
+.order-detail-group:first-child{margin-top:0}
+.order-detail-group h3,.order-costs h3{margin:0 0 10px;color:#315540;font-size:15px}
+.order-detail-group dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.order-detail-collections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.order-detail-collection{border:1px solid #e0e8e1;border-radius:8px;background:#f9fbf9;padding:9px 11px;min-width:0}
+.order-detail-collection summary{cursor:pointer;font-size:12px;font-weight:700;color:#315540}
+.order-detail-entry{border-top:1px solid #e0e8e1;margin-top:9px;padding-top:9px;min-width:0}
+.order-detail-entry-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:7px}
+.order-detail-entry-header>b{display:block;font-size:12px;overflow-wrap:anywhere}
+.order-detail-entry-header button{display:flex;align-items:center;gap:5px;min-height:34px;padding:6px 9px;border:1px solid #a5cfb3;border-radius:7px;background:#edf8f0;color:#116b49;font-size:11px;font-weight:700}
+.order-detail-entry-header button:disabled{opacity:.6;cursor:wait}
+.order-download-error,.order-download-notice{margin:0 0 10px;padding:8px 10px;border-radius:7px;font-size:12px;line-height:1.7}
+.order-download-error{background:#fff0ee;color:#a33129}
+.order-download-notice{background:#e9f6ee;color:#176e4a}
+.order-detail-entry dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0}
+.order-detail-entry .order-detail-item{background:#fff;padding:6px 8px}
+.order-detail-entry .order-detail-item dd{font-size:11px}
+.order-detail-collection p,.order-cost-runs p{color:#7c8980;font-size:12px;margin:7px 0 0}
+.order-costs{padding:15px;border:1px solid #dce8de;border-radius:10px;background:#f9fbf9}
+.order-cost-total{padding:12px;border-radius:9px;background:#eaf5ed;display:flex;flex-direction:column;gap:4px}
+.order-cost-total span,.order-live-usage b{font-size:12px}
+.order-cost-total strong{font-size:22px;text-align:right;color:#176e4a}
+.order-cost-total small,.order-live-usage small,.order-cost-note{font-size:11px;color:#6f8073;line-height:1.7}
+.order-live-usage{display:flex;flex-direction:column;gap:4px;padding:11px;margin-top:10px;border:1px solid #dde8e0;border-radius:8px;background:#fff;font-size:12px}
+.order-cost-runs{margin-top:14px}
+.order-cost-runs h4{font-size:13px;margin:0 0 8px}
+.order-cost-runs details{border-top:1px solid #dfe7e0;padding:9px 0}
+.order-cost-runs summary{display:flex;justify-content:space-between;gap:8px;cursor:pointer;font-size:12px;line-height:1.6}
+.order-cost-runs summary span{overflow-wrap:anywhere}
+.order-cost-runs summary b{white-space:nowrap;color:#176e4a}
+.order-cost-runs dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:10px 0 0}
+.order-cost-runs .order-detail-item{background:#fff;padding:6px 8px}
+.order-cost-runs .order-detail-item dd{font-size:11px}
+.order-cost-note{display:block;margin-top:11px}
+@media(max-width:1250px){.order-details-body{grid-template-columns:1fr}.order-detail-group dl{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.order-details-summary,.order-detail-group dl{grid-template-columns:repeat(2,minmax(0,1fr))}.order-detail-collections{grid-template-columns:1fr}}

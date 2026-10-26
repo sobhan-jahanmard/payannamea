@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "default_style": "academic-modern",
+  "default_font": "Vazirmatn",
+  "fonts": [
+    {"id": "Vazirmatn", "label": "وزیرمتن · پیشنهادی برای نمایش", "bundled": true},
+    {"id": "Tahoma", "label": "Tahoma", "bundled": false},
+    {"id": "B Nazanin", "label": "بی‌نازنین · نیازمند نصب روی رایانهٔ پردازشگر", "bundled": false},
+    {"id": "B Mitra", "label": "بی‌میترا · نیازمند نصب روی رایانهٔ پردازشگر", "bundled": false}
+  ],
+  "styles": [
+    {"id": "academic-formal", "label": "دانشگاهی رسمی", "description": "ساختار منظم، تیترهای مشخص و نمودارهای ساده برای جلسهٔ دفاع", "canvas": "FCFCFA", "ink": "172F46", "accent": "345B78", "secondary": "A27A38", "muted": "536477", "cover": "172F46", "font": "Vazirmatn", "heading_pt": 32, "body_pt": 22},
+    {"id": "academic-modern", "label": "دانشگاهی مدرن", "description": "روایت روشن، فضای تنفس و دیاگرام‌های خوانا برای ارائهٔ پژوهش", "canvas": "FFFFFF", "ink": "123B42", "accent": "007D82", "secondary": "C17D36", "muted": "51666B", "cover": "123B42", "font": "Vazirmatn", "heading_pt": 33, "body_pt": 22},
+    {"id": "analytical-business", "label": "تحلیلی و شرکتی", "description": "تأکید بر شاخص‌ها، مقایسهٔ سناریوها و تصمیم‌گیری", "canvas": "FFFFFF", "ink": "14293E", "accent": "205CBC", "secondary": "B66225", "muted": "536477", "cover": "14293E", "font": "Vazirmatn", "heading_pt": 34, "body_pt": 22},
+    {"id": "visual-teaching", "label": "آموزشی و تصویری", "description": "توضیح مرحله‌ای، جریان فرایند و خط زمانی برای آموزش", "canvas": "FFFEF9", "ink": "243A48", "accent": "A54236", "secondary": "236E8A", "muted": "586873", "cover": "243A48", "font": "Vazirmatn", "heading_pt": 34, "body_pt": 23}
+  ]
+}

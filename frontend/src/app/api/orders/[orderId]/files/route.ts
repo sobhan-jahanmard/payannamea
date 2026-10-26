@@ -1,5 +1,6 @@
 import { getCurrentUser } from "../../../../../server/auth";
 import { saveUpload } from "../../../../../server/files";
+import { validateInformationSource } from "../../../../../server/presentation";
 import { ApiError, errorResponse, json } from "../../../../../server/http";
 import { addOrderFile, deleteOrderFile, getOrderForUserOr404, serializeOrder } from "../../../../../server/orders";
 
@@ -22,6 +23,7 @@ export async function POST(request: Request, context: Context) {
       throw new ApiError(422, "file_type and file are required");
     }
 
+    if (fileType === "information_source") await validateInformationSource(file);
     const stored = await saveUpload(file, `orders/${order.id}/input`);
     const updated = await addOrderFile(order, {
       order_id: order.id,

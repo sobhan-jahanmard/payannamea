@@ -21,6 +21,10 @@ def write_text(path: Path, text: str) -> None:
 
 def archive_workspace(workspace: Path, order_id: str) -> Path:
     archive = workspace.parent / f"order_{order_id}"
+    # A retained order directory may itself be the active workspace. Never
+    # delete its contents while trying to archive it onto the same directory.
+    if archive.resolve() == workspace.resolve():
+        return workspace
     if archive.exists():
         shutil.rmtree(archive)
     shutil.copytree(workspace, archive)

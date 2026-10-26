@@ -4,3 +4,5 @@ python-dotenv>=1.0,<2
 pypdf>=5,<7
 matplotlib>=3.9,<4
 PyMuPDF>=1.24,<2
+python-pptx>=1.0.2,<2
+pywin32>=306; sys_platform == "win32"

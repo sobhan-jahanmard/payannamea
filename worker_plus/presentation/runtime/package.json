@@ -1,0 +1,8 @@
+{
+  "name": "daneshyar-presentation-renderer",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": { "pptxgenjs": "4.0.1" }
+}

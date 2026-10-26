@@ -43,9 +43,10 @@ def cleanup(order_id: str, workspace: str) -> dict[str, object]:
     with execution_lock(root):
         pointer = json.loads((root / "active.json").read_text(encoding="utf-8"))
         relative = Path(pointer["path"])
-        if relative.is_absolute() or ".." in relative.parts or relative.parts not in (("in_progress",),) and not (
+        valid_run = relative.parts == ("in_progress",) or (
             len(relative.parts) == 2 and relative.parts[0] == "runs" and relative.parts[1] not in ("", ".", "..")
-        ):
+        ) or relative.parts == (f"order_{order_id}",)
+        if relative.is_absolute() or ".." in relative.parts or not valid_run:
             raise ValueError("مسیر اجرای فعال معتبر نیست.")
         selected = root / relative
         if not selected.is_dir() or selected.resolve() != Path(workspace).resolve():

@@ -20,8 +20,14 @@ class DeliverablePolicyTests(unittest.TestCase):
     def test_unrelated_research_does_not_receive_factory_deliverables(self) -> None:
         order = {"title": "بررسی سبک‌های یادگیری دانشجویان", "order_type": "تحقیق دانشگاهی"}
         contract = deliverable_contract(order)
-        self.assertEqual(contract["project_type"], "academic_research")
-        self.assertNotIn("layout", {item["id"] for item in contract["deliverables"]})
+        self.assertEqual(contract["project_type"], "course_research")
+        ids = {item["id"] for item in contract["deliverables"]}
+        self.assertNotIn("layout", ids)
+        self.assertTrue({"research_question", "method_application"} <= ids)
+
+    def test_course_report_about_a_factory_is_not_a_factory_design(self) -> None:
+        order = {"title": "بررسی زمان‌بندی در کارخانه‌ها", "order_type": "تحقیق دانشگاهی"}
+        self.assertEqual(classify_project(order), "course_research")
 
     def test_guidance_instead_of_execution_fails(self) -> None:
         order = {"title": "امکان‌سنجی کارخانه محصول نمونه"}

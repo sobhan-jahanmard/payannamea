@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any
 
@@ -9,12 +10,17 @@ from common.helpers import write_json, write_text
 
 TITLE = "Package required interim reports"
 
-_HEADING = re.compile(r"(?m)^#\s+([0-9۰-۹٠-٩]+)\.\s+.+$")
+_HEADING = re.compile(r"(?m)^#\s+([0-9۰-۹٠-٩]+)(?:\.|\s)\s*.+$")
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 REPORTS = (
     ("report_1", "گزارش ۱: بررسی اولیه"),
     ("report_2", "گزارش ۲: تحلیل بازار و فنی"),
     ("report_3", "گزارش ۳: تحلیل مالی و اقتصادی"),
+)
+RESEARCH_REPORTS = (
+    ("report_1", "گزارش ۱: مسئله و مبانی"),
+    ("report_2", "گزارش ۲: روش و شواهد"),
+    ("report_3", "گزارش ۳: یافته‌ها و جمع‌بندی"),
 )
 
 
@@ -33,11 +39,15 @@ def split_chapters(markdown: str) -> tuple[str, dict[int, str], str]:
     return abstract, chapters, references
 
 
-def report_chapter_groups(chapters: dict[int, str]) -> tuple[tuple[int, ...], ...]:
+def report_chapter_groups(chapters: dict[int, str], research_report: bool = False) -> tuple[tuple[int, ...], ...]:
     """Split at actual market and finance chapters, not fixed chapter numbers."""
     numbers = sorted(chapters)
     if len(numbers) < 3:
         raise RuntimeError("Cannot package three interim reports from fewer than three chapters")
+    if research_report:
+        first = math.ceil(len(numbers) / 3)
+        second = first + math.ceil((len(numbers) - first) / 2)
+        return (tuple(numbers[:first]), tuple(numbers[first:second]), tuple(numbers[second:]))
     headings = {number: chapters[number].splitlines()[0] for number in numbers}
     market = next((number for number in numbers[1:] if any(word in headings[number] for word in ("بازار", "تقاضا"))), None)
     finance = next((number for number in numbers[1:] if any(word in headings[number] for word in ("مالی", "اقتصادی"))), None)
@@ -62,12 +72,13 @@ def run(context: dict[str, Any], services: Any) -> None:
         return
     source = workspace / context["artifacts"]["source"]
     abstract, chapters, references = split_chapters(source.read_text(encoding="utf-8"))
-    groups = report_chapter_groups(chapters)
+    research_report = context["order"].get("order_type") == "تحقیق دانشگاهی"
+    groups = report_chapter_groups(chapters, research_report=research_report)
     if not references.strip():
         raise RuntimeError("Cannot package interim reports without a reference list")
     rules = json.loads((workspace / context["artifacts"]["university_rules"]).read_text(encoding="utf-8"))
     files: list[dict[str, str]] = []
-    for (stem, title), numbers in zip(REPORTS, groups):
+    for (stem, title), numbers in zip(RESEARCH_REPORTS if research_report else REPORTS, groups):
         markdown = workspace / "final" / f"{stem}.md"
         docx = workspace / "final" / f"{stem}.docx"
         pdf = workspace / "final" / f"{stem}.pdf"
