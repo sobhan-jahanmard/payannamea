@@ -43,6 +43,12 @@ const stages = require('../../common/stages.json');
     if (screenshot) await widget.screenshot({ path: path.resolve(screenshot) });
     assert(await widget.getByText('سفارش فعال برای بررسی ویجت', { exact: true }).isVisible());
     await page.evaluate(stages => window.__widgetFixture.update({ running: false, context: {
+      order_id: 'fixture-active', status: 'failed', current_step: stages[2].id,
+      completed_steps: stages.slice(0, 2).map(stage => stage.id), errors: ['[WinError 5] Access is denied: order_context.json']
+    } }), stages);
+    await widget.getByText('مرحلهٔ ۳ · خطا در اجرا', { exact: true }).waitFor();
+    await widget.getByText('[WinError 5] Access is denied: order_context.json', { exact: true }).waitFor();
+    await page.evaluate(stages => window.__widgetFixture.update({ running: false, context: {
       order_id: 'fixture-active', status: 'in_progress', current_step: stages[6].id, completed_steps: stages.slice(0, 6).map(stage => stage.id)
     } }), stages);
     await widget.getByText('مرحلهٔ ۷ · متوقف', { exact: true }).waitFor();

@@ -111,8 +111,31 @@ def is_file_access_error(error: Exception) -> bool:
         return True
     message = str(error).lower()
     return any(marker in message for marker in (
-        "permission denied", "sharing violation", "being used by another process", "file is locked for editing",
+        "permission denied", "access is denied", "winerror 5", "sharing violation", "being used by another process", "file is locked for editing",
     ))
+
+
+def preserve_unstructured_failure(context: dict[str, Any]) -> None:
+    """Keep failures written by older runners before resume clears their error list."""
+    if context.get("status") not in {"failed", "paused"}:
+        return
+    error = str((context.get("errors") or [""])[-1] or context.get("pause_reason") or "")
+    if not error:
+        return
+    history = context.setdefault("recovery_history", [])
+    if history and history[-1].get("error") == error:
+        return
+    nodes = context.get("execution_trace", {}).get("nodes", [])
+    step = context.get("current_step") or (nodes[-1].get("step") if nodes else None)
+    if step not in STEPS:
+        step = next((stage for stage in STEPS if stage not in context.get("completed_steps", [])), None)
+    if not step:
+        return
+    failure = {"failed_step": step, "restart_step": step, "error": error}
+    if is_file_access_error(RuntimeError(error)):
+        failure["kind"] = "file_access"
+    history.append(failure)
+    context["active_failure"] = failure
 
 
 def has_declared_chart_figure(markdown: str, manifest: Path | None = None) -> bool:
@@ -1218,6 +1241,7 @@ def main() -> None:
     args.redo = args.redo or bool(args.order_id) or args.repackage
     if args.repackage:
         context = load(workspace)
+        preserve_unstructured_failure(context)
         if not context.get("order_id"):
             raise SystemExit("No saved order is available to repackage.")
         if not args.offline:
@@ -1233,6 +1257,7 @@ def main() -> None:
             context = new_context(workspace, "sample" if args.sample else "full")
         else:
             context = load(workspace)
+            preserve_unstructured_failure(context)
             if not context.get("order_id"):
                 raise SystemExit("No saved order is available; start with a normal run before using --step.")
             # A resumed sample publish must honour an explicit --sample flag.
@@ -1267,6 +1292,7 @@ def main() -> None:
                         stale.unlink()
     else:
         context = load(workspace) if args.resume else new_context(workspace, "sample" if args.sample else "full")
+        preserve_unstructured_failure(context)
     if args.resume:
         context["status"] = "in_progress"
         context["errors"] = []
@@ -1294,7 +1320,7 @@ def main() -> None:
             services.recovery_feedback = latest_recovery
     trace_session = begin_session(context, STEPS, "manual" if args.step else "repackage" if args.repackage else "resume" if args.resume else "run")
     save(workspace, context)
-    if args.auto_repair and services.recovery_feedback:
+    if args.auto_repair and services.recovery_feedback and not is_file_access_error(RuntimeError(args.failure_context)):
         from common.auto_repair import repair_worker_code
         trace = context["execution_trace"]
         failed_attempt = next((node for node in reversed(trace["nodes"]) if node["status"] in {"failed", "paused"} and node["step"] == latest_recovery.get("failed_step")), None)
@@ -1368,8 +1394,8 @@ def main() -> None:
             context["current_step"] = name
             trace_attempt = begin_attempt(context, STEPS, name, trace_session)
             services.active_attempt_id = trace_attempt
-            save(workspace, context)
             try:
+                save(workspace, context)
                 if pending_note_preflight and name == preflight_step:
                     analysis_report = workspace / "reports" / "operator_note_analysis.md"
                     analysis_report.parent.mkdir(parents=True, exist_ok=True)

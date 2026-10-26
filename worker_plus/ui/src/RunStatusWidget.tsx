@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleDashed, Externa
 import stageDefinitions from "../../common/stages.json";
 import presentationLabels from "../../presentation/stages.json";
 import type { WorkerState } from "./global";
+import { failureForContext } from "./recovery";
 
 const finished = new Set(["dry_run_complete", "worker_done_pending_approval", "sample_pending_customer_approval", "completed"]);
 const stageId = (id?: string | null) => id === "05c_research" ? "05c_research_evidence" : id;
@@ -25,7 +26,7 @@ export function RunStatusWidget({ state, desktop = false }: { state: WorkerState
   const completed = new Set(context?.completed_steps || []);
   const doneCount = stageDefinitions.filter(stage => completed.has(stage.id)).length;
   const done = !state?.running && finished.has(context?.status || "") && completed.has("10_validate_and_publish");
-  const failure = !done ? context?.active_failure || (["paused", "failed"].includes(context?.status || "") ? context?.recovery_history?.at(-1) : undefined) : undefined;
+  const failure = !done ? failureForContext(context) : undefined;
   const hasError = !state?.running && !done && Boolean(failure || context?.status === "failed");
   const activeId = stageId(state?.running
     ? context?.current_step || stageDefinitions.find(stage => !completed.has(stage.id))?.id

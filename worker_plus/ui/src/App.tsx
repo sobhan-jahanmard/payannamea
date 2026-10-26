@@ -4,7 +4,7 @@ import type { WorkerState, ArtifactRecord } from "./global";
 import { ORDER_STATUS_DEFINITIONS } from "../../../frontend/src/lib/order-status";
 import stageDefinitions from "../../common/stages.json";
 import presentationLabels from "../../presentation/stages.json";
-import { mergeRecoveryNote, recoveryNote, removeLegacyPresentationPlan } from "./recovery";
+import { failureForContext, mergeRecoveryNote, recoveryNote, removeLegacyPresentationPlan } from "./recovery";
 import { ExecutionGraph } from "./ExecutionGraph";
 import "./execution-graph.css";
 import { PresentationPreview } from "./PresentationPreview";
@@ -137,7 +137,7 @@ export function App() {
   const current = state?.running ? savedCurrent : undefined;
   const interruptedStep = !state?.running && state?.context?.status === "in_progress" ? savedCurrent : undefined;
   const displayedRunStatus = !matchingOrder ? "اجرا نشده" : state?.running ? "در حال انجام" : interruptedStep ? "متوقف / قطع‌شده" : runStatus(state?.context?.status);
-  const latestFailure = matchingOrder && !finalPackageReady ? state?.context?.active_failure || (state?.context?.status === "paused" || state?.context?.status === "failed" ? state?.context?.recovery_history?.at(-1) : undefined) : undefined;
+  const latestFailure = matchingOrder && !finalPackageReady ? failureForContext(runContext) : undefined;
   const codeRepair = matchingOrder && state?.autoRepair?.order_id === orderId && !state?.running ? state.autoRepair : undefined;
   const problemStep = !state?.running && (state?.context?.status === "paused" || state?.context?.status === "failed") ? currentStageId(latestFailure?.failed_step) : undefined;
   const suggestedIndex = latestFailure?.restart_step ? STEPS.indexOf(currentStageId(latestFailure.restart_step) || "") : -1;

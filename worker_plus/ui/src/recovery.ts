@@ -1,9 +1,28 @@
 import hints from "../../common/recovery_hints.json";
 import presentationHints from "../../presentation/recovery_hints.json";
-import type { FailureRecord } from "./global";
+import stages from "../../common/stages.json";
+import type { FailureRecord, WorkerState } from "./global";
+
+export function failureForContext(context?: WorkerState["context"]): FailureRecord | undefined {
+  if (!context) return undefined;
+  if (context.active_failure?.error) return context.active_failure;
+  if (!["failed", "paused"].includes(context.status || "")) return undefined;
+  const previous = context.recovery_history?.at(-1);
+  const error = context.errors?.at(-1) || context.pause_reason;
+  if (previous?.error && (!error || previous.error === error)) return previous;
+  if (!error) return undefined;
+  const attempt = context.execution_trace?.nodes.at(-1);
+  const step = context.current_step || attempt?.step || previous?.failed_step ||
+    stages.find(stage => !context.completed_steps?.includes(stage.id))?.id;
+  if (!step) return undefined;
+  const normalized = step === "05c_research" ? "05c_research_evidence" : step;
+  return { failed_step: normalized, restart_step: normalized, error,
+    ...(/access is denied|permission denied|winerror 5|sharing violation|file is locked/i.test(error) ? { kind: "file_access" } : {}) };
+}
 
 export function recoveryNote(failure?: FailureRecord, presentation = false): string {
   if (!failure?.error) return "";
+  if (failure.kind === "file_access") return `خطای دسترسی به فایل را بررسی کن و همان مرحله را ادامه بده؛ خروجی‌های تأییدشده را دوباره تولید نکن.\n${failure.error}`;
   if (presentation) {
     const stage = failure.restart_step || failure.failed_step || "";
     return [presentationHints.title, presentationHints.source_policy,

@@ -3,15 +3,34 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                     prefix=path.name + ".", suffix=".tmp", delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            json.dump(value, stream, ensure_ascii=False, indent=2)
+        except Exception:
+            stream.close()
+            temporary.unlink(missing_ok=True)
+            raise
+    try:
+        for attempt in range(8):
+            try:
+                temporary.replace(path)
+                return
+            except PermissionError:
+                if attempt == 7:
+                    raise
+                time.sleep(min(.02 * 2 ** attempt, .2))
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def write_text(path: Path, text: str) -> None:
