@@ -7,6 +7,7 @@ import json
 import hashlib
 from pathlib import Path
 import re
+import time
 
 
 class PresentationIntegrityError(RuntimeError):
@@ -125,10 +126,20 @@ def guard_inputs(services, extra=()):
                 else:
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(original)
+        # Persist only the trusted in-memory context after restoring the protected
+        # disk snapshot. Windows scanners/readers can briefly hold the destination
+        # during atomic replacement, so retry only that transient permission error.
         context = getattr(services, "context", None)
         if previous_depth == 0 and isinstance(context, dict):
             from common.order_context import save
-            save(root, context)
+            for attempt in range(3):
+                try:
+                    save(root, context)
+                    break
+                except PermissionError:
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
         if changed:
             raise PresentationIntegrityError("Presentation model changed protected inputs; originals restored: " + ", ".join(sorted(changed)))
 
