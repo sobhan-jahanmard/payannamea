@@ -1,5 +1,32 @@
 # Worker Plus
 
+## Run any supported order in a Codex chat
+
+The repository provides `daneshyar-order`, five dedicated order-type skills,
+`daneshyar-review` and `daneshyar-revise` under `../codex_skills/`. From the repository root,
+run `./codex_skills/install.ps1` to register them in the current user's Codex skills
+directory. Registration links to the checkout, so later skill fixes use one source.
+
+In Codex, ask `$daneshyar-order` to complete an order link or ID. The presentation
+skill reports ten visible milestones, uses only supplied information sources, and
+reuses the deterministic extraction, validation and rendering tools without starting
+the worker's AI loop. The document path supports bachelor's and master's theses,
+thesis proposals and university research with its own ten milestones, evidence
+ledger, editable Word/PDF, first-half samples and hash-bound page review. See
+[`codex_skills/README.md`](../codex_skills/README.md) for installation, all routes,
+prerequisites and execution/artifact guides.
+State lives in a separate `workspace/codex_orders/<id>` directory; generation is local
+until upload is requested. The entrypoint at
+`../codex_skills/daneshyar-order/scripts/order_tools.py` honors `WORKER_PLUS_PYTHON`
+and supports `--help` for individual operations and continuation.
+
+For an independent professor-style review of a local order of any supported type, use
+`$daneshyar-review` with the same order link or ID. It snapshots the order inputs
+and current deliverables, delegates to a fresh reviewer without chat history,
+and returns a documented 0–20 grade and a repair request to the calling chat.
+Each run is saved under the order's `reviews/` directory. It does not repair or
+publish the order automatically.
+
 The shared workflow lives in `common/`: order claim, workspace preparation, source handling, content review, DOCX packaging, publishing, and failure handling are implemented once.
 
 ## AI review loop in admin orders

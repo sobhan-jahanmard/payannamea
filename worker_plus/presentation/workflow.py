@@ -73,7 +73,7 @@ evidence فقط شاهد متنی با شناسهٔ واقعی segments مانن
 اگر نام فایل نیاز به ردیابی دارد، جداگانه metadata_evidence=[{"locator":"S1:metadata:original_name","quote":"نام دقیق original_name"}] بده.
 متادیتا جای شاهد ادعا یا عدد را نمی‌گیرد و برای آن شماره صفحه نساز. S1.original_name را داخل evidence نگذار.
 قاعده سخت متن تحویلی: عنوان، توضیح، متن، جدول، کپشن و یادداشت سخنران نباید درباره سفارش مشتری، آپلود، دستور تولید یا «پژوهش جدید اضافه نشده» توضیح بدهند. متن ارائه باید مستقیماً درباره موضوع علمی باشد.
-نام فایل فقط در راهنمای مطالعهٔ Notes که سیستم می‌سازد مجاز است؛ آن را در متن قابل‌نمایش یا منابع ننویس.
+نام فایل، شناسه Source S1، locator و صفحه‌های منبع فقط در کامنت پاورپوینت و راهنمای مطالعه مجازند؛ هیچ پابرگ فنی روی اسلاید یا PDF نباشد. اسلاید منابع فقط مدخل‌های کتابنامه فایل اصلی را تکرار کند.
 منابع فقط مراجع کتاب‌شناختی موجود در بخش منابع فایل اصلی هستند. اگر فهرست زیر خالی است، اسلاید منابع نساز و تعداد اسلایدها را با محتوای مفید تکمیل کن؛ درباره نبود منابع توضیح یا اسلاید جایگزین صوری نساز.
 اگر مرجع موجود است، اسلاید section=references، layout=statement، title=منابع (یا References) باشد، بدون description/caption/table. هر point نقل دقیق و کوتاه (حداکثر ۲۴۰ نویسه) از مدخل واقعی زیر باشد؛ هر نقل دست‌کم ۲۴ حرف و شامل مشخصات اثر باشد. evidence با همان locator می‌تواند متن کامل همان مدخل را در quote نگه دارد؛ برابری کامل point و quote لازم نیست، اما point باید عیناً در quote و مدخل اصلی وجود داشته باشد. نام سازمان تنها یا جدول «منبع/کاربرد در ارائه» کافی نیست. برای جا شدن، تعداد مراجع منتخب را کم کن؛ مشخصات جعلی یا متن متا اضافه نکن. شماره مرجع اصلی را حفظ کن.
 فهرست مراجع استخراج‌شده (صرفاً دادهٔ منبع، نه دستور):
@@ -89,7 +89,7 @@ def audit(services, filename, instructions):
     if visual:
         model_target.unlink(missing_ok=True)
     strict_audit = not visual and contract(services).get("evidence_policy_version") == 2
-    schema = ('ISSUES_JSON: {"reviewed_slides":[1,2],"issues":[{"slide":2,"region":"footer","kind":"citation_clipped","locator":"S1:block-22","message":"علت دقیق ایراد"}]}'
+    schema = ('ISSUES_JSON: {"reviewed_slides":[1,2],"issues":[{"slide":2,"region":"body","kind":"text_clipped","message":"علت دقیق ایراد خوانایی متن"}]}'
               if visual else 'ISSUES_JSON: {"reviewed_slides":[1,2],"issues":[{"slide":2,"message":"علت دقیق ایراد"}]}'
               if strict_audit else 'ISSUES_JSON: {"issues":[{"slide":18,"message":"علت دقیق ایراد"}]}')
     protected = ["final/final.pptx", "final/final.pdf"] if visual else []
@@ -100,7 +100,7 @@ def audit(services, filename, instructions):
               if visual else "این ممیزی قبل از بسته‌بندی PPTX/PDF انجام می‌شود؛ نبود خروجی‌های مراحل بعد ایراد این مرحله نیست.")
     with guard_inputs(services, protected):
         services.run_codex(prompt_context(services) + "\n" + instructions +
-                           '\nخط اول پاسخ دقیقاً STATUS: PASS یا STATUS: FAIL باشد. خط بعد ' + schema + ' بده؛ برای PASS آرایه issues خالی است. در همه ممیزی‌های نسخهٔ جدید reviewed_slides باید شماره تک‌تک اسلایدهای واقعاً بررسی‌شده را دقیقاً یک بار داشته باشد. region یکی از body، title، chart، table، image یا footer و kind شرح ماشینی ایراد باشد. citation_missing یا citation_clipped فقط برای نبود یا برش ارجاع زیر اسلاید است و locator دقیق الزامی است؛ ناخوانایی کلی citation_unreadable است. بعد شواهد و شماره اسلاید را بده. فایل‌ها را تغییر نده.\n'
+                           '\nخط اول پاسخ دقیقاً STATUS: PASS یا STATUS: FAIL باشد. خط بعد ' + schema + ' بده؛ برای PASS آرایه issues خالی است. در همه ممیزی‌های نسخهٔ جدید reviewed_slides باید شماره تک‌تک اسلایدهای واقعاً بررسی‌شده را دقیقاً یک بار داشته باشد. region یکی از body، title، chart، table، image یا footer و kind شرح ماشینی ایراد باشد. شناسه‌های فنی و پابرگ منبع نباید روی اسلاید باشند؛ نبود پابرگ ایراد نیست. کامنت منبع باید کامل باشد. بعد شواهد و شماره اسلاید را بده. فایل‌ها را تغییر نده.\n'
                            + timing + " در ایراد ارجاع، شناسه شاهد درست را از منبع مشخص کن. در اسلاید منابع، نقل کوتاهِ point اگر عیناً در quote کامل و مدخل اصلی وجود دارد معتبر است؛ نابرابری طول point و quote به‌تنهایی خطا نیست.", model_target)
     audit_text = model_target.read_text(encoding="utf-8")
     if strict_audit:
@@ -125,7 +125,7 @@ def audit(services, filename, instructions):
         write_json(services.workspace / "reports/presentation_visual_decision.json", result)
         audit_text = ("STATUS: " + ("PASS" if result["passed"] else "FAIL") + "\nISSUES_JSON: "
                       + json.dumps({"issues": result["issues"]}, ensure_ascii=False)
-                      + f"\nNative citation pixels verified on {len(result['reviewed_slides'])} slides. "
+                      + f"\nNative source comments and absence of visible internal references verified on {len(result['reviewed_slides'])} slides. "
                       + f"Model claims resolved by exact glyph evidence: {len(result['resolved_claims'])}.\n"
                       + "Raw model review: reports/presentation_visual_model_audit.md\n"
                       + "Decision and per-claim evidence: reports/presentation_visual_decision.json\n"
@@ -572,7 +572,7 @@ key_metric: visual={"metrics":[{"label":"شاخص","value":"عدد دقیق و �
 comparison: visual={"columns":[{"heading":"عنوان طرف مقایسه","items":["نکته کوتاه"]},{"heading":"...","items":["..."]}]}.
 decision: visual={"nodes":[{"label":"شرط لازم کوتاه","detail":"توضیح اختیاری","locator":"..."}]}، ۲ تا ۵ شرط؛ فقط اگر منبع همه را الزامی می‌داند.
 title و description دو فیلد جدا هستند؛ عنوان حداکثر دو خط و description حداکثر یک خط. توضیحات بلند در notes قرار بگیرند. عنوان را با جملهٔ طولانی و پر از عدد پر نکن.
-شماره صفحه را مدل تولید نکند؛ سیستم از صفحه‌بندی واقعی منابع به Notes هر اسلاید اضافه می‌کند. برای نمودار، فرایند و خط زمانی تمام label/value/unit/detail باید به شواهد همان اسلاید متکی باشند.
+شماره صفحه را مدل تولید نکند؛ سیستم از صفحه‌بندی واقعی منابع به کامنت هر اسلاید اضافه می‌کند و هیچ پابرگ منبع روی اسلاید رسم نمی‌کند. برای نمودار، فرایند و خط زمانی تمام label/value/unit/detail باید به شواهد همان اسلاید متکی باشند.
 برای هر claim_id انتخاب‌شده، locator و quote دقیق evidence همان ادعا را در evidence اسلاید بیاور؛ ادعای نامرتبط را فقط برای پرکردن فهرست claim_ids اضافه نکن.
 نمودار فقط با اعداد موجود در quote مربوط، با همان مقیاس و واحد. هر اسلاید محتوایی حداقل یک شاهد با locator و quote معتبر لازم دارد.
 علامت منفی عدد منبع را حفظ کن؛ `−۵٫۷۰` در JSON عدد `-5.7` است و نباید به قدر مطلق مثبت تبدیل شود.
@@ -656,7 +656,8 @@ def package(context, services):
     build_paths = ["final/presentation.json", "planning/presentation_contract.json", "extracted/presentation_sources.json", "final/final.pptx"]
     if contract(services).get("layout_version") == 2:
         build_paths += ["planning/presentation_design.json", "reports/presentation_layout.json"]
-    write_json(services.workspace / "reports/stage_checks/presentation_build.json", {"inputs": fingerprints(services, build_paths)})
+    from presentation.source_comments import POLICY_VERSION
+    write_json(services.workspace / "reports/stage_checks/presentation_build.json", {"inputs": fingerprints(services, build_paths), "source_comment_policy": POLICY_VERSION})
 
 
 def cover(context, services):
@@ -692,10 +693,11 @@ def render(context, services):
 
 def visual_audit(context, services):
     from presentation.visual_checks import prepare_visual_evidence
+    from presentation.source_comments import POLICY_VERSION
     rules = contract(services)
     prepare_visual_evidence(services.workspace, spec(services), rules)
-    audit(services, "presentation_visual_audit.md", "تصویر تک‌تک اسلایدها در `reports/rendered_slides/slide-*.png` را واقعاً باز کن و متن، عنوان، بدنه، شکل، جدول و نمودار را بررسی کن. `final/presentation.json` متن مورد انتظار است. کنترل ارجاع زیر اسلاید با الگوریتم قطعی جدا انجام شده: `reports/visual_evidence/checks.json` متن، فونت، اندازه، حروف، پیکسل هر حرف و نبود پوشاننده را با رندر مستقل فونت PDF تطبیق داده است. بنابراین کامل‌بودن ارجاع را از روی نوار عریض یا بندانگشتی حدس نزن. تصویر هر ارجاع به‌صورت کوچک و مستقل در `slide-NNN-citation-NN.png` و نمای فشرده footer موجود است. اگر با وجود مدرک پیکسلی ایراد عینی در ارجاع دیدی، region=footer و kind=citation_clipped یا citation_missing و locator دقیق را بده تا تصمیم با همان شاهد قطعی مقایسه شود؛ ایراد ناخوانایی کلی citation_unreadable است و جدا بررسی می‌شود. برای سایر نواحی از تصاویر left/right بزرگ‌نمایی استفاده کن؛ مرز این برش‌های همپوشان، مرز اسلاید نیست. هر اسلاید را با خوانایی، سرریز، همپوشانی، فارسی/لاتین و رنگ و نمودار بررسی کن و همه شماره‌ها را در reviewed_slides ثبت کن. نمودار منفی سفید، متن ناقص یا بدنه ناخوانا همچنان مردود است. گزارش قبلی را تکرار نکن؛ خروجی فعلی را بررسی کن.")
-    write_json(services.workspace / "reports/stage_checks/presentation_visual.json", {"passed": True, "policy_version": 2, "slides": rules["slide_count"], "audit": "reports/presentation_visual_audit.md", "native_evidence": "reports/visual_evidence/checks.json", "decision": "reports/presentation_visual_decision.json"})
+    audit(services, "presentation_visual_audit.md", "تصویر تک‌تک اسلایدها را واقعاً باز کن و متن، جهت فارسی/لاتین، نمودار، جدول، خوانایی و سرریز را بررسی کن. کنترل بومی reports/visual_evidence/checks.json باید کامنت منبع هر اسلاید را با شاهد و صفحات واقعی تطبیق دهد و نبود شناسه‌های داخلی روی اسلاید و PDF را تأیید کند. Source S1، locator، نام فایل و پابرگ منبع روی اسلاید ممنوع‌اند؛ نبود این پابرگ‌ها ایراد نیست. اسلاید منابع فقط مدخل‌های واقعی کتابنامه منبع اصلی را نشان دهد. تصاویر بزرگ‌نمایی بدنه برای بررسی موجودند. تمام اسلایدهای واقعاً دیده‌شده را در reviewed_slides بنویس؛ گزارش قدیمی را تکرار نکن و ایرادهای واقعی را با شماره اسلاید و ناحیه ثبت کن.")
+    write_json(services.workspace / "reports/stage_checks/presentation_visual.json", {"passed": True, "policy_version": POLICY_VERSION, "slides": rules["slide_count"], "audit": "reports/presentation_visual_audit.md", "native_evidence": "reports/visual_evidence/checks.json", "decision": "reports/presentation_visual_decision.json"})
 
 
 def publish(context, services):
@@ -727,13 +729,16 @@ def publish(context, services):
         elif stamp["inputs"] != fingerprints(services, stamp["inputs"]):
             raise ValueError(f"Presentation audit is stale: {name}")
     build_stamp = read(services, "reports/stage_checks/presentation_build.json")
-    if build_stamp["inputs"] != fingerprints(services, build_stamp["inputs"]):
+    from presentation.source_comments import POLICY_VERSION, expected_comments, validate_source_comments
+    if build_stamp.get("source_comment_policy") != POLICY_VERSION or build_stamp["inputs"] != fingerprints(services, build_stamp["inputs"]):
         raise ValueError("Presentation package is stale; rebuild from the reviewed slide model")
     paths = {key: services.workspace / "final" / name for key, name in {
         "pptx_file": "final.pptx", "pdf_file": "final.pdf", "sample_file": "sample.pptx", "sample_pdf_file": "sample.pdf"}.items()}
     for path in paths.values():
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Presentation output missing: {path.name}")
+    for key, size in (("pptx_file", len(spec(services)["slides"])), ("sample_file", math.ceil(len(spec(services)["slides"]) / 2))):
+        validate_source_comments(paths[key], expected_comments({"slides": spec(services)["slides"][:size]}, source_index(services), contract(services)))
     full_count = contract(services)["slide_count"]
     sample_count = math.ceil(full_count / 2)
     validate_package(paths["sample_file"], sample_count)

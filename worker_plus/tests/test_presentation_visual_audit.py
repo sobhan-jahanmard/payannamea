@@ -14,16 +14,22 @@ from presentation.visual_checks import prepare_visual_evidence
 class PresentationVisualAuditTests(unittest.TestCase):
     def make_fixture(self, root, damage=None):
         import fitz
-        deck = {"slides": [{"layout": "statement", "evidence": [{"locator": "S1:block-12"}]}]}
+        deck = {"slides": [{"layout": "statement", "evidence": [{"locator": "S1:block-12", "quote": "Slide body"}]}]}
         rules = {"font": "Helvetica", "slide_count": 1}
         write_json(root / "final/presentation.json", deck)
         write_json(root / "planning/presentation_contract.json", rules)
-        write_json(root / "extracted/presentation_sources.json", {"sources": []})
-        (root / "final/final.pptx").write_bytes(b"isolated-package-marker")
+        sources = {"sources": [{"id": "S1", "name": "study.docx", "pagination": {}, "images": [],
+                                "segments": [{"id": "S1:block-12", "text": "Slide body", "pages": [2]}]}]}
+        write_json(root / "extracted/presentation_sources.json", sources)
+        from pptx import Presentation
+        from presentation.source_comments import add_source_comments, expected_comments
+        prs = Presentation(); prs.slides.add_slide(prs.slide_layouts[6]); prs.save(root / "final/final.pptx")
+        add_source_comments(root / "final/final.pptx", expected_comments(deck, sources, rules))
         with fitz.open() as pdf:
             page = pdf.new_page(width=960, height=540)
             page.insert_text((60, 60), "Slide body", fontsize=22)
-            page.insert_text((60, 510), "S1:block-12", fontsize=13, render_mode=3 if damage == "invisible" else 0)
+            if damage:
+                page.insert_text((60, 510), "S1:block-12", fontsize=13, render_mode=3 if damage == "invisible" else 0)
             if damage in {"white_cover", "dark_cover", "partial_cover"}:
                 width = 3 if damage == "partial_cover" else 40
                 color = (0, 0, 0) if damage == "dark_cover" else (1, 1, 1)
@@ -49,22 +55,20 @@ class PresentationVisualAuditTests(unittest.TestCase):
                     prepare_visual_evidence(root, deck, rules)
                 report = json.loads((root / "reports/visual_evidence/checks.json").read_text())
                 self.assertFalse(report["passed"])
-                self.assertFalse(report["slides"][0]["raster"]["passed"])
+                self.assertTrue(report["slides"][0]["visible_internal_references"])
 
-    def test_complete_glyph_pixels_resolve_only_a_precise_false_citation_claim(self):
+    def test_comments_are_verified_and_missing_visible_footer_is_not_required(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             deck, rules = self.make_fixture(root)
             proof = prepare_visual_evidence(root, deck, rules)
             self.assertTrue(proof["passed"])
-            glyphs = proof["slides"][0]["raster"]["locators"][0]["glyphs"]
-            self.assertEqual(len("S1:block-12"), len(glyphs))
-            self.assertTrue(all(g["coverage"] >= .98 for g in glyphs))
-            result = aggregate_visual_audit(root, self.model([self.claim()]), deck, rules)
+            self.assertEqual([], proof["slides"][0]["raster"]["locators"])
+            self.assertTrue(proof["provenance"]["passed"])
+            result = aggregate_visual_audit(root, self.model([], status="PASS"), deck, rules)
             self.assertTrue(result["passed"])
-            self.assertEqual(1, len(result["resolved_claims"]))
-            self.assertEqual("STATUS: FAIL", result["model_status"])
-            self.assertTrue((root / proof["slides"][0]["raster"]["locators"][0]["image"]).is_file())
+            self.assertEqual(0, len(result["resolved_claims"]))
+            self.assertEqual("STATUS: PASS", result["model_status"])
 
     def test_body_chart_unknown_or_subjective_issues_still_fail(self):
         with TemporaryDirectory() as directory:
@@ -74,12 +78,12 @@ class PresentationVisualAuditTests(unittest.TestCase):
             for issue in (self.claim(region="body"), self.claim(kind="chart_color"), self.claim(kind="citation_unreadable"),
                           self.claim(locator="S1:block-99"), {"slide": 1, "message": "legacy unclassified defect"}):
                 with self.subTest(issue=issue):
-                    result = aggregate_visual_audit(root, self.model([self.claim(), issue], status="PASS"), deck, rules)
+                    result = aggregate_visual_audit(root, self.model([issue], status="PASS"), deck, rules)
                     self.assertFalse(result["passed"], "A model PASS cannot hide an unresolved defect")
                     self.assertEqual([issue], result["issues"])
 
     def test_stale_pdf_spec_or_rules_cannot_resolve_model_claims(self):
-        for changed in ("pdf", "spec", "rules"):
+        for changed in ("pdf", "pptx", "spec", "rules"):
             with self.subTest(changed=changed), TemporaryDirectory() as directory:
                 root = Path(directory)
                 deck, rules = self.make_fixture(root)
@@ -87,6 +91,9 @@ class PresentationVisualAuditTests(unittest.TestCase):
                 if changed == "pdf":
                     with (root / "final/final.pdf").open("ab") as stream:
                         stream.write(b"\n%changed\n")
+                elif changed == "pptx":
+                    with (root / "final/final.pptx").open("ab") as stream:
+                        stream.write(b"changed comments")
                 elif changed == "spec":
                     deck["slides"][0]["evidence"][0]["locator"] = "S1:block-99"
                 else:
@@ -109,7 +116,7 @@ class PresentationVisualAuditTests(unittest.TestCase):
             root = Path(directory)
             deck, rules = self.make_fixture(root)
             prepare_visual_evidence(root, deck, rules)
-            raw = self.model([self.claim()])
+            raw = self.model([], status="PASS")
             def respond(prompt, target):
                 self.assertEqual("presentation_visual_model_audit.md", target.name)
                 self.assertIn("reviewed_slides", prompt)
@@ -118,8 +125,8 @@ class PresentationVisualAuditTests(unittest.TestCase):
             self.assertEqual(raw, (root / "reports/presentation_visual_model_audit.md").read_text())
             self.assertTrue((root / "reports/presentation_visual_audit.md").read_text().startswith("STATUS: PASS\n"))
             decision = json.loads((root / "reports/presentation_visual_decision.json").read_text())
-            self.assertEqual("STATUS: FAIL", decision["model_status"])
-            self.assertEqual("contradicted_by_native_glyph_pixels", decision["resolved_claims"][0]["decision"])
+            self.assertEqual("STATUS: PASS", decision["model_status"])
+            self.assertEqual([], decision["resolved_claims"])
             stamp = json.loads((root / "reports/presentation_visual_audit.json").read_text())
             self.assertIn("reports/visual_evidence/checks.json", stamp["inputs"])
             self.assertIn("reports/presentation_visual_model_audit.md", stamp["inputs"])

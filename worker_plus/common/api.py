@@ -41,6 +41,16 @@ def fetch_order_read_only(config: Config, order_id: str) -> dict[str, Any]:
     return _json(requests.get(f"{config.backend_url}/api/worker/orders/{order_id}", headers=_headers(config), timeout=30))
 
 
+def fetch_review_scores(config: Config, order_id: str) -> dict[str, Any]:
+    return _json(requests.get(f"{config.backend_url}/api/worker/orders/{order_id}/review-scores",
+                              headers=_headers(config), timeout=30))
+
+
+def sync_review_scores(config: Config, order_id: str, reviews: list[dict]) -> dict[str, Any]:
+    return _json(requests.put(f"{config.backend_url}/api/worker/orders/{order_id}/review-scores",
+                              headers=_headers(config), json={"reviews": reviews}, timeout=60))
+
+
 def heartbeat(config: Config, order_id: str, notes: str) -> dict[str, Any]:
     url = f"{config.backend_url}/api/worker/orders/{order_id}/start"
     return _json(requests.post(url, headers={**_headers(config), "Content-Type": "application/json"}, json={"workerId": config.worker_id, "notes": notes}, timeout=30))

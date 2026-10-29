@@ -2,6 +2,9 @@
 
 Unified Next.js ordering system for bachelor’s and master’s theses, proposals, research assignments, and presentations.
 
+For conversation-driven execution of all five order types, independent review,
+and revisions in Codex, see [the Codex skill guide](codex_skills/README.md).
+
 ## Structure
 
 ```txt

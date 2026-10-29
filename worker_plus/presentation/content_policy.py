@@ -55,6 +55,27 @@ def bibliography_entries(sources):
     return entries
 
 
+def bibliography_excerpt(point, entry):
+    """Match exact excerpts, or an explicit elision of coauthors only.
+
+    Keep the original reference number and first author. Everything from the
+    opening title quote onward remains one exact contiguous source excerpt.
+    This allows a complete publication/year on a concise slide without making
+    invented citation wording acceptable.
+    """
+    value, original = clean(point), clean(entry)
+    if len(value) >= 24 and value in original:
+        return True
+    # NFKC expands the ellipsis glyph into three periods.
+    if value.count(' ... ') != 1:
+        return False
+    first, rest = value.split(' ... ')
+    comma, title = original.find(','), original.find('“')
+    return (comma > 0 and title > comma and ENTRY.match(original) is not None and
+            first == original[:comma + 1] and rest.startswith('“') and
+            len(rest) >= 24 and original[title:].startswith(rest))
+
+
 def compact_bibliography_points(spec, sources, max_chars=240):
     """Use exact short bibliography excerpts on slides; retain full evidence."""
     result = deepcopy(spec)
@@ -100,12 +121,44 @@ def visible_text(slide):
         yield from strings(slide.get(key))
 
 
+def primary_source_credit(slide, sources):
+    """Identify the supplied work separately from its own numbered bibliography.
+
+    Both title and author must be exact complete source segments, referenced in
+    slide evidence. This never permits synthetic entries in bibliography points.
+    """
+    credit = slide.get("primary_source")
+    if credit is None:
+        return None
+    if slide.get("section") != "references" or not isinstance(credit, dict):
+        raise ValueError("Primary source identity belongs on a references slide")
+    source = next((s for s in sources.get("sources", []) if s["id"] == credit.get("source_id")), None)
+    if source is None:
+        raise ValueError("Unknown primary source")
+    segments = {s["id"]: s["text"] for s in source.get("segments", [])}
+    for key in ("author", "title"):
+        value, locator = credit.get(key), credit.get(key + "_locator")
+        if (not isinstance(value, str) or not 8 <= len(value) <= 160 or
+                clean(value) != clean(segments.get(locator, "")) or
+                not any(e.get("locator") == locator and clean(value) == clean(e.get("quote", ""))
+                        for e in slide.get("evidence", []))):
+            raise ValueError("Primary source title/author must match complete source segments and slide evidence")
+    return credit
+
+
 def policy_violations(spec, sources):
     entries = bibliography_entries(sources)
     filenames = {clean(s.get(key, "")) for s in sources.get("sources", []) for key in ("name", "original_name")} - {""}
     issues = []
     for number, slide in enumerate(spec.get("slides", []), 1):
+        try:
+            primary_source_credit(slide, sources)
+        except ValueError as error:
+            issues.append((number, str(error)))
         texts = list(visible_text(slide))
+        from presentation.source_comments import INTERNAL_REFERENCE
+        if any(INTERNAL_REFERENCE.search(text) for text in texts):
+            issues.append((number, "Internal source identifiers belong in PowerPoint comments, never on slides"))
         if any(CHATTER.search(clean(text)) for text in [*texts, slide.get("notes", "")]):
             issues.append((number, "Production/order/upload commentary is forbidden in presentation copy and speaker notes"))
         if any(filename in clean(text) for text in texts for filename in filenames):
@@ -124,8 +177,8 @@ def policy_violations(spec, sources):
         if not points:
             issues.append((number, "References must contain real bibliographic entries"))
         for point in points:
-            matches = [entry for entry in entries if len(clean(point)) >= 24 and clean(point) in clean(entry["text"])]
-            if not any(e.get("locator") == entry["locator"] and clean(point) in clean(e.get("quote", "")) for entry in matches for e in evidence):
+            matches = [entry for entry in entries if bibliography_excerpt(point, entry["text"])]
+            if not any(e.get("locator") == entry["locator"] and bibliography_excerpt(point, e.get("quote", "")) for entry in matches for e in evidence):
                 issues.append((number, "Each reference must be an exact excerpt of an original bibliography entry with matching evidence; invented/abbreviated organizations are insufficient"))
                 break
     if entries and not any(slide.get("section") == "references" for slide in spec.get("slides", [])):

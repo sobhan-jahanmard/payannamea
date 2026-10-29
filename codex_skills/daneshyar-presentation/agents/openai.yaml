@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Presentation"
+  short_description: "Create source-only Daneshyar PowerPoint orders"
+  default_prompt: "Use $daneshyar-presentation to turn this order source into a reviewed PowerPoint."

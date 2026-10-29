@@ -79,19 +79,20 @@ each supported by the same real locator and quote in evidence. Omit description,
 caption, table and chart. Keep original reference numbers. If the source has no
 bibliography, omit references slides entirely; fill the exact requested slide
 count with substantive content. Do not invent references or a no-references notice.
-Original filenames and full physical page ranges remain in system-generated
-source preparation notes. Page footers show reading ranges separately from
-bibliography entries.
+Original filenames, source IDs, exact source pages and quotations belong in native
+PowerPoint comments. Never render Source S1, evidence locators or source-page
+footers on slides or PDF. The references slide repeats real entries from the
+original file bibliography, not the uploaded file identity.
 
 The worker compiles `final/presentation.json` using PptxGenJS 4.0.1 for layout v2;
 legacy v1 contracts retain python-pptx. Charts, tables and diagrams are editable.
 Source extraction, evidence gates, audits and recovery reuse the existing workflow.
-Every slide receives exact original source page ranges in PowerPoint speaker notes
-and the app's side-by-side preview. The application computes these pages from PDF
+Every slide receives exact original source page ranges in native PowerPoint comments
+and preparation notes. The application computes these pages from PDF
 or actual Word pagination; never estimate page numbers yourself. Disjoint ranges
 stay disjoint. Text files use a clearly labelled paginated snapshot. Source PPTX
-references use slide numbers. Source notes and the full original quotes remain
-available even when the footer displays a shorter human-readable reference.
+references use slide numbers. Native comments and full quotes preserve traceability while the visible slide
+canvas and PDF stay free of internal technical references.
 Do not replace the compiler, alter validators or create a fake PASS. This skill runs
 independently of a Codex desktop plugin and requires no external slide service.
 Follow the JSON schema in the stage prompt exactly. Total slide count includes the
@@ -104,13 +105,12 @@ open every rendered slide PNG. Check Persian direction, mixed-language text, mis
 glyphs, overflow, contrast, source accuracy, chart units and legibility. Report PASS
 only with per-slide evidence; report FAIL and the affected slide otherwise.
 
-At the visual-audit stage, PPTX/PDF already exist. Read the native footer checks in
-`reports/visual_evidence/checks.json`. Before reporting missing or clipped text,
-open the matching magnified footer or body image. The left/right images are
-overlapping crops for inspection; their edges are not slide-canvas boundaries.
-Native text presence confirms completeness, not visual readability. Do not infer
-missing citation prefixes from a downscaled overview, or repeat old audit claims
-without checking the current render. Never edit the rendered files or evidence.
+At the visual-audit stage, PPTX/PDF already exist. Read the native checks in
+`reports/visual_evidence/checks.json`: every slide must have a current source
+comment matching its evidence, and internal source IDs must be absent from the
+slide canvas and PDF. Open actual full slides and magnified body views for fit
+and readability. Do not report an intentionally absent technical footer as a
+missing citation. Never edit rendered files or evidence to pass a check.
 
 Judge design quality as well as correctness: one clear takeaway, distinct heading
 and body, readable typography at presentation size, deliberate whitespace,
@@ -119,12 +119,6 @@ slides, no duplicate table/bullets beside a chart. Review the selected style as 
 whole. Report a precise affected slide and region for each design defect. A file
 existing or passing native geometry checks does not establish good slide design.
 
-The citation checker also independently renders every expected glyph using the
-embedded PDF font and compares visible pixels. This catches invisible/covered
-text that extraction alone misses. Read its glyph-level evidence. Each citation
-has a tight `slide-NNN-citation-NN.png`; avoid inferring clipped prefixes from an
-extremely wide strip. Include every reviewed slide in `reviewed_slides`, and
-classify each issue by `region`, `kind` and exact `locator` where relevant. Only
-`citation_missing`/`citation_clipped` in the footer can be reconciled with this
-native proof. Body/chart/image defects and subjective legibility remain failures.
-Your raw report is retained alongside the aggregate evidence-based decision.
+Native source-comment checks establish traceability, not visual quality. Include
+every inspected slide in reviewed_slides and report actual body, chart, table or
+image defects. Your raw report is retained alongside the evidence-based decision.

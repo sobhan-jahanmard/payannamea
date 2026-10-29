@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Master Thesis"
+  short_description: "Execute and verify master thesis orders"
+  default_prompt: "Use $daneshyar-master-thesis to complete this registered Daneshyar order."

@@ -204,7 +204,7 @@ class PresentationRecoveryTests(unittest.TestCase):
                     calls["repair"] += 1
                     self.assertIn("Add the missing source locator", prompt)
                     corrected = deepcopy(original["slides"][1])
-                    corrected["caption"] = "Source: S1:table-1"
+                    corrected["caption"] = "مقایسه زمان ثبت‌شده در منبع"
                     write_json(target, {"patches": [{"slide_number": 2, "slide": corrected}]})
             service.run_codex.side_effect = respond
             def complete(ctx, _services):
@@ -303,14 +303,19 @@ class PresentationRecoveryTests(unittest.TestCase):
                 service.run_codex.side_effect = respond
                 def packaged(ctx, _services):
                     import fitz
-                    (workspace / "final/final.pptx").write_bytes(b"isolated-package-fixture")
+                    from pptx import Presentation
+                    from presentation.source_comments import add_source_comments, expected_comments
+                    model = workflow.spec(service)
+                    prs = Presentation()
+                    for _ in model['slides']:
+                        prs.slides.add_slide(prs.slide_layouts[6])
+                    prs.save(workspace / "final/final.pptx")
+                    add_source_comments(workspace / "final/final.pptx", expected_comments(model, workflow.source_index(service), workflow.contract(service)))
                     rules = workflow.contract(service)
                     with fitz.open() as pdf:
                         for slide in workflow.spec(service)["slides"]:
                             page = pdf.new_page(width=960, height=540)
                             page.insert_text((60, 60), "Fixture slide", fontname="Helvetica", fontsize=22)
-                            footer = " . ".join(dict.fromkeys(e["locator"] for e in slide["evidence"]))
-                            page.insert_text((60, 510), footer, fontname="Helvetica", fontsize=13)
                         pdf.save(workspace / "final/final.pdf")
                 def visual(ctx, svc):
                     from presentation.visual_checks import prepare_visual_evidence
@@ -343,33 +348,40 @@ class PresentationRecoveryTests(unittest.TestCase):
                 self.assertEqual("dry_run_complete", saved["status"])
                 self.assertEqual(runner.STEPS, saved["completed_steps"])
 
-    def test_citations_show_every_locator_at_readable_size(self):
+    def test_source_comments_preserve_all_locators_without_visible_citations(self):
         from pptx import Presentation
+        import zipfile
         with TemporaryDirectory() as directory:
             root = Path(directory)
             deck, rules, sources = self.prepare(root)
             deck["slides"][1]["evidence"] = [{"locator": f"S1:block-{n}", "quote": "fixture"} for n in range(10, 16)]
             build_pptx(deck, rules, sources, root / "fixture.pptx", root)
-            footer = next(shape for shape in Presentation(root / "fixture.pptx").slides[1].shapes if shape.name == "Source citations")
-            self.assertEqual(" · ".join(f"S1:block-{n}" for n in range(10, 16)), footer.text)
-            self.assertTrue(all(run.font.size.pt >= 13 for p in footer.text_frame.paragraphs for run in p.runs))
+            self.assertFalse(any(shape.name == 'Source citations' for shape in Presentation(root/'fixture.pptx').slides[1].shapes))
+            with zipfile.ZipFile(root/'fixture.pptx') as package:
+                comment = package.read('ppt/comments/comment2.xml').decode('utf-8')
+                visible = package.read('ppt/slides/slide2.xml').decode('utf-8')
+                for n in range(10, 16):
+                    self.assertIn(f'S1:block-{n}', comment)
+                    self.assertNotIn(f'S1:block-{n}', visible)
 
-    def test_pdf_footer_checks_detect_missing_prefix_and_small_text(self):
+    def test_pdf_checks_reject_internal_ids_in_body_or_footer(self):
         import fitz
         from presentation.visual_checks import prepare_visual_evidence
         from presentation.recovery import PresentationVisualAuditError
-        for footer, size, passed in (("S1:block-12", 13, True), ("12", 13, False), ("S1:block-123", 13, False), ("S1:block-12", 11, False)):
-            with self.subTest(footer=footer, size=size), TemporaryDirectory() as directory:
+        for location, text, passed in (("footer", "", True), ("footer", "Source S1 | pp. 2", False), ("body", "S1:block-12", False)):
+            with self.subTest(location=location, text=text), TemporaryDirectory() as directory:
                 root = Path(directory)
-                (root / "final").mkdir()
+                model, rules, sources = self.prepare(root)
+                deck = {'slides': [model['slides'][1]]}
+                rules['slide_count'] = 1
+                build_pptx(deck, rules, sources, root/'final/final.pptx', root)
+                rules['font'] = 'Helvetica'
                 with fitz.open() as pdf:
                     page = pdf.new_page(width=960, height=540)
-                    # The correct locator elsewhere cannot mask a broken footer.
-                    page.insert_text((60, 60), "Body S1:block-12", fontsize=22)
-                    page.insert_text((60, 510), footer, fontsize=size)
+                    page.insert_text((60, 60), "Body text", fontsize=22)
+                    if text:
+                        page.insert_text((60, 510 if location == 'footer' else 150), text, fontsize=13)
                     pdf.save(root / "final/final.pdf")
-                deck = {"slides": [{"layout": "statement", "evidence": [{"locator": "S1:block-12"}]}]}
-                rules = {"font": "Helvetica", "slide_count": 1}
                 if passed:
                     result = prepare_visual_evidence(root, deck, rules)
                     self.assertTrue(result["passed"])

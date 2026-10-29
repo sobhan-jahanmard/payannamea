@@ -11,9 +11,11 @@ def load_visual_proof(workspace: Path, spec: dict, rules: dict) -> dict:
     proof = json.loads((workspace / "reports/visual_evidence/checks.json").read_text(encoding="utf-8"))
     count = len(spec["slides"])
     if (proof.get("policy_version") != POLICY_VERSION or proof.get("passed") is not True
+            or proof.get("provenance", {}).get("passed") is not True
             or proof.get("inputs") != visual_inputs(workspace, spec, rules)
             or [s.get("slide") for s in proof.get("slides", [])] != list(range(1, count + 1))
-            or not all(s.get("raster", {}).get("passed") is True for s in proof["slides"])):
+            or not all(s.get("raster", {}).get("passed") is True and s.get("source_comment_verified") is True
+                       and not s.get("visible_internal_references") for s in proof["slides"])):
         raise ValueError("Native visual evidence is missing, failed or stale; no visual approval can be issued")
     return proof
 

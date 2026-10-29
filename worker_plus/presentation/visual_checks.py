@@ -10,14 +10,18 @@ import unicodedata
 from common.helpers import write_json
 from presentation.recovery import PresentationVisualAuditError
 
-POLICY_VERSION = 2
+from presentation.source_comments import POLICY_VERSION, INTERNAL_REFERENCE, expected_comments, validate_source_comments
 
 
 def visual_inputs(workspace: Path, spec: dict, rules: dict) -> dict:
     def digest(value):
         return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
     result = {"pdf_sha256": hashlib.sha256((workspace / "final/final.pdf").read_bytes()).hexdigest(),
+              "pptx_sha256": hashlib.sha256((workspace / "final/final.pptx").read_bytes()).hexdigest(),
               "spec_sha256": digest(spec), "rules_sha256": digest(rules)}
+    sources = workspace / "extracted/presentation_sources.json"
+    if sources.is_file():
+        result["sources_sha256"] = hashlib.sha256(sources.read_bytes()).hexdigest()
     manifest = workspace / "reports/presentation_layout.json"
     if rules.get("layout_version") == 2:
         result["layout_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
@@ -54,8 +58,8 @@ def validate_layout_manifest(manifest, spec, rules):
                 raise ValueError(f"Slide {index}: {obj['role']} is too small for presentation")
             if data["layout"] != "title" and obj["role"] not in {"title", "description", "citation", "page-number"} and (y0 < 142 or y1 > 492):
                 raise ValueError(f"Slide {index}: {obj['role']} crosses the heading or source footer region")
-        if data["layout"] != "title" and not row.get("citations"):
-            raise ValueError(f"Slide {index}: source footer is missing")
+        if row.get("citations") or any(o["role"] in {"citation", "primary-id", "primary-author", "primary-title"} for o in objects):
+            raise ValueError(f"Slide {index}: source provenance must be in comments, not on the canvas")
 
 
 def verify_citation_pixels(page, expected: list[str], destination: Path, number: int, region=None) -> dict:
@@ -182,6 +186,8 @@ def prepare_visual_evidence(workspace: Path, spec: dict, rules: dict) -> dict:
     destination = workspace / "reports/visual_evidence"
     destination.mkdir(parents=True, exist_ok=True)
     slides, issues = [], []
+    sources = json.loads((workspace / "extracted/presentation_sources.json").read_text(encoding="utf-8"))
+    provenance = validate_source_comments(workspace / "final/final.pptx", expected_comments(spec, sources, rules))
     manifest = None
     if rules.get("layout_version") == 2:
         manifest = json.loads((workspace / "reports/presentation_layout.json").read_text(encoding="utf-8"))
@@ -210,7 +216,10 @@ def prepare_visual_evidence(workspace: Path, spec: dict, rules: dict) -> dict:
                      "right": (fitz.Rect(bounds.width * .47, 0, bounds.width, bounds.height * .90), 2)}
             for label, (region, scale) in areas.items():
                 page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=region).save(destination / f"slide-{number:03}-{label}.png")
-            expected = [citation["text"] for citation in citations] if citations is not None else list(dict.fromkeys(e["locator"] for e in slide.get("evidence", []))) if slide["layout"] != "title" else []
+            # Technical identifiers are deliberately absent; their completeness
+            # is checked in native PPTX comments against current source bytes.
+            expected = []
+            leaked = INTERNAL_REFERENCE.findall(page.get_text())
             spans = [span for block in page.get_text("dict")["blocks"] if "lines" in block
                      for line in block["lines"] for span in line["spans"]
                      if fitz.Rect(span["bbox"]).intersects(footer)]
@@ -226,11 +235,14 @@ def prepare_visual_evidence(workspace: Path, spec: dict, rules: dict) -> dict:
                     result["source_locators"] = definition["source_locators"]
             row = {"slide": number, "expected_locators": expected, "pdf_footer_text": text, "raster": raster,
                    "spans": [{key: span[key] for key in ("text", "bbox", "size")} for span in spans],
-                   "missing_locators": missing, "clipped": bool(clipped), "small_citations": bool(small)}
+                   "missing_locators": missing, "clipped": bool(clipped), "small_citations": bool(small),
+                   "source_comment_verified": True, "visible_internal_references": leaked}
             slides.append(row)
+            if leaked:
+                issues.append({"slide": number, "message": "Internal source identifier leaked into PDF"})
             if missing or clipped or small or not raster["passed"]:
                 issues.append({"slide": number, "message": f"PDF footer check: missing={missing}, outside_canvas={bool(clipped)}, citation_below_12pt={bool(small)}, glyph_pixels_match={raster['passed']}; inspect reports/visual_evidence/slide-{number:03}-footer.png"})
-    report = {"policy_version": POLICY_VERSION, "inputs": visual_inputs(workspace, spec, rules), "passed": not issues, "slides": slides, "issues": issues}
+    report = {"policy_version": POLICY_VERSION, "provenance": provenance, "inputs": visual_inputs(workspace, spec, rules), "passed": not issues, "slides": slides, "issues": issues}
     write_json(destination / "checks.json", report)
     if issues:
         raise PresentationVisualAuditError("reports/visual_evidence/checks.json", "STATUS: FAIL\nISSUES_JSON: " + json.dumps({"issues": issues}), len(slides))

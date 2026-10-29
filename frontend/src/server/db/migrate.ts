@@ -229,6 +229,13 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists ix_review_notes_order_id on review_notes(order_id)`,
+  `create table if not exists local_review_scores (
+    order_id varchar(36) not null references orders(id) on delete cascade,
+    run_id varchar(128) not null,
+    payload jsonb not null,
+    created_at timestamptz not null default now(),
+    primary key (order_id, run_id)
+  )`,
   `create table if not exists ai_reviews (
     id varchar(36) primary key,
     order_id varchar(36) not null references orders(id) on delete cascade,

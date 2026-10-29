@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 from common.helpers import write_json
 from presentation import workflow
-from presentation.content_policy import bibliography_entries, compact_bibliography_points, policy_violations
+from presentation.content_policy import bibliography_entries, compact_bibliography_points, policy_violations, bibliography_excerpt
 from presentation.deck import validate_spec
 from test_presentation import fixture
 
@@ -23,6 +23,33 @@ class PresentationContentPolicyTests(unittest.TestCase):
     def test_real_original_references_are_accepted(self):
         self.validate()
         self.assertEqual(len(bibliography_entries(self.sources)), 1)
+
+    def test_coauthor_elision_preserves_real_title_publication_and_first_author(self):
+        entry = '[۱] A. Author, B. Other, and C. Third, “Real title,” Real Journal, 2024.'
+        self.assertTrue(bibliography_excerpt('[۱] A. Author, … “Real title,” Real Journal, 2024.', entry))
+        for bad in ['[۱] Invented, … “Real title,” Real Journal, 2024.',
+                    '[۱] A. Author, … “Real title,” Invented Journal, 2024.',
+                    '[۲] A. Author, … “Real title,” Real Journal, 2024.',
+                    '[۱] A. Author, … “Real title,” Real Journal, 2025.']:
+            self.assertFalse(bibliography_excerpt(bad, entry))
+
+    def test_primary_work_identity_requires_exact_source_and_does_not_relax_bibliography(self):
+        source = self.sources['sources'][0]
+        source['segments'] += [{'id': 'S1:cover-author', 'text': 'A real thesis author'},
+                               {'id': 'S1:cover-title', 'text': 'A supplied thesis title'}]
+        slide = self.model['slides'][5]
+        slide['primary_source'] = {'source_id': 'S1', 'author': 'A real thesis author',
+                                  'author_locator': 'S1:cover-author', 'title': 'A supplied thesis title',
+                                  'title_locator': 'S1:cover-title'}
+        slide['evidence'] += [{'locator': s['id'], 'quote': s['text']} for s in source['segments'][-2:]]
+        self.validate()
+        slide['primary_source']['author'] = 'An invented thesis author'
+        with self.assertRaisesRegex(ValueError, 'Primary source'):
+            self.validate()
+        slide['primary_source']['author'] = 'A real thesis author'
+        slide['points'] = ['A supplied thesis title with an invented publisher']
+        with self.assertRaisesRegex(ValueError, 'exact excerpt'):
+            self.validate()
 
     def test_long_real_reference_is_compacted_without_losing_source_evidence(self):
         entry = '[۱] ' + 'Author and detailed research title, ' * 8 + 'Journal of Testing, 2024.'

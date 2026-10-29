@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Order"
+  short_description: "Fetch and route Daneshyar orders inside Codex"
+  default_prompt: "Use $daneshyar-order to complete this Daneshyar order."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Review"
+  short_description: "Fresh professor-style review of local Daneshyar orders"
+  default_prompt: "Use $daneshyar-review to review this locally completed Daneshyar order in a fresh reviewer session, grade it out of 20, and return the issues and repair request here."

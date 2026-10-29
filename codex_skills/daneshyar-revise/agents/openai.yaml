@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Revise"
+  short_description: "Plan and apply reviewed Daneshyar delivery corrections"
+  default_prompt: "Use $daneshyar-revise to plan and execute corrections from this order's review, verify the revised package, and show all current delivery files again."

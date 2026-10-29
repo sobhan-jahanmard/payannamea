@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar University Research"
+  short_description: "Execute and verify university research orders"
+  default_prompt: "Use $daneshyar-university-research to complete this registered Daneshyar order."

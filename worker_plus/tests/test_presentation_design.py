@@ -163,4 +163,27 @@ class PresentationDesignTests(unittest.TestCase):
    subprocess.run([str(electron),str(ROOT/'runtime/render.mjs'),str(root/'payload.json')],check=True,capture_output=True,timeout=30,env={**os.environ,'ELECTRON_RUN_AS_NODE':'1'})
    self.assertTrue(target.is_file())
 
+ def test_renderer_keeps_original_bibliography_but_ignores_technical_labels(self):
+  import os,shutil,subprocess,zipfile
+  from lxml import etree
+  from presentation.design import ROOT
+  node=shutil.which('node')
+  if not node or not (ROOT/'runtime/node_modules/pptxgenjs').exists():self.skipTest('Presentation runtime is required')
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);target=root/'references.pptx'
+   slide={'layout':'statement','section':'references','title':'References',
+          'points':['[1] Author, Original research title, Journal of Testing, 2024.'],
+          'speaker_notes':'Narration only','source_notes':[{'ranges':[[2,2]]}],
+          'citations':[{'text':'Source S1 | pp. 2','locator':'S1'}],
+          'primary_source':{'source_id':'S1','author':'Input file author','title':'Input file title'}}
+   payload={'slides':[slide],'contract':{'rtl':False,'title':'Fixture'},'design':resolve_design({}),
+            'target':str(target),'content_sha256':'fixture','design_sha256':'fixture'}
+   (root/'payload.json').write_text(json.dumps(payload),encoding='utf-8')
+   subprocess.run([node,str(ROOT/'runtime/render.mjs'),str(root/'payload.json')],check=True,capture_output=True,timeout=30,env={**os.environ,'ELECTRON_RUN_AS_NODE':'1'})
+   with zipfile.ZipFile(target) as package:
+    visible=' '.join(etree.fromstring(package.read('ppt/slides/slide1.xml')).xpath('//*[local-name()="t"]/text()'))
+   self.assertIn('Original research title',visible)
+   for forbidden in ['Source S1','Input file author','Input file title','pp. 2']:
+    self.assertNotIn(forbidden,visible)
+
 if __name__=='__main__':unittest.main()

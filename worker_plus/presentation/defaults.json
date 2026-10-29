@@ -7,6 +7,8 @@
   "title_pt": 30,
   "body_pt": 22,
   "citation_pt": 13,
+  "source_reference_storage": "powerpoint_comments",
+  "visible_source_footers": false,
   "max_body_words": 65,
   "max_points": 4,
   "sections": ["title", "problem", "objectives", "background", "method", "results", "discussion", "limitations", "conclusion", "references", "questions"],

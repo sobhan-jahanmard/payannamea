@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Thesis Proposal"
+  short_description: "Execute and verify thesis proposal orders"
+  default_prompt: "Use $daneshyar-thesis-proposal to complete this registered Daneshyar order."

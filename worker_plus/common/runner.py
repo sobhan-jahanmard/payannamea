@@ -533,8 +533,8 @@ class Services:
         department = order.get("department") or ""
         faculty_line = " — ".join(part for part in (f"دانشکده {faculty}" if faculty else "", f"گروه {department}" if department else "") if part)
         research_report = order.get("order_type") == "تحقیق دانشگاهی"
-        degree_line = (f"گزارش تحقیق درس {order.get('course_name') or ''}" if research_report
-                       else f"پروژه طراحی برای دریافت درجه {order.get('degree') or 'کارشناسی'}")
+        from common.profile_support import document_cover_line
+        degree_line = document_cover_line(order)
         if order.get("field_of_study") and not research_report:
             degree_line += f" در رشته {order['field_of_study']}"
         cover_lines = [
@@ -885,7 +885,7 @@ class Services:
                 role = "student"
             elif text.startswith("دانشکده "):
                 role = "faculty"
-            elif text.startswith("پروژه طراحی برای دریافت درجه") or text.startswith("گزارش تحقیق درس "):
+            elif text.startswith(("پروژه طراحی برای دریافت درجه", "گزارش تحقیق درس ", "پایان‌نامه برای دریافت درجه", "پروپوزال پایان‌نامه")):
                 role = "degree"
             size, bold, gap = values[role]
             paragraph.paragraph_format.line_spacing = cover.get("line_spacing", 1.5)
@@ -1162,7 +1162,7 @@ class Services:
         title_size = max((run.font.size.pt for run in title_cover.runs if run.font.size is not None), default=0) if title_cover else 0
         if not cover_sizes or max(cover_sizes) - min(cover_sizes) < 8 or title_size != max(cover_sizes):
             errors.append("cover typography audit failed: title hierarchy or font-size contrast is insufficient")
-        if student_cover is None or (student_cover.paragraph_format.space_before.pt if student_cover.paragraph_format.space_before else 0) < 60:
+        if order.get("student_name") and (student_cover is None or (student_cover.paragraph_format.space_before.pt if student_cover.paragraph_format.space_before else 0) < 60):
             errors.append("cover layout audit failed: student and supervisor block is not positioned in the lower cover area")
         if missing_section_breaks:
             errors.append(f"top-level sections missing required page break ({missing_section_breaks})")

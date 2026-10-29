@@ -144,6 +144,33 @@ function processDiagram(slide, record, data) {
   const top = bodyTop(data);
   const count = nodes.length;
   if (count < 2 || count > 7) throw new Error(`Slide ${record.slide}: process needs 2–7 source-backed nodes`);
+  if (data.visual?.side_stream) {
+    const gap = .35, width = (11.4 - gap * (count - 1)) / count, y = top + .05;
+    const positions = nodes.map((node, index) => .95 + (rtl ? count - 1 - index : index) * (width + gap));
+    nodes.forEach((node, index) => {
+      const x = positions[index];
+      slide.addShape(deck.ShapeType.rect, { x, y, w: width, h: 1.3, fill: { color: design.canvas }, line: { color: design.accent, width: 1.5 } });
+      text(slide, record, 'process-label', node.label, { x: x + .1, y: y + .12, w: width - .2, h: .65 }, { fontSize: 19, bold: true, align: 'center' });
+      if (node.detail) text(slide, record, 'process-detail', node.detail, { x: x + .06, y: y + .82, w: width - .12, h: .4 }, { fontSize: 16, color: design.muted, align: 'center' });
+      if (index < count - 1) slide.addShape(deck.ShapeType.line, { x: rtl ? x - gap : x + width, y: y + .65, w: gap, h: 0, line: { color: design.accent, width: 1.5, beginArrowType: rtl ? 'triangle' : undefined, endArrowType: rtl ? undefined : 'triangle' } });
+    });
+    const branch = data.visual.side_stream, cx = positions[branch.from_node] + width / 2, by = y + 2.25;
+    slide.addShape(deck.ShapeType.line, { x: cx, y: y + 1.3, w: 0, h: .95, line: { color: design.secondary, width: 1.5, endArrowType: 'triangle' } });
+    text(slide, record, 'side-stream-flow', branch.flow_label, { x: cx - 1.55, y: y + 1.5, w: 1.4, h: .45 }, { fontSize: 18, color: design.secondary, align: 'left' });
+    slide.addShape(deck.ShapeType.rect, { x: cx - 1.7, y: by, w: 3.4, h: .85, fill: { color: design.canvas }, line: { color: design.secondary, width: 1.5 } });
+    text(slide, record, 'side-stream-label', branch.label, { x: cx - 1.58, y: by + .15, w: 3.16, h: .5 }, { fontSize: 21, bold: true, align: 'center' });
+    text(slide, record, 'side-stream-detail', branch.detail, { x: cx - 2.5, y: by + .95, w: 5, h: .4 }, { fontSize: 17, color: design.muted, align: 'center' });
+    if (data.visual.feed_stream) {
+      const feed = data.visual.feed_stream, fx = 9.15, fy = y + 1.5, targetX = cx + .5, feedY = fy + .425;
+      slide.addShape(deck.ShapeType.rect, { x: fx, y: fy, w: 3.2, h: .85, fill: { color: design.canvas }, line: { color: design.accent, width: 1.5 } });
+      text(slide, record, 'feed-stream-label', feed.label, { x: fx + .1, y: fy + .16, w: 3, h: .5 }, { fontSize: 21, bold: true, align: 'center' });
+      text(slide, record, 'feed-stream-detail', feed.detail, { x: fx, y: fy + .95, w: 3.2, h: .4 }, { fontSize: 17, color: design.muted, align: 'center' });
+      line(slide, targetX, feedY, fx - targetX, design.accent, 1.5);
+      slide.addShape(deck.ShapeType.line, { x: targetX, y: y + 1.3, w: 0, h: feedY - y - 1.3, line: { color: design.accent, width: 1.5, beginArrowType: 'triangle' } });
+    }
+    if (data.caption) text(slide, record, 'caption', data.caption, { x: .95, y: 6.3, w: 11.4, h: .45 }, { fontSize: 17, color: design.muted });
+    return;
+  }
   if (design.id === 'visual-teaching' || (count > 4 && nodes.some(node => node.detail))) {
     const cols = Math.ceil(count / 2), gap = .6, width = (11.4 - gap * (cols - 1)) / cols;
     const dimensions = data.visual?.relationship === 'dimensions';
@@ -215,10 +242,12 @@ function chart(slide, record, data) {
   const type = source.type === 'line' ? deck.ChartType.line : deck.ChartType.bar;
   const top = bodyTop(data);
   const series = source.series.map(s => ({ name: s.name, labels: source.categories, values: s.values }));
-  slide.addChart(type, series, { x: 1.05, y: top + .03, w: 11.1, h: 3.45,
+  const detailed = (data.points?.length || 0) > 1, height = detailed ? 2.3 : 3.45;
+  const numberFormat = source.series.every(s => s.values.every(Number.isInteger)) ? '0' : '0.00';
+  slide.addChart(type, series, { x: 1.05, y: top + .03, w: 11.1, h: height,
     catAxisLabelFontFace: design.font, catAxisLabelFontSize: 17, valAxisLabelFontFace: design.font, valAxisLabelFontSize: 14,
     showLegend: series.length > 1, legendFontFace: design.font, legendFontSize: 16,
-    showTitle: false, showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '0.##', dataLabelColor: design.ink,
+    showTitle: false, showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: numberFormat, dataLabelColor: design.ink,
     dataLabelFormatCodeSourceLinked: false, dataLabelFontFace: design.font, dataLabelFontSize: 17,
     chartColors: [design.accent, design.secondary, '688A9E'], showBorder: false,
     showCatName: false, showCatNameLabel: false, showShadow: false,
@@ -228,7 +257,11 @@ function chart(slide, record, data) {
     barDir: source.type === 'bar' ? 'bar' : 'col', catAxisLabelRotate: 0,
     showMarker: source.type === 'line', showLine: true, showCatName: false,
   });
-  record.objects.push({ role: 'chart', bbox: [1.05 * 72, (top + .03) * 72, 12.15 * 72, (top + 3.48) * 72], data: source });
+  record.objects.push({ role: 'chart', bbox: [1.05 * 72, (top + .03) * 72, 12.15 * 72, (top + .03 + height) * 72], data: source });
+  if (detailed) {
+    points(slide, record, data.points, { x: 1.05, y: 5.03, w: 11.1, h: 1.65 }, 18);
+    return;
+  }
   const takeaway = data.points?.[0] || data.caption;
   if (takeaway) text(slide, record, 'chart-takeaway', takeaway, { x: 1.05, y: 6.04, w: 11.1, h: .55 }, { fontSize: 20, bold: true, color: design.accent });
   // Details are still complete in speaker notes, not duplicated beside the chart.
@@ -251,12 +284,15 @@ function image(slide, record, data) {
   if (data.caption) text(slide, record, 'caption', data.caption, { x: .95, y: 6.16, w: 11.4, h: .43 }, { fontSize: 16, color: design.muted });
 }
 function references(slide, record, data) {
-  const rows = data.points || [];
-  const midpoint = Math.ceil(rows.length / 2);
-  [rows.slice(0, midpoint), rows.slice(midpoint)].forEach((items, index) => {
-    const x = rtl ? (index === 0 ? 6.95 : .95) : (index === 0 ? .95 : 6.95);
-    points(slide, record, items, { x, y: bodyTop(data) + .1, w: 5.4, h: 4.1 }, 18);
-  });
+    const top = bodyTop(data);
+    let y = top + .15;
+    for (const item of data.points || []) {
+      const value = item.replace(/\*/g, ''), height = Math.max(.55, lines(value, 11.4, 20) * 20 / 72 * 1.22);
+      if (y + height > 6.7) throw new Error(`Slide ${record.slide}: bibliography exceeds available space`);
+      const latin = (value.match(/[A-Za-z]/g) || []).length > value.length / 3;
+      text(slide, record, 'reference-entry', value, { x: .95, y, w: 11.4, h: height }, { fontSize: 20, rtlMode: latin ? false : rtl, align: latin ? 'left' : 'right', lang: latin ? 'en-US' : deck.lang });
+      y += height + .2;
+    }
 }
 
 for (let index = 0; index < slides.length; index++) {
@@ -272,17 +308,6 @@ for (let index = 0; index < slides.length; index++) {
     if (data.section === 'references' && kind === 'statement') references(slide, record, data);
     else ({ statement, two_column: comparison, comparison, key_metric: metrics, process: processDiagram, timeline,
       decision, chart, table, image, closing: statement }[kind] || statement)(slide, record, data);
-  }
-  if (kind !== 'title') {
-    let x = .85;
-    for (const citation of data.citations) {
-      const width = Math.max(1.6, citation.text.length * .082);
-      if (x + width > 11.9) throw new Error(`Slide ${index + 1}: source footer exceeds available width`);
-      const box = { x, y: 6.98, w: width, h: .27 };
-      text(slide, record, 'citation', citation.text, box, { fontSize: 13, color: design.muted, align: 'left', rtlMode: false, lang: 'en-US' });
-      record.citations.push({ ...citation, bbox: [x * 72, 6.87 * 72, (x + width) * 72, 7.35 * 72] });
-      x += width + .25;
-    }
   }
   text(slide, record, 'page-number', String(index + 1), { x: 12.05, y: 6.98, w: .4, h: .27 }, { fontSize: 12, color: kind === 'title' && design.id !== 'visual-teaching' ? 'CFDFE5' : design.muted, align: 'right', rtlMode: false });
   slide.addNotes(data.speaker_notes);

@@ -134,7 +134,11 @@ class PresentationTests(unittest.TestCase):
             ppt = Presentation(output)
             self.assertEqual(sum(shape.has_chart for slide in ppt.slides for shape in slide.shapes), 1)
             self.assertEqual(sum(shape.has_table for slide in ppt.slides for shape in slide.shapes), 1)
-            self.assertIn("S1:table-1", ppt.slides[3].notes_slide.notes_text_frame.text)
+            self.assertEqual(deck['slides'][3]['notes'], ppt.slides[3].notes_slide.notes_text_frame.text)
+            import zipfile
+            with zipfile.ZipFile(output) as package:
+                self.assertIn(b'S1:table-1', package.read('ppt/comments/comment4.xml'))
+                self.assertNotIn(b'S1:table-1', package.read('ppt/slides/slide4.xml'))
             self.assertIn('rtl="1"', ppt.slides[1]._element.xml)
             self.assertEqual(list(next(s.chart for s in ppt.slides[3].shapes if s.has_chart).series[0].values), [10, 20])
 

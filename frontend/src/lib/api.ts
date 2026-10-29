@@ -21,6 +21,7 @@ import type {
   PhoneFollowupResponse,
   NewFollowupsResponse
 } from "../types/api";
+import type { LocalReviewScore } from "./review-scores";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TOKEN_KEY = "payanname_auth_token";
@@ -290,6 +291,10 @@ export async function deleteAdminUser(id: string): Promise<void> {
 
 export async function getAdminOrder(orderId: string): Promise<Order> {
   return request<Order>(`/api/admin/orders/${orderId}`);
+}
+
+export async function getAdminReviewScores(orderId: string): Promise<{ reviews: LocalReviewScore[] }> {
+  return request(`/api/admin/orders/${encodeURIComponent(orderId)}/review-scores`);
 }
 
 export async function deleteAdminOrderFile(orderId: string, fileId: string): Promise<Order> {

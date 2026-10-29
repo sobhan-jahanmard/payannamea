@@ -44,3 +44,15 @@ def validate_order(order: dict[str, Any], expected_type: str) -> None:
     actual = str(order.get("order_type") or "").strip()
     if actual and actual != expected_type:
         raise RuntimeError(f"This worker handles '{expected_type}', not '{actual}'.")
+
+
+def document_cover_line(order: dict[str, Any]) -> str:
+    kind = order.get("order_type")
+    if kind == "تحقیق دانشگاهی":
+        return f"گزارش تحقیق درس {order.get('course_name') or ''}"
+    if kind == "پروپوزال پایان‌نامه":
+        return "پروپوزال پایان‌نامه" + (f" دوره {order['degree']}" if order.get("degree") else "")
+    if kind in ("پایان‌نامه کارشناسی", "پایان‌نامه کارشناسی ارشد"):
+        degree = order.get("degree") or ("کارشناسی ارشد" if kind == "پایان‌نامه کارشناسی ارشد" else "کارشناسی")
+        return f"پایان‌نامه برای دریافت درجه {degree}"
+    return f"پروژه طراحی برای دریافت درجه {order.get('degree') or 'کارشناسی'}"

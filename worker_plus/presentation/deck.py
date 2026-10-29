@@ -115,6 +115,25 @@ def validate_spec(spec: dict, contract: dict, sources: dict, workspace: Path) ->
                 for value in values:
                     if not isinstance(value, (int, float)) or not math.isfinite(value) or float(value) not in allowed:
                         raise ValueError(f"Slide {n}: chart value {value} lacks a quoted source value")
+        side_stream = slide.get("visual", {}).get("side_stream")
+        if side_stream is not None:
+            nodes = slide.get("visual", {}).get("nodes", [])
+            if (slide["layout"] != "process" or slide["visual"].get("relationship") != "sequence" or
+                    not isinstance(side_stream, dict) or type(side_stream.get("from_node")) is not int or
+                    not 0 <= side_stream["from_node"] < len(nodes) or len(nodes) > 5 or
+                    any(not isinstance(side_stream.get(key), str) or not 1 <= len(side_stream[key]) <= 45
+                        for key in ("label", "detail", "flow_label")) or not evidence):
+                raise ValueError(f"Slide {n}: invalid source-backed process side stream")
+        feed_stream = slide.get("visual", {}).get("feed_stream")
+        if feed_stream is not None:
+            nodes = slide.get("visual", {}).get("nodes", [])
+            if (side_stream is None or not isinstance(feed_stream, dict) or
+                    type(feed_stream.get("to_node")) is not int or
+                    not 0 <= feed_stream["to_node"] < len(nodes) or
+                    feed_stream["to_node"] != side_stream["from_node"] or
+                    any(not isinstance(feed_stream.get(key), str) or not 1 <= len(feed_stream[key]) <= 45
+                        for key in ("label", "detail"))):
+                raise ValueError(f"Slide {n}: invalid source-backed process feed stream")
         if slide["layout"] == "table":
             rows = slide.get("table", [])
             if (not isinstance(rows, list) or not 2 <= len(rows) <= 6 or
@@ -337,16 +356,15 @@ def build_pptx(spec: dict, contract: dict, sources: dict, target: Path, workspac
                             _style_paragraph(cell.text_frame.paragraphs[0], value, 17, "FFFFFF" if r == 0 else ink, font, rtl, r == 0)
                 box(slide, points, 8.55, 1.95, 3.95, 3.9, 20)
                 box(slide, data.get("caption", ""), .85, 5.98, 11.6, .62, 13, ink)
-        refs = list(dict.fromkeys(e["locator"] for e in data.get("evidence", [])))
-        if not title_slide:
-            footer = " · ".join(refs)
-            citation = box(slide, footer, .8, 6.85, 10.9, .48, max(13, contract["citation_pt"]), "526777", direction=False)
-            citation.name = "Source citations"
         box(slide, str(index), 12.05, 6.92, .5, .3, 11, "B6D7DB" if title_slide else "526777")
-        notes = data["notes"] + "\n\nSources:\n" + "\n".join(f"{e['locator']}: {e['quote']}" for e in data.get("evidence", []))
+        notes = data["notes"]
         slide.notes_slide.notes_text_frame.text = notes
     target.parent.mkdir(parents=True, exist_ok=True)
     prs.save(target)
+    from presentation.source_comments import add_source_comments, expected_comments, validate_source_comments
+    texts = expected_comments(spec, sources, contract)
+    add_source_comments(target, texts)
+    validate_source_comments(target, texts)
 
 
 def validate_package(path: Path, expected_count: int) -> dict:

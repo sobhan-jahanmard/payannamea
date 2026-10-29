@@ -12,7 +12,7 @@ import zipfile
 
 from common.helpers import write_json
 from presentation.design import ROOT, ensure_font, resolve_design, semantic_digest
-from presentation.source_pages import slide_source_notes, format_source_notes
+from presentation.source_pages import slide_source_notes
 
 
 class PresentationDesignError(RuntimeError):
@@ -63,20 +63,10 @@ def build_designed_pptx(spec, contract, sources, target: Path, workspace: Path):
         data = dict(source)
         source_notes = slide_source_notes(data, sources)
         data["source_notes"] = source_notes
-        data["speaker_notes"] = format_source_notes(source_notes, contract.get("rtl", True)) + "\n\n" + data["notes"] + "\n\nEvidence:\n" + "\n".join(f"{e['locator']}: {e['quote']}" for e in data.get("evidence", []))
+        data["speaker_notes"] = data["notes"]
         if data.get("points"):
             data["speaker_notes"] += "\n\n" + ("جزئیات تکمیلی اسلاید:" if contract.get("rtl", True) else "Slide talking points:") + "\n" + "\n".join(data["points"])
-        if data.get("metadata_evidence"):
-            data["speaker_notes"] += "\n\nSource file identity:\n" + "\n".join(f"{e['locator']}: {e['quote']}" for e in data["metadata_evidence"])
-        citations = []
-        for item in source_notes:
-            # Human-readable references; full non-contiguous ranges and internal
-            # evidence locators are retained in the speaker notes and manifest.
-            ranges = ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in item["ranges"][:2])
-            extra = " +" if len(item["ranges"]) > 2 else ""
-            citations.append({"locator": item["source_id"], "text": f"[{item['source_number']}] pp. {ranges}{extra}",
-                              "source_locators": item["locators"]})
-        data["citations"] = citations
+        data["citations"] = []  # Provenance belongs in comments, never on canvas.
         if data.get("image_id"):
             image = images[data["image_id"]]
             data["image_path"] = str((workspace / image["path"]).resolve())
@@ -110,4 +100,8 @@ def build_designed_pptx(spec, contract, sources, target: Path, workspace: Path):
     if os.name == "nt":
         subprocess.run([sys.executable, "-m", "presentation.embed_fonts", str(target.resolve()), font],
                        cwd=str(ROOT.parent), check=True, timeout=180)
+    from presentation.source_comments import add_source_comments, expected_comments, validate_source_comments
+    texts = expected_comments(spec, sources, contract)
+    add_source_comments(target, texts)
+    validate_source_comments(target, texts)
     return manifest

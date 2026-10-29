@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Push Local Online"
+  short_description: "Publish a completed local Daneshyar package online"
+  default_prompt: "Use $daneshyar-push-local-online to publish this completed local order, verify all four stored files, and report its online status."
