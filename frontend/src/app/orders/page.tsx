@@ -1,19 +1,13 @@
 "use client";
 
-import { ClipboardList, ExternalLink, RefreshCcw, Trash2 } from "lucide-react";
+import { ClipboardList, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AuthGate, useAuth } from "../../components/auth/AuthProvider";
-import { StatusBadge } from "../../components/ui/badge";
+import { OrderCard } from "../../components/orders/OrderCard";
 import { Button } from "../../components/ui/button";
 import { deleteOrder, listMyOrders } from "../../lib/api";
-import {
-  formatDate,
-  formatDateTime,
-  paymentStatusLabel,
-  statusLabel,
-} from "../../lib/format";
 import type { Order } from "../../types/api";
 
 function OrdersList() {
@@ -116,77 +110,17 @@ function OrdersList() {
         </div>
       ) : null}
 
-      <section className="tool-surface p-5">
+      <section className="tool-surface p-3 sm:p-5" aria-label="فهرست سفارش‌ها">
         {orders.length ? (
           <div className="grid gap-3">
             {orders.map((order) => (
-              <div
+              <OrderCard
                 key={order.id}
-                className="grid gap-3 rounded-md border border-border bg-white p-4 transition hover:bg-muted lg:grid-cols-[1fr_auto]"
-              >
-                <Link
-                  href={
-                    user?.role === "admin"
-                      ? `/admin/orders/${encodeURIComponent(order.id)}`
-                      : `/status?order=${encodeURIComponent(order.id)}`
-                  }
-                  className="grid min-w-0 gap-3 lg:grid-cols-[1fr_auto]"
-                >
-                  <div className="min-w-0">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <StatusBadge status={order.status} />
-                      <span className="text-xs text-muted-foreground">
-                        {statusLabel(order.status)}
-                      </span>
-                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                        {paymentStatusLabel(order.payment_status)}
-                      </span>
-                    </div>
-                    <h2 className="line-clamp-2 text-base font-semibold">
-                      {order.title}
-                    </h2>
-                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
-                      <span>{order.order_type ?? "سفارش دانشگاهی"}</span>
-                      <span>{order.degree}</span>
-                      <span>{order.university}</span>
-                      <span>مهلت: {formatDate(order.deadline)}</span>
-                    </div>
-                    {user?.role === "admin" &&
-                    order.created_by?.role === "operator" ? (
-                      <p className="mt-2 text-xs text-primary">
-                        ثبت‌شده توسط اپراتور:{" "}
-                        {order.created_by.full_name ??
-                          order.created_by.username ??
-                          order.created_by.email ??
-                          "بدون نام"}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex items-end justify-between gap-3 lg:flex-col lg:items-end">
-                    <span className="text-sm text-muted-foreground">
-                      {formatDateTime(order.created_at)}
-                    </span>
-                    <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
-                      مشاهده
-                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                  </div>
-                </Link>
-                {user?.role === "admin" ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void removeOrder(order.id)}
-                    loading={deletingOrderId === order.id}
-                  >
-                    <Trash2
-                      className="h-4 w-4 stroke-red-600"
-                      aria-hidden="true"
-                    />
-                  </Button>
-                ) : null}
-              </div>
+                order={order}
+                isAdmin={user?.role === "admin"}
+                deleting={deletingOrderId === order.id}
+                onDelete={(orderId) => void removeOrder(orderId)}
+              />
             ))}
           </div>
         ) : (
