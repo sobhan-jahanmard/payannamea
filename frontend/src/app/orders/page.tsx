@@ -1,21 +1,41 @@
 "use client";
 
-import { ClipboardList, RefreshCcw } from "lucide-react";
+import { ClipboardList, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AuthGate, useAuth } from "../../components/auth/AuthProvider";
 import { OrderCard } from "../../components/orders/OrderCard";
 import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
 import { deleteOrder, listMyOrders } from "../../lib/api";
 import type { Order } from "../../types/api";
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[\u064b-\u065f\u0670\u0640]/g, "")
+    .replace(/[\s\u200c\u200d()+-]/g, "")
+    .toLowerCase();
+}
 
 function OrdersList() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const query = normalizeSearch(search);
+  const filteredOrders = orders.filter((order) =>
+    normalizeSearch(order.student_name ?? "").includes(query) ||
+    normalizeSearch(order.customer?.phone ?? "").includes(query),
+  );
 
   async function loadOrders() {
     setLoading(true);
@@ -111,29 +131,87 @@ function OrdersList() {
       ) : null}
 
       <section className="tool-surface p-3 sm:p-5" aria-label="فهرست سفارش‌ها">
-        {orders.length ? (
-          <div className="grid gap-3">
-            {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                isAdmin={user?.role === "admin"}
-                deleting={deletingOrderId === order.id}
-                onDelete={(orderId) => void removeOrder(orderId)}
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <form role="search" className="w-full sm:max-w-md" onSubmit={(event) => event.preventDefault()}>
+            <label htmlFor="student-search" className="mb-2 block text-sm font-medium">
+              جست‌وجوی دانشجو
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                ref={searchInputRef}
+                id="student-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="نام یا شماره موبایل دانشجو"
+                autoComplete="off"
+                className="h-12 pl-12 pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                aria-controls="orders-results"
               />
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 rounded-md border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
-            <p>هنوز سفارشی ثبت نکرده‌اید.</p>
-            <Button asChild>
-              <Link href="/order">
-                <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                ثبت اولین سفارش
-              </Link>
-            </Button>
-          </div>
-        )}
+              {search ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-0.5 top-1/2 h-11 w-11 -translate-y-1/2"
+                  aria-label="پاک کردن جست‌وجو"
+                  onClick={() => {
+                    setSearch("");
+                    searchInputRef.current?.focus();
+                  }}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+          </form>
+          <p className="text-xs leading-6 text-muted-foreground" role="status">
+            {loading
+              ? "در حال بارگذاری سفارش‌ها..."
+              : error && !orders.length
+                ? "بارگذاری سفارش‌ها ناموفق بود."
+                : query
+                  ? `${filteredOrders.length.toLocaleString("fa-IR")} نتیجه از ${orders.length.toLocaleString("fa-IR")} سفارش`
+                  : `${orders.length.toLocaleString("fa-IR")} سفارش`}
+          </p>
+        </div>
+        <div id="orders-results" aria-busy={loading}>
+          {filteredOrders.length ? (
+            <div className="grid gap-3">
+              {filteredOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  isAdmin={user?.role === "admin"}
+                  deleting={deletingOrderId === order.id}
+                  onDelete={(orderId) => void removeOrder(orderId)}
+                />
+              ))}
+            </div>
+          ) : loading ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">در حال بارگذاری سفارش‌ها...</p>
+          ) : error && !orders.length ? null : query ? (
+            <div className="grid justify-items-center gap-3 rounded-md border border-dashed border-border bg-white p-6 text-center">
+              <Search className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm font-medium">سفارشی با این نام یا شماره موبایل پیدا نشد.</p>
+              <p className="text-xs leading-6 text-muted-foreground">بخشی از نام یا شماره را وارد کنید یا جست‌وجو را پاک کنید.</p>
+              <Button type="button" variant="outline" onClick={() => setSearch("")}>
+                پاک کردن جست‌وجو
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 rounded-md border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
+              <p>هنوز سفارشی ثبت نکرده‌اید.</p>
+              <Button asChild>
+                <Link href="/order">
+                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                  ثبت اولین سفارش
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
       </section>
     </main>
   );

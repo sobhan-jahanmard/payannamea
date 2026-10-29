@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, Clock3, GraduationCap, Landmark, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, GraduationCap, Landmark, Phone, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { formatDate, formatDateTime, paymentStatusLabel } from "../../lib/format";
@@ -41,6 +41,22 @@ export function OrderCard({
             {order.title}
           </Link>
         </h2>
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm leading-6">
+          <div className="flex min-w-0 items-start gap-1.5">
+            <dt className="inline-flex shrink-0 items-center gap-1.5 text-muted-foreground">
+              <UserRound className="mt-1 h-4 w-4" aria-hidden="true" />
+              دانشجو:
+            </dt>
+            <dd className="break-words font-medium">{order.student_name?.trim() || "ثبت نشده"}</dd>
+          </div>
+          <div className="flex min-w-0 items-start gap-1.5">
+            <dt className="inline-flex shrink-0 items-center gap-1.5 text-muted-foreground">
+              <Phone className="mt-1 h-4 w-4" aria-hidden="true" />
+              موبایل:
+            </dt>
+            <dd><bdi dir="ltr" className="tabular-nums">{order.customer?.phone || "ثبت نشده"}</bdi></dd>
+          </div>
+        </dl>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs leading-6 text-muted-foreground sm:text-sm">
           {order.degree ? (
             <div className="flex min-w-0 items-start gap-1.5">
