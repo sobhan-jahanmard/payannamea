@@ -1,6 +1,7 @@
 import "../env";
 
 import { getDataSource } from "./data-source";
+import { ensureOrderListIndexes } from "./order-list-indexes";
 
 const statements = [
   `create table if not exists users (
@@ -314,6 +315,7 @@ async function main() {
   for (const statement of statements) {
     await dataSource.query(statement);
   }
+  await ensureOrderListIndexes(dataSource);
   await dataSource.destroy();
   console.log("PostgreSQL schema is ready.");
 }

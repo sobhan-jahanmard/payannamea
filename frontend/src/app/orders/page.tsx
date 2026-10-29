@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, RefreshCcw, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,53 +9,51 @@ import { OrderCard } from "../../components/orders/OrderCard";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { deleteOrder, listMyOrders } from "../../lib/api";
-import type { Order } from "../../types/api";
-
-function normalizeSearch(value: string) {
-  return value
-    .normalize("NFKC")
-    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
-    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
-    .replace(/ي/g, "ی")
-    .replace(/ك/g, "ک")
-    .replace(/[\u064b-\u065f\u0670\u0640]/g, "")
-    .replace(/[\s\u200c\u200d()+-]/g, "")
-    .toLowerCase();
-}
+import type { OrdersListResponse } from "../../types/api";
 
 function OrdersList() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [data, setData] = useState<OrdersListResponse | null>(null);
+  const [query, setQuery] = useState({ search: "", page: 1 });
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const query = normalizeSearch(search);
-  const filteredOrders = orders.filter((order) =>
-    normalizeSearch(order.student_name ?? "").includes(query) ||
-    normalizeSearch(order.customer?.phone ?? "").includes(query),
-  );
-
-  async function loadOrders() {
-    setLoading(true);
-    setError(null);
-    try {
-      setOrders(await listMyOrders());
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "بارگذاری سفارش‌ها ناموفق بود",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const trimmedSearch = search.trim();
+  const orders = data?.orders ?? [];
+  const pagination = data?.pagination;
 
   useEffect(() => {
-    void loadOrders();
-  }, []);
+    if (trimmedSearch === query.search) return;
+    const timer = window.setTimeout(() => {
+      setQuery({ search: trimmedSearch, page: 1 });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [trimmedSearch, query.search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    // Cancel the previous request as soon as typing starts, and wait for
+    // debounce before requesting page one of the new search.
+    if (trimmedSearch !== query.search) return () => controller.abort();
+    setError(null);
+    void listMyOrders({ ...query, limit: 20 }, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setData(result);
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) return;
+        setData(null);
+        setError(loadError instanceof Error ? loadError.message : "بارگذاری سفارش‌ها ناموفق بود");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [query, trimmedSearch, refreshKey]);
 
   async function removeOrder(orderId: string) {
     if (
@@ -68,7 +66,7 @@ function OrdersList() {
     setError(null);
     try {
       await deleteOrder(orderId);
-      setOrders((current) => current.filter((order) => order.id !== orderId));
+      setRefreshKey((current) => current + 1);
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -109,7 +107,7 @@ function OrdersList() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => void loadOrders()}
+            onClick={() => setRefreshKey((current) => current + 1)}
             loading={loading}
           >
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
@@ -144,6 +142,7 @@ function OrdersList() {
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                maxLength={120}
                 placeholder="نام یا شماره موبایل دانشجو"
                 autoComplete="off"
                 className="h-12 pl-12 pr-10 [&::-webkit-search-cancel-button]:appearance-none"
@@ -167,19 +166,19 @@ function OrdersList() {
             </div>
           </form>
           <p className="text-xs leading-6 text-muted-foreground" role="status">
-            {loading
+            {loading || trimmedSearch !== query.search
               ? "در حال بارگذاری سفارش‌ها..."
-              : error && !orders.length
+              : error && !data
                 ? "بارگذاری سفارش‌ها ناموفق بود."
-                : query
-                  ? `${filteredOrders.length.toLocaleString("fa-IR")} نتیجه از ${orders.length.toLocaleString("fa-IR")} سفارش`
-                  : `${orders.length.toLocaleString("fa-IR")} سفارش`}
+                : `${(pagination?.total ?? 0).toLocaleString("fa-IR")} ${query.search ? "نتیجه" : "سفارش"}`}
           </p>
         </div>
-        <div id="orders-results" aria-busy={loading}>
-          {filteredOrders.length ? (
+        <div id="orders-results" aria-busy={loading || trimmedSearch !== query.search}>
+          {loading || trimmedSearch !== query.search ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">در حال بارگذاری سفارش‌ها...</p>
+          ) : orders.length ? (
             <div className="grid gap-3">
-              {filteredOrders.map((order) => (
+              {orders.map((order) => (
                 <OrderCard
                   key={order.id}
                   order={order}
@@ -189,9 +188,7 @@ function OrdersList() {
                 />
               ))}
             </div>
-          ) : loading ? (
-            <p className="p-6 text-center text-sm text-muted-foreground">در حال بارگذاری سفارش‌ها...</p>
-          ) : error && !orders.length ? null : query ? (
+          ) : error ? null : query.search ? (
             <div className="grid justify-items-center gap-3 rounded-md border border-dashed border-border bg-white p-6 text-center">
               <Search className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm font-medium">سفارشی با این نام یا شماره موبایل پیدا نشد.</p>
@@ -212,6 +209,38 @@ function OrdersList() {
             </div>
           )}
         </div>
+        {pagination && pagination.total > 0 && !error ? (
+          <nav aria-label="صفحه‌بندی سفارش‌ها" className="mt-5 flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs leading-6 text-muted-foreground">
+              نمایش {((pagination.page - 1) * pagination.limit + 1).toLocaleString("fa-IR")} تا {Math.min(pagination.page * pagination.limit, pagination.total).toLocaleString("fa-IR")} از {pagination.total.toLocaleString("fa-IR")}
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                disabled={loading || trimmedSearch !== query.search || Boolean(deletingOrderId) || pagination.page <= 1}
+                onClick={() => setQuery((current) => ({ ...current, page: pagination.page - 1 }))}
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                قبلی
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                صفحه {pagination.page.toLocaleString("fa-IR")} از {pagination.pages.toLocaleString("fa-IR")}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                disabled={loading || trimmedSearch !== query.search || Boolean(deletingOrderId) || pagination.page >= pagination.pages}
+                onClick={() => setQuery((current) => ({ ...current, page: pagination.page + 1 }))}
+              >
+                بعدی
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          </nav>
+        ) : null}
       </section>
     </main>
   );

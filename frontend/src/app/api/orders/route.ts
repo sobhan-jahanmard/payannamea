@@ -1,5 +1,6 @@
 import { getCurrentUser, isStaffRole } from "../../../server/auth";
-import { createCustomerOrder, listAdminOrders, listCustomerOrders, serializeOrder } from "../../../server/orders";
+import { createCustomerOrder, serializeOrder } from "../../../server/orders";
+import { listOrdersPage } from "../../../server/order-list";
 import { errorResponse, json } from "../../../server/http";
 import { findOrCreateCustomerByPhone } from "../../../server/users";
 import { z } from "zod";
@@ -10,9 +11,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser(request);
-    const orders = user.role === "admin" ? await listAdminOrders(null) : await listCustomerOrders(user);
+    const params = new URL(request.url).searchParams;
+    const result = await listOrdersPage(user, {
+      search: params.get("search") ?? undefined,
+      page: params.get("page") ?? undefined,
+      limit: params.get("limit") ?? undefined,
+    });
     const audience = user.role === "customer" ? "customer" : "admin";
-    return json(orders.map((order) => serializeOrder(order, false, audience)));
+    return json({ ...result, orders: result.orders.map((order) => serializeOrder(order, false, audience)) });
   } catch (error) {
     return errorResponse(error);
   }

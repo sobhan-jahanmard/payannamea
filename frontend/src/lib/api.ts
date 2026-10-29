@@ -9,6 +9,7 @@ import type {
   OtpRequestResponse,
   OtpVerifyPayload,
   Order,
+  OrdersListResponse,
   OrderCreatePayload,
   PaymentNoteType,
   PaymentStatus,
@@ -213,8 +214,15 @@ export async function deleteOrderFile(orderId: string, fileId: string): Promise<
   });
 }
 
-export async function listMyOrders(): Promise<Order[]> {
-  return request<Order[]>("/api/orders");
+export async function listMyOrders(
+  params: { search?: string; page?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<OrdersListResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  query.set("page", String(params.page ?? 1));
+  query.set("limit", String(params.limit ?? 20));
+  return request<OrdersListResponse>(`/api/orders?${query.toString()}`, { signal });
 }
 
 export async function addReference(orderId: string, payload: ReferenceInput) {

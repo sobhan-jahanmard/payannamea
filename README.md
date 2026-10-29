@@ -47,6 +47,17 @@ npm run db:migrate
 npm run dev -- -p 5173
 ```
 
+The order list uses `GET /api/orders?search=...&page=1&limit=20`, returning
+`{ orders, pagination: { page, limit, total, pages } }`. Search matches the student's
+name or customer mobile number within the signed-in user's permitted orders.
+The UI debounces searches by 400 ms and cancels superseded requests.
+
+For an existing database, run `npm run db:index-orders` from `frontend/` before
+deploying this API. It adds normalized trigram search indexes and pagination
+indexes concurrently; `db:migrate` includes the same setup for fresh databases.
+Run `npm run test:order-list` to verify the API against PostgreSQL using temporary
+fixture tables that are rolled back after the test.
+
 Create/update an admin:
 
 ```bash

@@ -203,6 +203,11 @@ export interface Order {
   worker_submissions?: WorkerRun[];
 }
 
+export interface OrdersListResponse {
+  orders: Order[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
 export interface ReferenceInput {
   reference_type: string;
   title: string;
