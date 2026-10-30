@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { formatDate, formatDateTime, paymentStatusLabel } from "../../lib/format";
 import type { Order } from "../../types/api";
-import { StatusBadge } from "../ui/badge";
+import { Badge, StatusBadge } from "../ui/badge";
 import { Button } from "../ui/button";
 
 export function OrderCard({
@@ -21,9 +21,9 @@ export function OrderCard({
     <article className="group relative min-w-0 rounded-xl border border-border bg-white transition-[border-color,box-shadow] hover:border-primary/50 hover:shadow-sm focus-within:border-primary/50">
       <div className="p-4 sm:px-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
-          <span className="font-medium text-primary">
+          <Badge className="border-green-700 bg-green-700 text-white">
             {order.order_type || "سفارش دانشگاهی"}
-          </span>
+          </Badge>
           <span className="inline-flex items-center gap-1.5">
             <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             ثبت: <time dateTime={order.created_at}>{formatDateTime(order.created_at)}</time>
