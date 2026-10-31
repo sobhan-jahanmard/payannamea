@@ -47,30 +47,35 @@ const features = [
 const services = [
   {
     analyticsKey: "bachelor_thesis",
+    sampleFile: "bachelor-thesis.pdf",
     icon: FileText,
     title: "پایان‌نامه کارشناسی",
     body: "راهنمایی در انتخاب موضوع، تنظیم ساختار، گردآوری منابع، نگارش بخش‌ها و آماده‌سازی فایل نهایی مطابق خواسته دانشگاه.",
   },
   {
     analyticsKey: "master_thesis",
+    sampleFile: "master-thesis.pdf",
     icon: FileText,
     title: "پایان‌نامه کارشناسی ارشد",
     body: "از انتخاب موضوع و پروپوزال تا نگارش فصل‌ها، تحلیل، و آماده‌سازی فایل نهایی طبق شیوه‌نامه دانشگاه.",
   },
   {
     analyticsKey: "proposal",
+    sampleFile: "proposal.pdf",
     icon: ClipboardList,
     title: "پروپوزال پایان‌نامه",
     body: "تبدیل ایده اولیه به پروپوزال منظم شامل مسئله پژوهش، اهداف، پرسش‌ها، روش انجام و منابع اولیه.",
   },
   {
     analyticsKey: "research_assignment",
+    sampleFile: "research-assignment.pdf",
     icon: SearchCheck,
     title: "تحقیق دانشگاهی",
     body: "تهیه تحقیق کلاسی یا پژوهشی با ساختار منظم، منابع قابل بررسی، و نگارش متناسب با خواسته استاد.",
   },
   {
     analyticsKey: "presentation",
+    sampleFile: "presentation.pdf",
     icon: Presentation,
     title: "ارائه و پاورپوینت",
     body: "طراحی اسلاید دفاع، ارائه کلاسی یا ارائه پژوهشی با متن منسجم، ساختار روشن و فایل قابل تحویل.",
@@ -177,43 +182,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto -mt-28 w-full max-w-7xl px-4 pb-10 lg:px-8">
+      <section aria-labelledby="samples-heading" className="relative z-10 mx-auto -mt-28 w-full max-w-7xl px-4 pb-10 lg:px-8">
         <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-l from-teal-950 via-teal-800 to-cyan-800 p-1 shadow-xl shadow-teal-950/15">
-          <div className="flex flex-col items-start gap-5 rounded-[0.7rem] bg-slate-950/15 px-5 py-6 text-white backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="rounded-[0.7rem] bg-slate-950/15 px-5 py-6 text-white backdrop-blur-sm sm:px-7">
             <div className="flex items-start gap-4">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-amber-300 text-slate-950 shadow-lg shadow-slate-950/20">
                 <FileText className="h-6 w-6" aria-hidden="true" />
               </span>
               <div>
-                <p className="text-sm font-bold text-amber-200">نمونه‌کار واقعی</p>
-                <h2 className="mt-1 text-xl font-semibold">نمونه‌ای از خروجی انجام‌شده را ببینید</h2>
+                <p className="text-sm font-bold text-amber-200">نمونه‌کارهای واقعی</p>
+                <h2 id="samples-heading" className="mt-1 text-xl font-semibold">نمونهٔ هر نوع سفارش را دانلود کنید</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-teal-50/90">
-                  یک نمونه از فایل نهایی آماده‌شده را دانلود کنید و با کیفیت ساختار و نگارش آن آشنا شوید.
+                  فایل نهایی هر یک از پنج نوع خدمات را با فرمت PDF ببینید و با ساختار و کیفیت خروجی آشنا شوید.
                 </p>
               </div>
             </div>
-            <Button
-              asChild
-              className="w-full shrink-0 border border-amber-200 bg-amber-300 text-slate-950 shadow-md hover:bg-amber-200 sm:w-auto"
-            >
-              <a
-                href="/sample/final.pdf"
-                download
-                target="_blank"
-                rel="noreferrer"
-                data-analytics-event="landing_sample_download_clicked"
-                data-analytics-label="final.pdf"
-                data-analytics-location="sample_download"
-              >
-                دانلود نمونه‌کار
-                <Download className="h-4 w-4" aria-hidden="true" />
-              </a>
-            </Button>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {services.map((service) => {
+                const Icon = service.icon;
+                return (
+                  <article key={service.analyticsKey} className="flex flex-col rounded-lg border border-white/20 bg-white/10 p-4">
+                    <Icon className="mb-3 h-6 w-6 text-amber-200" aria-hidden="true" />
+                    <h3 className="mb-4 text-sm font-semibold leading-7">{service.title}</h3>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="mt-auto min-h-12 w-full border-white/50 bg-transparent text-white hover:bg-white/15 focus-visible:ring-amber-200"
+                    >
+                      <a
+                        href={`/sample/${service.sampleFile}`}
+                        download
+                        data-analytics-event="landing_sample_download_clicked"
+                        data-analytics-label={service.analyticsKey}
+                        data-analytics-location="sample_download"
+                      >
+                        دانلود نمونه PDF
+                        <span className="sr-only"> {service.title}</span>
+                        <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      </a>
+                    </Button>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="-mt-16 relative z-10 mx-auto grid w-full max-w-7xl gap-4 px-4 pb-10 lg:px-8">
+      <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-4 px-4 pb-10 lg:px-8">
         <div className="tool-surface grid gap-4 p-4 sm:grid-cols-3">
           {steps.map((step, index) => (
             <div
