@@ -27,7 +27,7 @@ type UserCandidateRow = {
 
 type ReportCandidate = {
   phone: string;
-  source: "کاربر تأییدشده" | "درخواست مشاوره (تأییدنشده)";
+  source: "ثبت‌نام با تأیید قبلی" | "ثبت‌نام با شماره موبایل";
   arrivedAt: Date | string;
   adminNote: string | null;
 };
@@ -85,7 +85,7 @@ function escapeHtml(value: string): string {
 function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
   const candidatesByPhone = new Map<string, ReportCandidate>();
 
-  // Include both regular OTP users and consultation requests, identified by verification status.
+  // Include all phone registrations, preserving historical verification information.
   for (const user of userRows) {
     const phone = normalizePhone(user.phone);
 
@@ -96,8 +96,8 @@ function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
     candidatesByPhone.set(phone, {
       phone,
       source: user.is_verified
-        ? "کاربر تأییدشده"
-        : "درخواست مشاوره (تأییدنشده)",
+        ? "ثبت‌نام با تأیید قبلی"
+        : "ثبت‌نام با شماره موبایل",
       arrivedAt: user.created_at,
       adminNote: normalizeAdminNote(user.admin_note),
     });

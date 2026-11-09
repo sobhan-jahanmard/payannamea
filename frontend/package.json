@@ -12,6 +12,7 @@
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:index-orders": "tsx src/server/scripts/index-order-list.ts",
     "test:order-list": "tsx --test src/server/order-list.test.ts",
+    "test:phone-auth": "tsx --test src/server/phone-auth.test.ts",
     "db:create-admin": "tsx src/server/scripts/create-admin.ts",
     "report-followups": "tsx src/server/scripts/send-new-followups-report.ts",
     "report-contacted-followups": "tsx src/server/scripts/send-contacted-followups-report.ts"

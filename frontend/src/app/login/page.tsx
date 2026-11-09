@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, LogIn, Phone } from "lucide-react";
+import { LogIn, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,56 +16,33 @@ import { Label } from "../../components/ui/label";
 const phoneSchema = z.object({
   phone: z.string().trim().min(10, "شماره موبایل معتبر نیست").max(40, "شماره موبایل معتبر نیست")
 });
-const codeSchema = z.object({ code: z.string().trim().regex(/^\d{4,8}$/, "کد تأیید معتبر نیست") });
 const adminSchema = z.object({
   username: z.string().trim().min(1, "نام کاربری یا ایمیل را وارد کنید").max(255),
   password: z.string().min(1, "رمز عبور را وارد کنید")
 });
 
 type PhoneValues = z.infer<typeof phoneSchema>;
-type CodeValues = z.infer<typeof codeSchema>;
 type AdminValues = z.infer<typeof adminSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, requestOtp, verifyOtp, user } = useAuth();
-  const [challengeId, setChallengeId] = useState<string | null>(null);
-  const [phone, setPhone] = useState("");
-  const [devCode, setDevCode] = useState<string | null>(null);
+  const { login, loginPhone, user } = useAuth();
   const [adminMode, setAdminMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const phoneForm = useForm<PhoneValues>({ resolver: zodResolver(phoneSchema) });
-  const codeForm = useForm<CodeValues>({ resolver: zodResolver(codeSchema) });
   const adminForm = useForm<AdminValues>({ resolver: zodResolver(adminSchema) });
 
-  async function sendCode(values: PhoneValues) {
+  async function submitPhone(values: PhoneValues) {
     setError(null);
     try {
-      const normalizedInput = values.phone.trim();
-      const result = await requestOtp(normalizedInput);
-      setPhone(normalizedInput);
-      setChallengeId(result.challenge_id);
-      setDevCode(result.dev_code ?? null);
-      if (result.dev_code) codeForm.setValue("code", result.dev_code);
-      trackAnalyticsEvent("otp_requested");
-    } catch (requestError) {
-      trackAnalyticsEvent("otp_request_failed");
-      setError(requestError instanceof Error ? requestError.message : "ارسال کد ناموفق بود");
-    }
-  }
-
-  async function submitCode(values: CodeValues) {
-    if (!challengeId) return;
-    setError(null);
-    try {
-      await verifyOtp({ phone, challenge_id: challengeId, code: values.code.trim(), utm_source: captureUtmSource() });
+      await loginPhone({ phone: values.phone.trim(), utm_source: captureUtmSource() });
       clearCapturedUtmSource();
       trackAnalyticsEvent("customer_login_completed");
       router.push("/orders");
-    } catch (verifyError) {
+    } catch (loginError) {
       trackAnalyticsEvent("customer_login_failed");
-      setError(verifyError instanceof Error ? verifyError.message : "تأیید شماره ناموفق بود");
+      setError(loginError instanceof Error ? loginError.message : "ورود ناموفق بود؛ دوباره تلاش کنید");
     }
   }
 
@@ -87,7 +64,10 @@ export default function LoginPage() {
         <div className="mb-5">
           <h1 className="text-2xl font-semibold">ورود یا ثبت‌نام</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            شماره موبایل خود را وارد کنید؛ اگر حسابی نداشته باشید، خودکار ساخته می‌شود.
+            با شماره موبایل خود وارد شوید یا ثبت‌نام کنید. برای ورودهای بعدی هم همین شماره کافی است.
+          </p>
+          <p id="phone-login-hint" className="mt-3 rounded-md bg-teal-50 p-3 text-sm leading-7 text-teal-900">
+            شماره‌ای را وارد کنید که در تلگرام فعال است؛ ارتباط و هماهنگی سفارش‌ها از طریق تلگرامِ همین شماره خواهد بود.
           </p>
         </div>
 
@@ -97,47 +77,21 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {!adminMode && !challengeId ? (
+        {!adminMode ? (
           <form
-            onSubmit={phoneForm.handleSubmit(sendCode)}
+            onSubmit={phoneForm.handleSubmit(submitPhone)}
             className="grid gap-4"
             data-analytics-form="phone_login_form"
           >
             <div className="space-y-2">
-              <Label>شماره موبایل</Label>
-              <Input className="ltr text-left" type="tel" inputMode="tel" autoComplete="tel" placeholder="09123456789" {...phoneForm.register("phone")} />
-              {phoneForm.formState.errors.phone ? <p className="text-xs font-medium text-red-700">{phoneForm.formState.errors.phone.message}</p> : null}
+              <Label htmlFor="login-phone">شماره موبایل فعال در تلگرام</Label>
+              <Input id="login-phone" className="ltr text-left" type="tel" inputMode="tel" autoComplete="tel" placeholder="09123456789" aria-describedby={phoneForm.formState.errors.phone ? "phone-login-hint login-phone-error" : "phone-login-hint"} aria-invalid={!!phoneForm.formState.errors.phone} {...phoneForm.register("phone")} />
+              {phoneForm.formState.errors.phone ? <p id="login-phone-error" role="alert" className="text-xs font-medium text-red-700">{phoneForm.formState.errors.phone.message}</p> : null}
             </div>
             {error ? <ErrorBox message={error} /> : null}
             <Button type="submit" loading={phoneForm.formState.isSubmitting}>
               <Phone className="h-4 w-4" aria-hidden="true" />
-              دریافت کد تأیید
-            </Button>
-          </form>
-        ) : null}
-
-        {!adminMode && challengeId ? (
-          <form
-            onSubmit={codeForm.handleSubmit(submitCode)}
-            className="grid gap-4"
-            data-analytics-form="otp_verification_form"
-          >
-            <div className="rounded-md bg-muted px-4 py-3 text-sm">
-              کد تأیید برای <span className="ltr inline-block font-medium">{phone}</span> ارسال شد.
-            </div>
-            <div className="space-y-2">
-              <Label>کد تأیید</Label>
-              <Input className="ltr text-center text-lg tracking-[0.35em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} {...codeForm.register("code")} />
-              {codeForm.formState.errors.code ? <p className="text-xs font-medium text-red-700">{codeForm.formState.errors.code.message}</p> : null}
-            </div>
-            {devCode ? <p className="text-xs text-amber-800">کد محیط توسعه: {devCode}</p> : null}
-            {error ? <ErrorBox message={error} /> : null}
-            <Button type="submit" loading={codeForm.formState.isSubmitting}>
-              <KeyRound className="h-4 w-4" aria-hidden="true" />
-              تأیید و ورود
-            </Button>
-            <Button type="button" variant="outline" onClick={() => { setChallengeId(null); setError(null); }}>
-              اصلاح شماره یا دریافت کد تازه
+              ورود یا ثبت‌نام با شماره
             </Button>
           </form>
         ) : null}
@@ -169,7 +123,7 @@ export default function LoginPage() {
         <button
           type="button"
           className="mt-5 text-xs font-medium text-muted-foreground hover:text-primary"
-          onClick={() => { setAdminMode((value) => !value); setChallengeId(null); setError(null); }}
+          onClick={() => { setAdminMode((value) => !value); setError(null); }}
           data-analytics-event="login_mode_toggled"
         >
           {adminMode ? "بازگشت به ورود با موبایل" : "ورود مدیر یا اپراتور"}
@@ -180,5 +134,5 @@ export default function LoginPage() {
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{message}</div>;
+  return <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{message}</div>;
 }

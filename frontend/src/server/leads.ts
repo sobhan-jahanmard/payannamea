@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDataSource } from "./db/data-source";
 import { UserSchema } from "./db/entities";
 import { email } from "./email";
-import { normalizeIranianPhone } from "./otp";
+import { normalizeIranianPhone } from "./phone";
 
 export const consultationLeadCreateSchema = z.object({
   phone: z.string().min(1).max(40),
@@ -19,7 +19,7 @@ export async function createConsultationUser(rawInput: unknown) {
   const dataSource = await getDataSource();
 
   const result = await dataSource.transaction(async (manager) => {
-    await manager.query("select pg_advisory_xact_lock(hashtext($1))", [`consultation:${phone}`]);
+    await manager.query("select pg_advisory_xact_lock(hashtext($1))", [phone]);
     const repo = manager.getRepository(UserSchema);
     const existing = await repo.findOneBy({ phone });
     if (existing) {

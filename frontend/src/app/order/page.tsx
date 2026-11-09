@@ -53,7 +53,7 @@ const optionalQuantity = z.preprocess((value) => {
 
 const formSchema = z.object({
   customer_phone: z.string().trim().max(40).optional(),
-  correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
+  correspondence_email: z.string().trim().email("ایمیل معتبر برای سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
@@ -489,7 +489,7 @@ function OrderForm() {
             <p className="mt-1 text-sm text-muted-foreground">ابتدا نوع سفارش را انتخاب کنید، سپس مشخصات دانشگاهی، فایل‌ها و منابع لازم را وارد کنید تا سفارش برای بررسی مدیر ارسال شود.</p>
             {user && !isStaff ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                سفارش با حساب <span className="ltr inline-block">{user.phone}</span> ثبت می‌شود.
+                سفارش با حساب <span className="ltr inline-block">{user.phone}</span> ثبت می‌شود. ارتباط و هماهنگی از طریق تلگرامِ همین شماره خواهد بود.
               </p>
             ) : null}
           </div>
@@ -604,7 +604,7 @@ function OrderForm() {
                 <Field label="شماره دانشجویی *" error={errors.student_number?.message}>
                   <Input className="ltr text-left" inputMode="numeric" {...register("student_number")} />
                 </Field>
-                <Field label="ایمیل مکاتبات سفارش *" error={errors.correspondence_email?.message}>
+                <Field label="ایمیل سفارش *" error={errors.correspondence_email?.message}>
                   <Input className="ltr text-left" type="email" autoComplete="email" placeholder="name@example.com" {...register("correspondence_email")} />
                 </Field>
                 <SearchableField id="majors" label="رشته یا گرایش تحصیلی" error={errors.field_of_study?.message} options={majorOptions} inputProps={register("field_of_study")} />
@@ -776,7 +776,7 @@ function OrderForm() {
                 <h2 className="mb-4 text-lg font-semibold">خلاصه سفارش</h2>
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <dt className="text-muted-foreground">ایمیل مکاتبات سفارش</dt>
+                    <dt className="text-muted-foreground">ایمیل سفارش</dt>
                     <dd className="ltr text-left font-medium">{watched.correspondence_email || "-"}</dd>
                   </div>
                   <div>

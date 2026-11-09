@@ -33,19 +33,8 @@ export interface AdminUsersResponse {
   pagination: { page: number; limit: number; total: number; pages: number };
 }
 
-export interface OtpRequestPayload {
+export interface PhoneLoginPayload {
   phone: string;
-}
-
-export interface OtpRequestResponse {
-  challenge_id: string;
-  expires_in: number;
-  dev_code?: string;
-}
-
-export interface OtpVerifyPayload extends OtpRequestPayload {
-  challenge_id: string;
-  code: string;
   utm_source?: string | null;
 }
 

@@ -1,18 +1,8 @@
-import { z } from "zod";
-
-import { errorResponse, json } from "../../../../../server/http";
-import { requestOtp } from "../../../../../server/otp";
+import { json } from "../../../../../server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const schema = z.object({ phone: z.string().min(1).max(40) });
-
-export async function POST(request: Request) {
-  try {
-    const payload = schema.parse(await request.json());
-    return json(await requestOtp(payload.phone));
-  } catch (error) {
-    return errorResponse(error);
-  }
+export async function POST() {
+  return json({ detail: "ارسال کد تأیید غیرفعال است؛ برای ورود یا ثبت‌نام از شماره موبایل در /api/auth/phone استفاده کنید" }, 410);
 }

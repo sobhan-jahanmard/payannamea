@@ -20,6 +20,18 @@ The active application is now `frontend/`. It serves both:
 - Farsi RTL web UI
 - `/api/*` backend routes for auth, orders, admin approval, files, and worker pickup
 
+Customers register and sign in through `POST /api/auth/phone` with `{ phone, utm_source? }`.
+A new phone number creates a customer; subsequent logins reuse the same account and orders.
+Customer login requires only the phone number, with no OTP or SMS delivery. It does not
+verify ownership of the number (`is_verified` remains false for new accounts). Staff
+accounts must continue to use username/password login. The former OTP endpoints return
+410 and never send messages. No MsgWay credentials are required.
+
+Customer communication and order coordination take place through Telegram using the
+registered phone number. The login, consultation, order pages, and shared footer explain
+that customers should register with a number active on Telegram.
+Run `npm run test:phone-auth` from `frontend/` to check the phone login and consultation flow.
+
 ## Supabase/PostgreSQL Setup
 
 Create `frontend/.env.local`:

@@ -11,14 +11,14 @@ export async function POST(request: Request) {
       throw new ApiError(403, "Cross-site requests are not accepted");
     }
     const currentUser = await getCurrentUser(request);
-    if (!currentUser.is_verified) {
-      throw new ApiError(403, "ابتدا شماره موبایل خود را تأیید کنید");
+    if (!currentUser.phone || currentUser.role !== "customer") {
+      throw new ApiError(403, "برای درخواست مشاوره با شماره موبایل مشتری وارد شوید");
     }
     const payload = await request.json();
     const user = await createConsultationUser({ ...payload, phone: currentUser.phone });
     return json({
       id: user.id,
-      message: "درخواست مشاوره شما ثبت شد؛ به‌زودی با شما تماس می‌گیریم."
+      message: "درخواست مشاوره شما ثبت شد؛ به‌زودی از طریق تلگرامِ همین شماره با شما در ارتباط خواهیم بود."
     }, 201);
   } catch (error) {
     return errorResponse(error);

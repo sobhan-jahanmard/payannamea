@@ -17,7 +17,7 @@ import type {
 
 const statusLabels: Record<UserFollowupStatus, string> = {
   new: "جدید",
-  contacted: "تماس گرفته شد",
+  contacted: "پیگیری در تلگرام انجام شد",
   closed: "بسته‌شده",
 };
 
@@ -97,10 +97,10 @@ function FollowupsListPanel() {
   return (
     <main className="mx-auto grid w-full max-w-9xl gap-5 px-4 py-6 lg:px-8">
       <div>
-        <h2 className="mb-2 text-base font-semibold">شیوه نامه تماس</h2>
+        <h2 className="mb-2 text-base font-semibold">شیوه‌نامه ارتباط در تلگرام</h2>
         <section className="tool-surface border-teal-200 bg-teal-50/80 p-4 text-sm leading-8 text-teal-950 sm:p-5">
         <p>سلام وقتتون بخیر</p>
-        <p>از سایت دانش یار تماس می‌گیرم خدمتتون</p>
+        <p>از سایت دانشیار در تلگرام پیام می‌دهم خدمتتون.</p>
         <p>در زمینه انجام کارهای دانشگاهی فعالیت داریم مثل پایان نامه و تحقیق و ارایه</p>
         <p>در سایت ما ثبت نام داشتید</p>
         <p>اگر کمکی از دستمون برمیاد در خدمتم</p>
@@ -153,7 +153,7 @@ function FollowupsListPanel() {
                 <tr key={user.id} className="border-b border-border/70 align-top">
                   <td className="ltr whitespace-nowrap p-3 text-left">{user.phone ?? "-"}</td>
                   <td className="p-3">{user.full_name ?? "بدون نام"}</td>
-                  <td className="p-3">{user.is_verified ? "کاربر تأییدشده" : "درخواست مشاوره (تأییدنشده)"}</td>
+                  <td className="p-3">{user.is_verified ? "ثبت‌نام با تأیید قبلی" : "ثبت‌نام با شماره موبایل"}</td>
                   <td className="ltr whitespace-nowrap p-3 text-left">{user.signup_ip ?? "-"}</td>
                   <td className="whitespace-nowrap p-3">{formatDateTime(user.created_at)}</td>
                   <td className="p-3">{user.order_count.toLocaleString("fa-IR")}</td>
@@ -179,7 +179,7 @@ function FollowupsListPanel() {
                       value={draft.note}
                       disabled={isSaving}
                       maxLength={2000}
-                      placeholder="نتیجه تماس یا توضیحات پیگیری..."
+                      placeholder="نتیجه گفت‌وگو در تلگرام یا توضیحات پیگیری..."
                       onChange={(event) =>
                         setDrafts((current) => ({
                           ...current,

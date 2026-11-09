@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getDataSource } from "./db/data-source";
 import { UserSchema } from "./db/entities";
 import { ApiError } from "./http";
-import { normalizeIranianPhone } from "./otp";
+import { normalizeIranianPhone } from "./phone";
 import { serializeAdminUser, updateAdminUser } from "./users";
 
 export const phoneFollowupQuerySchema = z.object({

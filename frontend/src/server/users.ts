@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDataSource } from "./db/data-source";
 import { UserSchema, type UserEntity, type UserFollowupStatus } from "./db/entities";
 import { ApiError } from "./http";
-import { normalizeIranianPhone } from "./otp";
+import { normalizeIranianPhone } from "./phone";
 
 export const adminUserQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),

@@ -18,7 +18,7 @@ import type {
 
 const statusLabels: Record<UserFollowupStatus, string> = {
   new: "جدید",
-  contacted: "تماس گرفته شد",
+  contacted: "پیگیری در تلگرام انجام شد",
   closed: "بسته‌شده",
 };
 
@@ -219,7 +219,7 @@ function FollowupCard({
             onChange={(event) =>
               onChange({ ...draft, note: event.target.value })
             }
-            placeholder="نتیجه تماس یا توضیحات..."
+            placeholder="نتیجه گفت‌وگو در تلگرام یا توضیحات..."
           />
         </div>
         <Button

@@ -51,7 +51,7 @@ const optionalQuantity = z.preprocess((value) => {
 }, z.number().int().min(1, "حداقل مقدار ۱ است").max(500000, "حداکثر مقدار ۵۰۰۰۰۰ است").optional());
 
 const formSchema = z.object({
-  correspondence_email: z.string().trim().email("ایمیل معتبر برای مکاتبات سفارش وارد کنید"),
+  correspondence_email: z.string().trim().email("ایمیل معتبر برای سفارش وارد کنید"),
   degree: z.string().min(1, "مقطع الزامی است"),
   university: z.string().min(1, "دانشگاه الزامی است"),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
@@ -590,7 +590,7 @@ function StatusContent() {
                   <Field label="کد معرف" error={errors.moarref_code?.message}>
                     <Input className="ltr text-left" {...register("moarref_code")} />
                   </Field>
-                  <Field label="ایمیل مکاتبات سفارش" error={errors.correspondence_email?.message}>
+                  <Field label="ایمیل سفارش" error={errors.correspondence_email?.message}>
                     <Input className="ltr text-left" type="email" autoComplete="email" {...register("correspondence_email")} />
                   </Field>
                 </div>
@@ -734,7 +734,7 @@ function StatusContent() {
               <DetailItem label="کد معرف" value={display(order.moarref_code)} />
               <DetailItem label="نام دانشجو" value={display(order.student_name)} />
               <DetailItem label="شماره دانشجویی" value={<span className="ltr inline-block">{display(order.student_number)}</span>} />
-              <DetailItem label="ایمیل مکاتبات" value={<span className="ltr inline-block">{order.correspondence_email}</span>} />
+              <DetailItem label="ایمیل سفارش" value={<span className="ltr inline-block">{order.correspondence_email}</span>} />
               <DetailItem label="تاریخ ثبت" value={formatDateTime(order.created_at)} />
               <DetailItem label="آخرین به‌روزرسانی" value={formatDateTime(order.updated_at)} />
               <DetailItem label="مقطع تحصیلی" value={order.degree} />

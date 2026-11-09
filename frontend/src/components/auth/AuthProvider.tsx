@@ -11,12 +11,11 @@ import {
   getStoredToken,
   getStoredUser,
   loginAccount,
-  requestLoginOtp,
+  loginWithPhone,
   storeAuthSession,
-  storeAuthUser,
-  verifyLoginOtp
+  storeAuthUser
 } from "../../lib/api";
-import type { LoginPayload, OtpRequestResponse, OtpVerifyPayload, User } from "../../types/api";
+import type { LoginPayload, PhoneLoginPayload, User } from "../../types/api";
 import { Button } from "../ui/button";
 
 interface AuthContextValue {
@@ -27,8 +26,7 @@ interface AuthContextValue {
   isOperator: boolean;
   canFollowUp: boolean;
   login: (payload: LoginPayload) => Promise<User>;
-  requestOtp: (phone: string) => Promise<OtpRequestResponse>;
-  verifyOtp: (payload: OtpVerifyPayload) => Promise<User>;
+  loginPhone: (payload: PhoneLoginPayload) => Promise<User>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -84,9 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(session.access_token);
         return session.user;
       },
-      requestOtp: (phone) => requestLoginOtp({ phone }),
-      verifyOtp: async (payload) => {
-        const session = await verifyLoginOtp(payload);
+      loginPhone: async (payload) => {
+        const session = await loginWithPhone(payload);
         storeAuthSession(session);
         setUser(session.user);
         setToken(session.access_token);
@@ -146,7 +143,7 @@ export function AuthGate({
             <div>
               <h1 className="text-xl font-semibold">ورود لازم است</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                برای ثبت سفارش و دیدن فهرست سفارش‌ها ابتدا وارد حساب خود شوید.
+                برای ثبت سفارش و دیدن فهرست سفارش‌ها با شماره موبایل خود وارد شوید. ارتباط با شما از طریق تلگرامِ همین شماره خواهد بود.
               </p>
             </div>
           </div>

@@ -3,12 +3,10 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Check,
   RefreshCcw,
   Save,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -27,7 +25,7 @@ import type {
 
 const statusLabels: Record<UserFollowupStatus, string> = {
   new: "جدید",
-  contacted: "تماس گرفته شد",
+  contacted: "پیگیری در تلگرام انجام شد",
   closed: "بسته‌شده",
 };
 
@@ -246,7 +244,6 @@ function AdminUsersPanel() {
             <tr>
               <th className="w-56 p-3">نام</th>
               <th className="p-3">نقش</th>
-              <th className="p-3">تأیید OTP</th>
               <th className="p-3">شماره موبایل</th>
               <th className="w-64 p-3">ایمیل</th>
               <th className="p-3">منبع UTM</th>
@@ -290,19 +287,6 @@ function AdminUsersPanel() {
                   </td>
                   <td className="whitespace-nowrap p-3">
                     {roleLabels[user.role]}
-                  </td>
-                  <td className="whitespace-nowrap p-3">
-                    {user.is_verified ? (
-                      <Check
-                        className="h-5 w-5 text-emerald-600"
-                        aria-label="تأییدشده"
-                      />
-                    ) : (
-                      <X
-                        className="h-5 w-5 text-red-600"
-                        aria-label="تأییدنشده"
-                      />
-                    )}
                   </td>
                   <td className="ltr p-3 text-left">{user.phone || "-"}</td>
                   <td className="p-3">
@@ -359,7 +343,7 @@ function AdminUsersPanel() {
                       value={draft.admin_note}
                       maxLength={2000}
                       disabled={isSaving}
-                      placeholder="نتیجه تماس یا توضیحات پیگیری..."
+                      placeholder="نتیجه گفت‌وگو در تلگرام یا توضیحات پیگیری..."
                       onChange={(e) =>
                         setDrafts((current) => ({
                           ...current,

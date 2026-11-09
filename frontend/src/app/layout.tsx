@@ -32,6 +32,9 @@ export default function RootLayout({
             <TopNav />
           </Suspense>
           {children}
+          <footer className="border-t border-border bg-teal-50 px-4 py-4 text-center text-sm leading-7 text-teal-950">
+            ارتباط و هماهنگی سفارش‌ها از طریق تلگرامِ شماره ثبت‌شده خواهد بود؛ لطفاً با شماره‌ای ثبت‌نام کنید که در تلگرام فعال است.
+          </footer>
         </AuthProvider>
         {process.env.NODE_ENV === "production" && cloudflareAnalyticsToken ? (
           <CloudflareAnalytics token={cloudflareAnalyticsToken} />
