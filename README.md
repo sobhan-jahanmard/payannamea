@@ -78,6 +78,14 @@ indexes concurrently; `db:migrate` includes the same setup for fresh databases.
 Run `npm run test:order-list` to verify the API against PostgreSQL using temporary
 fixture tables that are rolled back after the test.
 
+Student search on the orders page is shown only to admins and operators.
+The landing page reads per-page/per-slide rates and example quantities from
+`service_pricing`; all amounts are stored in **toman**. Run
+`npm run db:seed-service-pricing` for an existing database (`db:migrate` includes
+it for fresh setups). Re-running setup fills missing services and preserves
+edited rates. Run `npm run test:service-pricing` to verify stored rates,
+example totals, and preservation of edits using a temporary PostgreSQL table.
+
 Create/update an admin:
 
 ```bash

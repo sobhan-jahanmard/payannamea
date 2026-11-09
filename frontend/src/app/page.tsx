@@ -16,6 +16,9 @@ import {
 import { Button } from "../components/ui/button";
 
 import { FreeConsultationForm } from "../components/landing/FreeConsultationForm";
+import { getServicePricing, type ServicePricing } from "../server/service-pricing";
+
+export const dynamic = "force-dynamic";
 
 const ORDER_DISCOUNT_PERCENT: number = 0;
 const ORDER_DISCOUNT_LABEL = ORDER_DISCOUNT_PERCENT.toLocaleString("fa-IR");
@@ -90,7 +93,16 @@ const requiredInputs = [
   "توضیحات استاد، اصلاحات قبلی، یا نکته‌هایی که باید رعایت شود",
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  let pricing: ServicePricing[] = [];
+  try {
+    pricing = await getServicePricing();
+  } catch {
+    // Keep samples and order registration available during database outages.
+    console.error("Landing page service pricing could not be loaded.");
+  }
+  const pricingByType = new Map(pricing.map((item) => [item.order_type, item]));
+
   return (
     <main>
       {ORDER_DISCOUNT_PERCENT > 0 ? (
@@ -183,44 +195,74 @@ export default function LandingPage() {
       </section>
 
       <section aria-labelledby="samples-heading" className="relative z-10 mx-auto -mt-28 w-full max-w-7xl px-4 pb-10 lg:px-8">
-        <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-l from-teal-950 via-teal-800 to-cyan-800 p-1 shadow-xl shadow-teal-950/15">
-          <div className="rounded-[0.7rem] bg-slate-950/15 px-5 py-6 text-white backdrop-blur-sm sm:px-7">
+        <div className="relative isolate overflow-hidden rounded-2xl border border-slate-700/60 bg-[#101f28] shadow-2xl shadow-slate-950/20">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_0%,rgba(45,212,191,0.14),transparent_55%)]" />
+          <div className="px-5 py-7 text-slate-100 sm:p-8">
             <div className="flex items-start gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-amber-300 text-slate-950 shadow-lg shadow-slate-950/20">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-200/25 bg-amber-200/10 text-amber-200">
                 <FileText className="h-6 w-6" aria-hidden="true" />
               </span>
               <div>
-                <p className="text-sm font-bold text-amber-200">نمونه‌کارهای واقعی</p>
-                <h2 id="samples-heading" className="mt-1 text-xl font-semibold">نمونهٔ هر نوع سفارش را دانلود کنید</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-teal-50/90">
+                <p className="text-xs font-medium text-teal-200">نمونه‌کارهای واقعی</p>
+                <h2 id="samples-heading" className="mt-2 text-xl font-semibold sm:text-2xl">نمونه‌کارها و تعرفه خدمات</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
                   فایل نهایی هر یک از پنج نوع خدمات را با فرمت PDF ببینید و با ساختار و کیفیت خروجی آشنا شوید.
                 </p>
               </div>
             </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {services.map((service) => {
                 const Icon = service.icon;
+                const rate = pricingByType.get(service.analyticsKey);
+                const unitLabel = rate?.unit === "slide" ? "اسلاید" : "صفحه";
                 return (
-                  <article key={service.analyticsKey} className="flex flex-col rounded-lg border border-white/20 bg-white/10 p-4">
-                    <Icon className="mb-3 h-6 w-6 text-amber-200" aria-hidden="true" />
-                    <h3 className="mb-4 text-sm font-semibold leading-7">{service.title}</h3>
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="mt-auto min-h-12 w-full border-white/50 bg-transparent text-white hover:bg-white/15 focus-visible:ring-amber-200"
-                    >
-                      <a
-                        href={`/sample/${service.sampleFile}`}
-                        download
-                        data-analytics-event="landing_sample_download_clicked"
-                        data-analytics-label={service.analyticsKey}
-                        data-analytics-location="sample_download"
+                  <article key={service.analyticsKey} className="group grid grid-rows-[1fr_auto] overflow-hidden rounded-xl border border-white/10 bg-white/[0.035] shadow-lg shadow-black/10 transition duration-300 hover:border-teal-200/35 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20 motion-safe:hover:-translate-y-1">
+                    <div className="flex flex-col p-4 pb-5">
+                      <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200/15 bg-teal-200/[0.07] text-teal-200 transition-colors group-hover:border-teal-200/30 group-hover:bg-teal-200/10">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <h3 className="mb-4 text-sm font-semibold leading-7 text-slate-100 lg:min-h-14">{service.title}</h3>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="mt-auto min-h-11 w-full gap-2 border-white/20 bg-white/[0.03] px-2 text-xs font-medium text-slate-200 hover:border-teal-200/40 hover:bg-teal-200/10 hover:text-teal-100 focus-visible:ring-teal-200"
                       >
-                        دانلود نمونه PDF
-                        <span className="sr-only"> {service.title}</span>
-                        <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      </a>
-                    </Button>
+                        <a
+                          href={`/sample/${service.sampleFile}`}
+                          download
+                          data-analytics-event="landing_sample_download_clicked"
+                          data-analytics-label={service.analyticsKey}
+                          data-analytics-location="sample_download"
+                        >
+                          دانلود نمونه PDF
+                          <span className="sr-only"> {service.title}</span>
+                          <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </a>
+                      </Button>
+                    </div>
+                    <div className="border-t border-white/10 bg-slate-950/20 p-4 pt-5" aria-label={`تعرفه ${service.title}`}>
+                      {rate ? (
+                        <>
+                          <p className="text-xs font-medium text-slate-300">تعرفه هر {unitLabel}</p>
+                          <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-[1.625rem] font-bold leading-none tracking-tight text-amber-200 tabular-nums">
+                            {rate.price_per_unit_toman.toLocaleString("fa-IR")}{" "}
+                            <span className="text-xs font-normal tracking-normal text-slate-400">تومان</span>
+                          </p>
+                          <div className="mt-5 rounded-lg border border-teal-200/10 bg-teal-200/[0.045] px-3 py-3">
+                            <p className="flex flex-wrap items-center justify-between gap-1 text-[11px] leading-6 text-slate-300">
+                              <span>هزینه تقریبی</span>
+                              <span className="whitespace-nowrap text-teal-200">{rate.estimate_quantity.toLocaleString("fa-IR")} {unitLabel}</span>
+                            </p>
+                            <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-lg font-semibold leading-7 text-slate-100 tabular-nums">
+                              {(rate.price_per_unit_toman * rate.estimate_quantity).toLocaleString("fa-IR")}{" "}
+                              <span className="text-[11px] font-normal text-slate-400">تومان</span>
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm leading-7 text-slate-300">تعرفه در حال حاضر در دسترس نیست.</p>
+                      )}
+                    </div>
                   </article>
                 );
               })}

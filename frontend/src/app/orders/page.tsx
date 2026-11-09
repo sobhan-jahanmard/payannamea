@@ -21,7 +21,8 @@ function OrdersList() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const trimmedSearch = search.trim();
+  const canSearch = user?.role === "admin" || user?.role === "operator";
+  const trimmedSearch = canSearch ? search.trim() : "";
   const orders = data?.orders ?? [];
   const pagination = data?.pagination;
 
@@ -130,41 +131,43 @@ function OrdersList() {
 
       <section className="tool-surface p-3 sm:p-5" aria-label="فهرست سفارش‌ها">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <form role="search" className="w-full sm:max-w-md" onSubmit={(event) => event.preventDefault()}>
-            <label htmlFor="student-search" className="mb-2 block text-sm font-medium">
-              جست‌وجوی دانشجو
-            </label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                ref={searchInputRef}
-                id="student-search"
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                maxLength={120}
-                placeholder="نام یا شماره موبایل دانشجو"
-                autoComplete="off"
-                className="h-12 pl-12 pr-10 [&::-webkit-search-cancel-button]:appearance-none"
-                aria-controls="orders-results"
-              />
-              {search ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-0.5 top-1/2 h-11 w-11 -translate-y-1/2"
-                  aria-label="پاک کردن جست‌وجو"
-                  onClick={() => {
-                    setSearch("");
-                    searchInputRef.current?.focus();
-                  }}
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              ) : null}
-            </div>
-          </form>
+          {canSearch ? (
+            <form role="search" className="w-full sm:max-w-md" onSubmit={(event) => event.preventDefault()}>
+              <label htmlFor="student-search" className="mb-2 block text-sm font-medium">
+                جست‌وجوی دانشجو
+              </label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  ref={searchInputRef}
+                  id="student-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  maxLength={120}
+                  placeholder="نام یا شماره موبایل دانشجو"
+                  autoComplete="off"
+                  className="h-12 pl-12 pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                  aria-controls="orders-results"
+                />
+                {search ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-0.5 top-1/2 h-11 w-11 -translate-y-1/2"
+                    aria-label="پاک کردن جست‌وجو"
+                    onClick={() => {
+                      setSearch("");
+                      searchInputRef.current?.focus();
+                    }}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
           <p className="text-xs leading-6 text-muted-foreground" role="status">
             {loading || trimmedSearch !== query.search
               ? "در حال بارگذاری سفارش‌ها..."
