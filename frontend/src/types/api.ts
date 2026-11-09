@@ -35,7 +35,15 @@ export interface AdminUsersResponse {
 
 export interface PhoneLoginPayload {
   phone: string;
+  password: string;
+  password_confirmation?: string;
+  purpose?: "login" | "consultation";
   utm_source?: string | null;
+}
+
+export interface PhoneAuthStatus {
+  exists: boolean;
+  next_step: "login" | "setup" | "staff";
 }
 
 export interface LoginPayload {

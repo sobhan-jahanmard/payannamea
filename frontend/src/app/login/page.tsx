@@ -1,49 +1,38 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LogIn, Phone } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useAuth } from "../../components/auth/AuthProvider";
-import { captureUtmSource, clearCapturedUtmSource, trackAnalyticsEvent } from "../../lib/analytics";
+import { PhoneAuthForm } from "../../components/auth/PhoneAuthForm";
+import { clearCapturedUtmSource, trackAnalyticsEvent } from "../../lib/analytics";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 
-const phoneSchema = z.object({
-  phone: z.string().trim().min(10, "شماره موبایل معتبر نیست").max(40, "شماره موبایل معتبر نیست")
-});
 const adminSchema = z.object({
   username: z.string().trim().min(1, "نام کاربری یا ایمیل را وارد کنید").max(255),
   password: z.string().min(1, "رمز عبور را وارد کنید")
 });
 
-type PhoneValues = z.infer<typeof phoneSchema>;
 type AdminValues = z.infer<typeof adminSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginPhone, user } = useAuth();
+  const { login, user } = useAuth();
   const [adminMode, setAdminMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const phoneForm = useForm<PhoneValues>({ resolver: zodResolver(phoneSchema) });
   const adminForm = useForm<AdminValues>({ resolver: zodResolver(adminSchema) });
 
-  async function submitPhone(values: PhoneValues) {
-    setError(null);
-    try {
-      await loginPhone({ phone: values.phone.trim(), utm_source: captureUtmSource() });
-      clearCapturedUtmSource();
-      trackAnalyticsEvent("customer_login_completed");
-      router.push("/orders");
-    } catch (loginError) {
-      trackAnalyticsEvent("customer_login_failed");
-      setError(loginError instanceof Error ? loginError.message : "ورود ناموفق بود؛ دوباره تلاش کنید");
-    }
+  function onCustomerAuthenticated() {
+    clearCapturedUtmSource();
+    trackAnalyticsEvent("customer_login_completed");
+    router.push("/orders");
   }
 
   async function submitAdmin(values: AdminValues) {
@@ -64,7 +53,7 @@ export default function LoginPage() {
         <div className="mb-5">
           <h1 className="text-2xl font-semibold">ورود یا ثبت‌نام</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            با شماره موبایل خود وارد شوید یا ثبت‌نام کنید. برای ورودهای بعدی هم همین شماره کافی است.
+            شماره موبایل خود را وارد کنید. هنگام ثبت‌نام رمز عبور تعیین می‌کنید و برای ورودهای بعدی از شماره و رمز استفاده خواهید کرد.
           </p>
           <p id="phone-login-hint" className="mt-3 rounded-md bg-teal-50 p-3 text-sm leading-7 text-teal-900">
             شماره‌ای را وارد کنید که در تلگرام فعال است؛ ارتباط و هماهنگی سفارش‌ها از طریق تلگرامِ همین شماره خواهد بود.
@@ -78,22 +67,7 @@ export default function LoginPage() {
         ) : null}
 
         {!adminMode ? (
-          <form
-            onSubmit={phoneForm.handleSubmit(submitPhone)}
-            className="grid gap-4"
-            data-analytics-form="phone_login_form"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="login-phone">شماره موبایل فعال در تلگرام</Label>
-              <Input id="login-phone" className="ltr text-left" type="tel" inputMode="tel" autoComplete="tel" placeholder="09123456789" aria-describedby={phoneForm.formState.errors.phone ? "phone-login-hint login-phone-error" : "phone-login-hint"} aria-invalid={!!phoneForm.formState.errors.phone} {...phoneForm.register("phone")} />
-              {phoneForm.formState.errors.phone ? <p id="login-phone-error" role="alert" className="text-xs font-medium text-red-700">{phoneForm.formState.errors.phone.message}</p> : null}
-            </div>
-            {error ? <ErrorBox message={error} /> : null}
-            <Button type="submit" loading={phoneForm.formState.isSubmitting}>
-              <Phone className="h-4 w-4" aria-hidden="true" />
-              ورود یا ثبت‌نام با شماره
-            </Button>
-          </form>
+          <PhoneAuthForm onAuthenticated={onCustomerAuthenticated} />
         ) : null}
 
         {adminMode ? (

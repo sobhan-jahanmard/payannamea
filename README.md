@@ -20,10 +20,18 @@ The active application is now `frontend/`. It serves both:
 - Farsi RTL web UI
 - `/api/*` backend routes for auth, orders, admin approval, files, and worker pickup
 
-Customers register and sign in through `POST /api/auth/phone` with `{ phone, utm_source? }`.
-A new phone number creates a customer; subsequent logins reuse the same account and orders.
-Customer login requires only the phone number, with no OTP or SMS delivery. It does not
-verify ownership of the number (`is_verified` remains false for new accounts). Staff
+Customers first submit their phone to `POST /api/auth/phone/status`, which returns
+`{ exists, next_step: "setup" | "login" | "staff" }` without creating an account or session.
+`POST /api/auth/phone` requires `{ phone, password, utm_source?, purpose? }`. For a new
+number or an existing customer without a password, `password_confirmation` must match
+and the new password must be 8–128 characters. Only then is a session issued. Passwords
+are stored as salted PBKDF2 hashes. Subsequent logins require the existing password
+and reuse the same account and orders; password confirmation cannot overwrite it.
+The consultation form uses `purpose: "consultation"`: an existing number shows
+“درخواست مشاوره شما از قبل ثبت شده است.” and cannot register or sign in through that form.
+The server also rejects duplicate consultation signups atomically with HTTP 409.
+No OTP or SMS is sent. Registration does not verify ownership of the number
+(`is_verified` remains false for new accounts). Staff
 accounts must continue to use username/password login. The former OTP endpoints return
 410 and never send messages. No MsgWay credentials are required.
 

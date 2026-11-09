@@ -6,6 +6,7 @@ import type {
   ForgotPasswordResponse,
   LoginPayload,
   PhoneLoginPayload,
+  PhoneAuthStatus,
   Order,
   OrdersListResponse,
   OrderCreatePayload,
@@ -120,6 +121,13 @@ export async function loginWithPhone(payload: PhoneLoginPayload): Promise<AuthRe
   return request<AuthResponse>("/api/auth/phone", {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function getPhoneAuthStatus(phone: string): Promise<PhoneAuthStatus> {
+  return request<PhoneAuthStatus>("/api/auth/phone/status", {
+    method: "POST",
+    body: JSON.stringify({ phone })
   });
 }
 

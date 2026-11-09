@@ -1,4 +1,5 @@
 import { getCurrentUser } from "../../../server/auth";
+import { CONSULTATION_ALREADY_REGISTERED, CONSULTATION_REGISTERED } from "../../../lib/phone-auth-schema";
 import { createConsultationUser } from "../../../server/leads";
 import { ApiError, errorResponse, json } from "../../../server/http";
 
@@ -15,11 +16,11 @@ export async function POST(request: Request) {
       throw new ApiError(403, "برای درخواست مشاوره با شماره موبایل مشتری وارد شوید");
     }
     const payload = await request.json();
-    const user = await createConsultationUser({ ...payload, phone: currentUser.phone });
+    const { user, repeated } = await createConsultationUser({ ...payload, phone: currentUser.phone });
     return json({
       id: user.id,
-      message: "درخواست مشاوره شما ثبت شد؛ به‌زودی از طریق تلگرامِ همین شماره با شما در ارتباط خواهیم بود."
-    }, 201);
+      message: repeated ? CONSULTATION_ALREADY_REGISTERED : CONSULTATION_REGISTERED
+    }, repeated ? 200 : 201);
   } catch (error) {
     return errorResponse(error);
   }

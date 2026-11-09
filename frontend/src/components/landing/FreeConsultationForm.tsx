@@ -1,40 +1,19 @@
 "use client";
 
-import { CheckCircle2, Headphones, Send } from "lucide-react";
+import { CheckCircle2, Headphones } from "lucide-react";
 import { useState } from "react";
 
-import { captureUtmSource, trackAnalyticsEvent } from "../../lib/analytics";
-import { requestFreeConsultation } from "../../lib/consultation-api";
-import { useAuth } from "../auth/AuthProvider";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { clearCapturedUtmSource, trackAnalyticsEvent } from "../../lib/analytics";
+import { CONSULTATION_REGISTERED } from "../../lib/phone-auth-schema";
+import { PhoneAuthForm } from "../auth/PhoneAuthForm";
 
 export function FreeConsultationForm() {
-  const { loginPhone } = useAuth();
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  async function submitConsultation(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await loginPhone({ phone: phone.trim(), utm_source: captureUtmSource() });
-      const result = await requestFreeConsultation();
-      setMessage(result.message);
-      setPhone("");
-      trackAnalyticsEvent("consultation_lead_submitted", { location: "landing_hero" });
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "ثبت درخواست ناموفق بود؛ دوباره تلاش کنید.");
-      trackAnalyticsEvent("consultation_lead_failed", { location: "landing_hero" });
-    } finally {
-      setLoading(false);
-    }
+  function onConsultationRegistered() {
+    clearCapturedUtmSource();
+    setMessage(CONSULTATION_REGISTERED);
+    trackAnalyticsEvent("consultation_lead_submitted", { location: "landing_hero" });
   }
 
   return (
@@ -49,42 +28,13 @@ export function FreeConsultationForm() {
         از طریق تلگرامِ همین شماره با شما در ارتباط خواهند بود.
       </p>
 
-      <form
-        onSubmit={submitConsultation}
-        className="mt-5 grid gap-3"
-        data-analytics-form="consultation_form"
-      >
-        <div className="space-y-2">
-          <Label htmlFor="consultation-phone">شماره موبایل فعال در تلگرام</Label>
-          <Input
-            id="consultation-phone"
-            className="ltr bg-white text-left"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="09123456789"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            maxLength={40}
-            required
-          />
-        </div>
-        <Button type="submit" loading={loading} className="w-full">
-          <Send className="h-4 w-4" aria-hidden="true" />
-          ثبت درخواست مشاوره در تلگرام
-        </Button>
-      </form>
-      <p className="mt-3 text-xs leading-6 text-slate-600">با ثبت درخواست، حساب شما با همین شماره ساخته می‌شود؛ برای ورودهای بعدی هم همین شماره کافی است.</p>
+      {!message ? <div className="mt-5"><PhoneAuthForm purpose="consultation" onAuthenticated={onConsultationRegistered} /></div> : null}
+      <p className="mt-3 text-xs leading-6 text-slate-600">برای شماره جدید، تعیین رمز عبور و تکرار آن الزامی است. ورودهای بعدی با شماره و رمز عبور انجام می‌شود.</p>
 
       {message ? (
         <div role="status" className="mt-3 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
           <CheckCircle2 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
           {message}
-        </div>
-      ) : null}
-      {error ? (
-        <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {error}
         </div>
       ) : null}
     </aside>
