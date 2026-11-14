@@ -271,6 +271,9 @@ class DocumentTools(OrderTools):
         gate.enforce_visual_policy(context, services, source, docx)
         rules = read(self.workspace / "extracted/university_rules.json")
         services.validate_docx(source, docx, rules, self.workspace / "reports/stage_checks/docx_quality.json", "full", context["order"])
+        if rules.get("native_typesetting", {}).get("optimize_fonts"):
+            from common.docx_typesetting import optimize_package
+            optimize_package(docx)
         (self.workspace / OUTPUTS[0]).write_bytes(docx.read_bytes())
         write_json(self.workspace / "order_context.json", context)
         self.record("build", [*self.content_paths(), OUTPUTS[0]])
@@ -285,9 +288,14 @@ class DocumentTools(OrderTools):
         context, services = self.context(), self.services()
         rules = read(self.workspace / "extracted/university_rules.json")
         font = rules["font"]["persian"]
-        services.export_pdf(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[1], font)
+        latin_numbers = bool(rules.get("native_typesetting", {}).get("latin_numbers")) or "https://" in (self.workspace / "final/deliverable_source.md").read_text(encoding="utf-8")
+        export_options = {"preserve_latin_numbers": True} if latin_numbers else {}
+        services.export_pdf(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[1], font, **export_options)
         full, sample = services.create_first_half_sample(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[2])
-        services.export_pdf(self.workspace / OUTPUTS[2], self.workspace / OUTPUTS[3], font)
+        services.export_pdf(self.workspace / OUTPUTS[2], self.workspace / OUTPUTS[3], font, **export_options)
+        if rules.get("native_typesetting", {}).get("optimize_fonts"):
+            from common.docx_typesetting import optimize_package
+            optimize_package(self.workspace / OUTPUTS[2])
         # Explicit companions use this order's chosen titles; no factory-specific interim template.
         companions = []
         for item in read(self.workspace / "planning/document_plan.json").get("companions", []):

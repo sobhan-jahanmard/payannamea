@@ -1,0 +1,19 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+private/
+sessions/
+tokens/
+vendor/
+
+# Local working files and exported social media
+/state/
+/content/**/*.png
+/content/**/*.jpg
+/content/**/*.jpeg
+/content/**/*.webp
+/content/**/*.mp4
+/content/**/*.mov

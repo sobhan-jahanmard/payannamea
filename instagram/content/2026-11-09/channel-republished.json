@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-09",
+  "account": "daneshyar.web",
+  "source": "https://t.me/daneshyar_samples",
+  "method": "Instagram official API via MCP.ai Basic",
+  "posts": {
+    "welcome": {
+      "telegram_message_id": 3,
+      "asset": "telegram/assets/daneshyar-telegram-v1.png",
+      "media_id": "18091408451264171",
+      "permalink": "https://www.instagram.com/p/DfhVOv2G5UW/",
+      "published_at": "2026-11-09T12:29:02+0000",
+      "media_type": "IMAGE",
+      "caption_matches": true,
+      "contact_footer_updated": true,
+      "contact_icons_verified_on": "2026-11-10"
+    },
+    "guide": {
+      "telegram_message_id": 9,
+      "asset": "instagram/content/2026-11-09/order-guide.jpg",
+      "media_id": "17997275823044666",
+      "permalink": "https://www.instagram.com/p/DfhV2Stm-M0/",
+      "published_at": "2026-11-09T12:45:16+0000",
+      "media_type": "IMAGE",
+      "caption_matches": true,
+      "contact_footer_updated": true,
+      "contact_icons_verified_on": "2026-11-10"
+    },
+    "samples": {
+      "telegram_message_id": 12,
+      "assets": [
+        "instagram/content/2026-11-09/samples-00-cover.jpg",
+        "instagram/content/2026-11-09/samples-01-bachelor-thesis.jpg",
+        "instagram/content/2026-11-09/samples-02-master-thesis.jpg",
+        "instagram/content/2026-11-09/samples-03-proposal.jpg",
+        "instagram/content/2026-11-09/samples-04-research-assignment.jpg",
+        "instagram/content/2026-11-09/samples-05-presentation.jpg"
+      ],
+      "media_id": "17922840798450484",
+      "permalink": "https://www.instagram.com/p/DfhXIAcEfSU/",
+      "published_at": "2026-11-09T12:44:59+0000",
+      "media_type": "CAROUSEL_ALBUM",
+      "caption_matches": true,
+      "slide_count": 6,
+      "contact_footer_updated": true,
+      "contact_icons_verified_on": "2026-11-10"
+    },
+    "pricing": {
+      "telegram_message_id": 14,
+      "asset": "telegram/content/2026-11-09/pricing-poster.png",
+      "media_id": "18494356276114761",
+      "permalink": "https://www.instagram.com/p/DfhVXT2Gzmx/",
+      "published_at": "2026-11-09T12:29:41+0000",
+      "media_type": "IMAGE",
+      "caption_matches": true,
+      "contact_footer_updated": true,
+      "status": "archived",
+      "moved_to_story": "https://www.instagram.com/stories/daneshyar.web/4027216881723463431",
+      "highlight": "https://www.instagram.com/stories/highlights/18025484594717945/"
+    }
+  },
+  "reel": {
+    "status": "published_and_verified",
+    "media_id": "18122914561957120",
+    "permalink": "https://www.instagram.com/reel/DfhY2_XlHEg/",
+    "published_at": "2026-11-09T13:00:23+0000",
+    "media_product_type": "REELS",
+    "caption_matches": true,
+    "source": "D:/projects/videos/daneshyar-teaser/v4/output/daneshyar-teaser-v4-20s.mp4",
+    "asset": "instagram/content/2026-11-09/daneshyar-teaser-v4-reel.mp4",
+    "duration_seconds": 20,
+    "audio": "Original procedural score and effects; free ElevenLabs narration removed for commercial publication",
+    "contact_icons_verified_on": "2026-11-10"
+  },
+  "tariffs_highlight": {
+    "title": "تعرفه‌ها",
+    "url": "https://www.instagram.com/stories/highlights/18025484594717945/",
+    "verified_in_browser": true,
+    "story_id": "18130945681865848"
+  }
+}

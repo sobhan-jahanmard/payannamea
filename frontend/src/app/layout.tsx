@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { AnalyticsTracker, CloudflareAnalytics } from "../components/analytics/AnalyticsTracker";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { TopNav } from "../components/layout/TopNav";
+import { SiteFooter } from "../components/layout/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,9 +33,7 @@ export default function RootLayout({
             <TopNav />
           </Suspense>
           {children}
-          <footer className="border-t border-border bg-teal-50 px-4 py-4 text-center text-sm leading-7 text-teal-950">
-            ارتباط و هماهنگی سفارش‌ها از طریق تلگرامِ شماره ثبت‌شده خواهد بود؛ لطفاً با شماره‌ای ثبت‌نام کنید که در تلگرام فعال است.
-          </footer>
+          <SiteFooter />
         </AuthProvider>
         {process.env.NODE_ENV === "production" && cloudflareAnalyticsToken ? (
           <CloudflareAnalytics token={cloudflareAnalyticsToken} />

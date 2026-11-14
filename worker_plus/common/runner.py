@@ -503,6 +503,13 @@ class Services:
             settings.append(language)
         language.set(qn("w:bidi"), "fa-IR")
         section = document.sections[0]
+        # python-docx's default template is Letter; margins alone do not apply
+        # the requested paper format.
+        paper_sizes_cm = {"A4": (21.0, 29.7), "A5": (14.8, 21.0), "LETTER": (21.59, 27.94)}
+        paper_size = str(page.get("size", "A4")).upper()
+        if paper_size not in paper_sizes_cm:
+            raise ValueError(f"unsupported document paper size: {paper_size}")
+        section.page_width, section.page_height = map(Cm, paper_sizes_cm[paper_size])
         section.top_margin, section.bottom_margin = Cm(page["top_cm"]), Cm(page["bottom_cm"])
         section.right_margin, section.left_margin = Cm(page["right_cm"]), Cm(page["left_cm"])
         section.header_distance, section.footer_distance = Cm(1.2), Cm(1.2)
@@ -516,6 +523,7 @@ class Services:
         style("TOC Entry", font["body_pt"], align=WD_ALIGN_PARAGRAPH.RIGHT)
         style("Figure Caption", rules["captions"]["font_pt"], align=WD_ALIGN_PARAGRAPH.CENTER)
         style("Table Caption", rules["captions"]["font_pt"], align=WD_ALIGN_PARAGRAPH.CENTER)
+        document.styles["Table Caption"].paragraph_format.keep_with_next = True
         style("Title", font["heading_1_pt"] + 2, True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 1", font["heading_1_pt"], True, WD_ALIGN_PARAGRAPH.CENTER)
         style("Heading 2", font["heading_2_pt"], True, WD_ALIGN_PARAGRAPH.RIGHT)
@@ -543,6 +551,7 @@ class Services:
             (degree_line, cover.get("degree_pt", 15), True, cover.get("degree_after_pt", 48)),
             (title, cover.get("title_pt", 28), True, cover.get("title_after_pt", 54)),
             (order.get("student_name") or "", cover.get("student_pt", 19), True, cover.get("student_after_pt", 48)),
+            (f"شماره دانشجویی: {order['student_number']}" if order.get("student_number") else "", cover.get("metadata_pt", 14), False, cover.get("supervisor_after_pt", 22)),
             (f"استاد درس: {order['instructor_name']}" if research_report and order.get("instructor_name") else f"استاد راهنما: {order['advisor_name']}" if not research_report and order.get("advisor_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
             (f"استاد مشاور: {order['consultant_name']}" if not research_report and order.get("consultant_name") else "", cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
         ]
@@ -745,13 +754,19 @@ class Services:
                     rows.append([cell.strip() for cell in lines[index].strip().strip("|").split("|")])
                     index += 1
                 headers = [normalize_persian(cell.strip()) for cell in line.strip("|").split("|")]
+                short_fiche = bool(document.paragraphs and "فیش تحلیل" in document.paragraphs[-1].text and len(rows) <= 5)
                 table = document.add_table(rows=1, cols=len(headers))
                 table.style = "Table Grid"
                 rtl_table(table)
+                # Keep a table's heading with its first data row and repeat it
+                # when Word paginates a longer analytical table.
+                header_props = table.rows[0]._tr.get_or_add_trPr()
+                header_props.append(OxmlElement("w:tblHeader"))
                 for cell, value in zip(table.rows[0].cells, headers):
                     cell.text = value
                     for p in cell.paragraphs:
                         p.alignment = WD_ALIGN_PARAGRAPH.CENTER; bidi(p)
+                        p.paragraph_format.keep_with_next = True
                         for r in p.runs: apply_persian_run(r, font["table_pt"]); r.font.bold = True
                 for row in rows:
                     cells = table.add_row().cells
@@ -760,6 +775,15 @@ class Services:
                         for p in cell.paragraphs:
                             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT; bidi(p)
                             for r in p.runs: apply_persian_run(r, font["table_pt"])
+                for table_row in table.rows:
+                    table_row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+                if short_fiche:
+                    # The caption, locator and heading already keep with the
+                    # next block. Chain short fiche rows into one readable unit.
+                    for table_row in table.rows[:-1]:
+                        for cell in table_row.cells:
+                            for p in cell.paragraphs:
+                                p.paragraph_format.keep_with_next = True
                 continue
             # `line` is normalized for Persian prose, but normalizing it also
             # transforms ASCII digits in asset filenames (V04.png -> V۰۴.png).
@@ -772,10 +796,12 @@ class Services:
                     raise RuntimeError(f"Markdown figure is missing: {relative_image}")
                 paragraph = document.add_paragraph()
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                paragraph.paragraph_format.keep_with_next = True
                 run = paragraph.add_run()
                 run.add_picture(str(image_path), width=Cm(14.5))
                 caption_paragraph = document.add_paragraph(normalize_persian(caption), style="Figure Caption")
                 caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                caption_paragraph.paragraph_format.keep_with_next = True
                 caption_paragraph.paragraph_format.first_line_indent = Cm(0)
                 bidi(caption_paragraph)
                 for run in caption_paragraph.runs:
@@ -815,6 +841,8 @@ class Services:
                     add_bookmark(paragraph, caption_anchors[index])
             else:
                 paragraph = document.add_paragraph(line, style="Normal")
+                if line.startswith("محل سند:"):
+                    paragraph.paragraph_format.keep_with_next = True
             if paragraph.style.name == "Normal":
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             elif paragraph.style.name == "Heading 1":
@@ -828,6 +856,8 @@ class Services:
             index += 1
         self.release_docx_lock(output)
         output.parent.mkdir(parents=True, exist_ok=True)
+        from common.docx_typesetting import apply_typesetting
+        apply_typesetting(document, rules)
         document.save(output)
 
     def word_rtl_audit(self, docx: Path, audit_only: bool = True) -> dict[str, int]:
@@ -868,6 +898,7 @@ class Services:
             "degree": (cover.get("degree_pt", 15), True, cover.get("degree_after_pt", 48)),
             "title": (cover.get("title_pt", 28), True, cover.get("title_after_pt", 54)),
             "student": (cover.get("student_pt", 19), True, cover.get("student_after_pt", 48)),
+            "student_number": (cover.get("metadata_pt", 14), False, cover.get("supervisor_after_pt", 22)),
             "supervisor": (cover.get("supervisor_pt", 13), False, cover.get("supervisor_after_pt", 22)),
         }
         document = Document(docx)
@@ -883,6 +914,8 @@ class Services:
                 role = "title"
             elif text == (order.get("student_name") or ""):
                 role = "student"
+            elif text.startswith("شماره دانشجویی:"):
+                role = "student_number"
             elif text.startswith("دانشکده "):
                 role = "faculty"
             elif text.startswith(("پروژه طراحی برای دریافت درجه", "گزارش تحقیق درس ", "پایان‌نامه برای دریافت درجه", "پروپوزال پایان‌نامه")):
@@ -923,7 +956,7 @@ class Services:
             raise RuntimeError("Word page count returned no numeric result")
         return int(counts[-1])
 
-    def export_pdf(self, docx: Path, pdf: Path, font_name: str) -> None:
+    def export_pdf(self, docx: Path, pdf: Path, font_name: str, preserve_latin_numbers: bool = False) -> None:
         if os.name != "nt":
             raise RuntimeError("PDF export requires the Windows Word runtime")
         script = Path(__file__).resolve().parent / "scripts" / "export_pdf.ps1"
@@ -933,8 +966,11 @@ class Services:
             self.release_docx_lock(pdf)
             if pdf.exists():
                 pdf.unlink()
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf), "-FontName", font_name]
+            if preserve_latin_numbers:
+                command.append("-PreserveLatinNumbers")
             process = subprocess.Popen(
-                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf), "-FontName", font_name],
+                command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
             )
             try:
@@ -1010,6 +1046,12 @@ class Services:
         document = Document(docx)
         errors: list[str] = []
         warnings: list[str] = []
+        requested_paper = str(rules.get("page", {}).get("size", "A4")).upper()
+        expected_paper = {"A4": (21.0, 29.7), "A5": (14.8, 21.0), "LETTER": (21.59, 27.94)}.get(requested_paper)
+        if expected_paper is None:
+            errors.append(f"unsupported document paper size: {requested_paper}")
+        elif any(abs(s.page_width.cm - expected_paper[0]) > 0.02 or abs(s.page_height.cm - expected_paper[1]) > 0.02 for s in document.sections):
+            errors.append(f"DOCX page dimensions do not match requested {requested_paper}")
         # `--sample` controls submission status only; every run generates the
         # same complete package and its first-half excerpt.
         from common.page_budget import planned_page_budget

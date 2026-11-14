@@ -30,8 +30,27 @@ try {
   # save path; Word is only needed to trim the copied document afterward.
   Copy-Item -LiteralPath $Path -Destination $OutputPath -Force
   $sample = $word.Documents.Open($OutputPath, $false, $false, $false)
+  # Preserve the rendered page references before trimming their targets.
+  # Updating live PAGEREF fields after trimming prints Bookmark errors and
+  # changes the excerpt's pagination. The original remains fully dynamic.
+  for ($i = $sample.Fields.Count; $i -ge 1; $i--) {
+    $field = $sample.Fields.Item($i)
+    if ($field.Type -eq 37) { $field.Unlink() } # wdFieldPageRef
+  }
+  # Unlinking fields changes character positions even though the visible
+  # layout is unchanged. Locate the page boundary in the copied document.
+  $sample.Repaginate()
+  $end = if ($samplePages -ge $pages) { $sample.Content.End } else { $sample.GoTo(1, 1, $samplePages + 1).Start }
   if ($end -lt $sample.Content.End) {
     $sample.Range($end, $sample.Content.End).Delete()
+  }
+  # An index entry for a later full-document section keeps its printed page
+  # number, but cannot remain a broken clickable link in this excerpt.
+  for ($i = $sample.Hyperlinks.Count; $i -ge 1; $i--) {
+    $link = $sample.Hyperlinks.Item($i)
+    if ($link.SubAddress -and -not $sample.Bookmarks.Exists($link.SubAddress)) {
+      $link.Delete()
+    }
   }
   $sample.Repaginate()
   $sample.Fields.Update()

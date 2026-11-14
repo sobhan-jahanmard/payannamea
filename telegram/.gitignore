@@ -1,0 +1,18 @@
+# Local exports, QA previews and historical account snapshots
+/outputs/
+/previews/
+/content/**/channel-before-*.json
+/content/**/profile-before.json
+/content/**/*-verified.jpg
+/content/**/*-published.jpg
+/content/**/*.zip
+
+# Generated poster and copies of website assets
+/content/**/pricing-font.ttf
+/content/**/pricing-logo.png
+/content/**/pricing-poster.*
+
+# Research exports and working copies of outreach replies
+/research/**/authoring/*.png
+/research/**/authoring/ranking-reply-source.json
+/research/**/authoring/workbook-verification.json

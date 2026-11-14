@@ -1,6 +1,7 @@
 import "../env";
 
 import { getDataSource } from "./data-source";
+import { ensureAdvertisingTables } from "./advertising";
 import { ensureOrderListIndexes } from "./order-list-indexes";
 import { ensureServicePricing } from "./service-pricing";
 
@@ -318,6 +319,7 @@ async function main() {
   }
   await ensureOrderListIndexes(dataSource);
   await ensureServicePricing(dataSource);
+  await ensureAdvertisingTables(dataSource);
   await dataSource.destroy();
   console.log("PostgreSQL schema is ready.");
 }

@@ -39,6 +39,24 @@ worker_plus/workspace/*
 worker_plus/ui/release-portable*
 worker_plus/ui/release-portable-final*
 worker_plus/ui/release-portable-staging*
-worker_plus/ui/dist-electron/main.js
+/worker_plus/ui/dist-electron/
 worker_plus/ui/release
 worker_plus/ui/release-*/
+
+# Local reports, previews and scratch files
+/output/
+/tmp/
+
+# Machine-specific MCP configuration and one-off customer operations
+/.codex/config.toml
+/frontend/scripts/register-law-master-order.ts
+
+# Rendered marketing drafts
+/marketing/ads/**/*.png
+/marketing/ads/**/*.jpg
+/marketing/ads/**/*.jpeg
+/marketing/ads/**/*.webp
+/marketing/ads/**/*.mp4
+
+# Local discovery links; canonical Instagram skills are tracked in instagram/skills.
+.agents/skills/ig-*/

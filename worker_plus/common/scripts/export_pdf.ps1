@@ -1,7 +1,8 @@
 param(
   [Parameter(Mandatory = $true)][string]$Path,
   [Parameter(Mandatory = $true)][string]$OutputPath,
-  [Parameter(Mandatory = $true)][string]$FontName
+  [Parameter(Mandatory = $true)][string]$FontName,
+  [switch]$PreserveLatinNumbers
 )
 
 $ErrorActionPreference = "Stop"
@@ -72,6 +73,21 @@ public static extern bool RemoveFontResource(string path);
   }
   $stage = "update fields"
   $document.Fields.Update()
+  if ($PreserveLatinNumbers) {
+    # Global Hindi numeral mode also changes DOI/URL glyphs in Latin prose.
+    # Context mode respects LTR references; PAGE results below remain Persian.
+    $word.Options.ArabicNumeral = 2 # wdNumeralContext
+    foreach ($field in $document.Fields) {
+      # PAGEREF index values are standalone numbers, just like PAGE fields.
+      if ($field.Type -eq 37) {
+        $value = [string]$field.Result.Text
+        for ($digit = 0; $digit -le 9; $digit++) {
+          $value = $value.Replace([string]$digit, [string][char](0x06F0 + $digit))
+        }
+        $field.Result.Text = $value
+      }
+    }
+  }
   $stage = "repaginate"
   $document.Repaginate()
   # PAGE's field update restores its merge-format font. Reapply the required
@@ -82,6 +98,13 @@ public static extern bool RemoveFontResource(string path);
       foreach ($field in @($footer.Range.Fields | Where-Object { $_.Type -eq 33 })) {
         $field.Result.Font.Name = $FontName
         $field.Result.Font.NameBi = $FontName
+        if ($PreserveLatinNumbers) {
+          $value = [string]$field.Result.Text
+          for ($digit = 0; $digit -le 9; $digit++) {
+            $value = $value.Replace([string]$digit, [string][char](0x06F0 + $digit))
+          }
+          $field.Result.Text = $value
+        }
       }
     }
   }

@@ -1,0 +1,51 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import {Workbook,SpreadsheetFile} from '@oai/artifact-tool';
+const folder=new URL('../../../outputs/01a1c4dd-0f74-7500-a258-6ae9b4374957/',import.meta.url);
+const csvPath=new URL('daneshyar-advertising-outreach.csv',folder);
+const imported=await Workbook.fromCSV((await fs.readFile(csvPath,'utf8')).replace(/^\uFEFF/,''),{sheetName:'Source'});
+const original=imported.worksheets.getItemAt(0).getRange('A1:E11').values;
+const values=[['نام کانال','آدرس کانال','آیدی ادمین تبلیغات','تاریخ و ساعت پیام به ادمین (تهران)','وضعیت','توضیحات']];
+for(const row of original.slice(1)){
+ const url=row[4].match(/https:\/\/t\.me\/[A-Za-z0-9_]+/)[0];
+ values.push([row[0],url,row[1],row[2]||null,row[3]||null,row[4]]);
+}
+const wb=Workbook.create();
+const sheet=wb.worksheets.add('پیگیری تبلیغات');
+sheet.getRange('A1:F11').values=values;
+const all=sheet.getRange('A1:F11');
+all.format.font={name:'Arial',size:11,color:'#172B3A'};
+all.format.verticalAlignment='center';
+all.format.rowHeight=92;
+all.format.wrapText=true;
+all.format.horizontalAlignment='right';
+sheet.getRange('A1:F1').format={fill:'#203E56',font:{name:'Arial',size:11,bold:true,color:'#FFFFFF'},rowHeight:48,horizontalAlignment:'center'};
+const widths=[220,310,185,225,130,570];
+for(let i=0;i<6;i++)sheet.getRangeByIndexes(0,i,11,1).format.columnWidthPx=widths[i];
+sheet.getRange('B2:C11').format.horizontalAlignment='left';
+sheet.getRange('B2:B11').format.font.color='#1264A3';
+sheet.getRange('B2:C11').format.wrapText=false;
+sheet.getRange('D2:E11').format.fill='#FFF6DC';
+sheet.getRange('D2:D11').setNumberFormat('yyyy-mm-dd hh:mm');
+sheet.getRange('E2:E11').dataValidation={rule:{type:'list',values:['expensive','yes','no','advertised']}};
+sheet.getRange('E2:E11').format.horizontalAlignment='center';
+sheet.showGridLines=false;
+sheet.freezePanes.freezeRows(1);
+wb.recalculate();
+const actual=sheet.getRange('A1:F11').values;
+assert.equal(actual.length,11);
+for(let i=1;i<11;i++){
+ assert.match(actual[i][1],/^https:\/\/t\.me\/[A-Za-z0-9_]+$/);
+ assert.equal(actual[i][0],original[i][0]);
+ assert.equal(actual[i][2],original[i][1]);
+ assert.equal(actual[i][5],original[i][4]);
+}
+console.log((await wb.inspect({kind:'table',range:'پیگیری تبلیغات!A1:F3',include:'values',tableMaxRows:3,tableMaxCols:6,maxChars:1000})).ndjson);
+const preview=await wb.render({sheetName:sheet.name,range:'A1:F4',scale:1,format:'png'});
+await fs.writeFile(new URL('outreach-preview.png',import.meta.url),new Uint8Array(await preview.arrayBuffer()));
+const xlsx=await SpreadsheetFile.exportXlsx(wb);
+await xlsx.save(new URL('daneshyar-advertising-outreach.xlsx',folder).pathname.replace(/^\/([A-Z]:)/,'$1'));
+const escape=v=>{const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replaceAll('"','""')+'"':s;};
+const csv=actual.map(r=>r.map(escape).join(',')).join('\r\n')+'\r\n';
+await fs.writeFile(csvPath,'\uFEFF'+csv,'utf8');
+console.log('Saved XLSX and updated CSV: 10 channels; separate channel URL; English status choices.');

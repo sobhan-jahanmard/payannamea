@@ -1,0 +1,5 @@
+telethon==1.45.0
+mcp==1.30.0
+python-socks[asyncio]==2.8.2
+filelock==3.32.7
+python-dotenv==1.2.4

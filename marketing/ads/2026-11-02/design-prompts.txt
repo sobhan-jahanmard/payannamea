@@ -1,0 +1,52 @@
+Daneshyar ad creatives — 2026-11-02
+Mode: built-in image_gen tool
+Reference logo: D:/projects/payannamea/frontend/public/images/daneshyar-logo.png
+Website checked: https://daneshyar.vercel.app (HTTP 200, title Daneshyar academic services)
+
+STORY — INITIAL GENERATION
+Use case: ads-marketing.
+Create a finished premium Persian advertising STORY image for Daneshyar academic services, portrait 9:16, 1080x1920 pixels, full bleed. This is the actual flat ad artwork, not a mockup in a phone or on a wall.
+Input image 1 is the existing BRAND LOGO, not an edit target. Integrate its recognizable teal-and-gold open book, graduate and star emblem at modest size in the brand header. Keep its shape and colors; no invented substitute logo.
+Established palette: deep petroleum teal #062d31 and #0e5958, warm ivory #f7f4eb, rich warm gold #f5bb32. Confident, refined contemporary academic brand. Strong typographic hierarchy, elegant Persian geometric sans typography with correct joined Persian letters and right-to-left text. Excellent mobile legibility. Restrained editorial layout, generous breathing room, crisp rendered typography, no clutter or decorative tiny text.
+Composition: keep all important text and logo at least 150 px from top and 180 px from bottom, 72 px from sides. Compact logo and brand at top. Large very bold headline near upper third, ivory and gold. A beautiful central 3D editorial still life: a teal hardcover academic book with warm ivory pages, two elegantly floating report and presentation sheets with simplified teal charts (ornamental, NO fake readable content), gold page edge highlights, soft tactile paper and high quality studio lighting. Visual occupies central third and does not obscure text. Lower third contains FIVE clearly legible service names, arranged thoughtfully in two or three clean rows, subtle short rules or tiny restrained icons, not five huge cards. Below, small trust line and gold CTA strip with dark teal text, followed by website, kept in safe area.
+The ONLY readable text, render Persian VERBATIM and fully legible:
+Brand: "دانشیار"
+Descriptor: "خدمات دانشگاهی"
+Main headline on two lines: "از ایده" / "تا تحویل"
+Five services, each exactly once:
+"پایان‌نامه کارشناسی"
+"پایان‌نامه ارشد"
+"پروپوزال"
+"تحقیق دانشگاهی"
+"ارائه و پاورپوینت"
+Trust line: "نمونه‌کار واقعی • فایل قابل ویرایش"
+CTA: "مشاهده نمونه‌کار و ثبت سفارش"
+Website in plain readable Latin lowercase: "daneshyar.vercel.app"
+Constraints: no prices, discounts, deadlines, guarantees of grades, fabricated testimonials, phone number, QR code or other handles. Do not add extra text. Do not use a graduation stock photo or people. Prioritize a designed advertising poster with typography over a busy illustration. No watermarks.
+
+STORY — FINAL SAFE AREA EDIT
+Edit the provided finished Daneshyar story advertisement. Make ONE change only: improve Instagram/Telegram story UI SAFE MARGINS by recomposing and slightly compacting the existing content. Preserve all design, colors, exact wording, correct Persian lettering, logo identity, book/report scene and style.
+Output a full-bleed 9:16 portrait story, ideally 1080x1920. Keep the TOP 180 px and BOTTOM 240 px of a 1080x1920 canvas as background only, with no essential logo, text, button or URL in these zones. Use equivalent 9.4% top and 12.5% bottom margins at any resolution. Keep at least 6.5% side margins. Move the brand header fully below the top safe zone. Move the whole CTA AND website fully above the bottom safe zone. Reduce the central book illustration and headline height as necessary to fit everything in between, preserving readable typography. Extend the same rich teal background naturally to fill the protected margins; no borders, white padding or crop.
+Keep every readable text exactly as existing: "دانشیار"; "خدمات دانشگاهی"; "از ایده"; "تا تحویل"; "پایان‌نامه کارشناسی"; "پایان‌نامه ارشد"; "پروپوزال"; "تحقیق دانشگاهی"; "ارائه و پاورپوینت"; "نمونه‌کار واقعی • فایل قابل ویرایش"; "مشاهده نمونه‌کار و ثبت سفارش"; "daneshyar.vercel.app". No omissions, repetitions or new text. This is a safe-area refinement of the same poster, not a new concept.
+
+TELEGRAM BANNER — FINAL GENERATION
+Use case: ads-marketing.
+Create a finished premium Persian advertising BANNER for posting in Telegram university channels, landscape 4:3, 1440x1080 pixels. Actual flat finished artwork, not a device mockup.
+Input image 1 is the existing Daneshyar BRAND LOGO reference, not an edit target. Place its recognizable teal-and-gold open book, graduate and star emblem in the brand header, preserving its shape and colors.
+Brand palette deep petroleum teal #062d31 and #0e5958, warm ivory #f7f4eb and warm gold #f5bb32. Contemporary, refined and credible academic editorial design. Large clean Persian geometric sans type, correct Persian joined letters, RTL. High contrast, completely legible on a small phone. Restrained layout with generous whitespace.
+Composition appropriate for RTL: typography and main message on the RIGHT two-thirds; a beautifully lit tactile 3D academic still life on the LEFT third, featuring an open teal hardcover book and two ivory report/presentation sheets with simplified teal charts, gold highlights. No tiny content text on illustrative sheets. Background is mostly solid deep teal with subtle depth. Main headline is large and bold, ivory and gold. Five services shown as a neat compact set of two or three lines under headline, each completely readable. Footer gold CTA and plain website. Minimum 64 px safety margins all sides.
+The ONLY readable text, render VERBATIM:
+Brand: "دانشیار"
+Descriptor: "خدمات دانشگاهی"
+Main headline: "از ایده تا تحویل"
+Five services each exactly once:
+"پایان‌نامه کارشناسی"
+"پایان‌نامه ارشد"
+"پروپوزال"
+"تحقیق دانشگاهی"
+"ارائه و پاورپوینت"
+Trust line: "نمونه‌کار واقعی • فایل قابل ویرایش"
+CTA: "مشاهده نمونه‌کار و ثبت سفارش"
+Website in readable Latin lowercase: "daneshyar.vercel.app"
+No prices, discount badges, urgency, guarantee of grades, fictional testimonials, phone, QR code or social handle. No extra text. No people, no stock photo graduate, no watermark. A coherent companion to a portrait story in the same teal, ivory and gold visual identity.
+Input image 2 is the approved portrait STORY STYLE REFERENCE: match its teal and gold lighting, open book, floating reports, typography character and brand identity. Recompose into a landscape 4:3 banner; do not place the portrait inside the banner. Keep the visual on the left and readable Persian copy on the right. Every service name and website must appear correctly.

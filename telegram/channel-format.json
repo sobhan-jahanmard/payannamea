@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "channel": {
+    "id": 3790127880,
+    "username": "daneshyar_samples",
+    "url": "https://t.me/daneshyar_samples"
+  },
+  "contact": {
+    "telegram": "@daneshyar_academic",
+    "website": "https://daneshyar.vercel.app",
+    "email": "admin.daneshyar@gmail.com",
+    "instagram": "https://instagram.com/daneshyar.web"
+  },
+  "common_hashtags": [
+    "#دانشیار",
+    "#خدمات_دانشگاهی"
+  ],
+  "divider": "━━━━━━━━━━━━━━",
+  "footer_lines": [
+    "💬 سفارش در تلگرام: @daneshyar_academic",
+    "📢 کانال تلگرام: https://t.me/daneshyar_samples",
+    "📷 اینستاگرام: https://instagram.com/daneshyar.web",
+    "🌐 سایت: https://daneshyar.vercel.app",
+    "✉️ ایمیل: admin.daneshyar@gmail.com"
+  ],
+  "timestamp_spacer": "\n⁠",
+  "sample_post": {
+    "title": "📎 نمونه‌کارها",
+    "message_id": 12,
+    "url": "https://t.me/daneshyar_samples/12",
+    "delivery": "One text post with five labeled PDF download links; no ZIP and no separate sample posts."
+  }
+}

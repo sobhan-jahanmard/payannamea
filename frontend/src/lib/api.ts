@@ -22,6 +22,7 @@ import type {
   NewFollowupsResponse
 } from "../types/api";
 import type { LocalReviewScore } from "./review-scores";
+import type { AdvertisingCampaign, AdvertisingChannel, CampaignInput, CampaignUpdate } from "./advertising";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TOKEN_KEY = "payanname_auth_token";
@@ -265,6 +266,20 @@ export async function getAdminAnalytics(params: {
     if (value !== undefined && value !== "") query.set(key, String(value));
   }
   return request<AnalyticsDashboard>(`/api/admin/analytics?${query.toString()}`);
+}
+
+export function getAdminAdvertising(signal?: AbortSignal) {
+  return request<{ channels: AdvertisingChannel[]; campaigns: AdvertisingCampaign[] }>("/api/admin/advertising", {
+    cache: "no-store",
+    signal
+  });
+}
+
+export function saveAdminAdvertising(input: CampaignInput | CampaignUpdate) {
+  return request<AdvertisingCampaign>("/api/admin/advertising", {
+    method: "id" in input ? "PATCH" : "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export async function getAdminUsers(params: {

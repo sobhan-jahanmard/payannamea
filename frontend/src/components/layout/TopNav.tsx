@@ -8,6 +8,7 @@ import {
   ListOrdered,
   LogIn,
   LogOut,
+  Megaphone,
   Phone,
   SearchCheck,
   Users,
@@ -15,6 +16,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { useAuth } from "../auth/AuthProvider";
@@ -22,7 +24,12 @@ import { useAuth } from "../auth/AuthProvider";
 export function TopNav() {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { user, isAdmin, canFollowUp, logout } = useAuth();
+  const auth = useAuth();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const user = mounted ? auth.user : null;
+  const isAdmin = mounted && auth.isAdmin;
+  const canFollowUp = mounted && auth.canFollowUp;
   const isCustomerPreview =
     pathname === "/status" &&
     searchParams?.get("customer_view") === "1" &&
@@ -48,12 +55,13 @@ export function TopNav() {
           { href: "/admin", label: "مدیریت", icon: LayoutDashboard },
           { href: "/admin/users", label: "کاربران", icon: Users },
           { href: "/admin/analytics", label: "آمار بازدید", icon: ChartNoAxesCombined },
+          { href: "/admin/advertising", label: "تبلیغات", icon: Megaphone },
         ]
       : []),
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-white/88 backdrop-blur-2xl">
+    <header className="relative z-40 border-b border-border bg-white/88 backdrop-blur-2xl sm:sticky sm:top-0">
       <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-8">
         <Link
           href="/"
@@ -118,7 +126,7 @@ export function TopNav() {
               </div>
               <button
                 type="button"
-                onClick={logout}
+                onClick={auth.logout}
                 data-analytics-event="nav_logout_clicked"
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-medium text-foreground transition hover:bg-muted"
                 title="خروج از حساب"

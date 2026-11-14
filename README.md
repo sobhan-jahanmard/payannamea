@@ -86,6 +86,17 @@ it for fresh setups). Re-running setup fills missing services and preserves
 edited rates. Run `npm run test:service-pricing` to verify stored rates,
 example totals, and preservation of edits using a temporary PostgreSQL table.
 
+The admin-only Telegram advertising page at `/admin/advertising` shows the
+channel shortlist and records each publication with the Daneshyar subscriber
+count before publication and after 24 and 48 hours. Order counts are entered
+for 0–24 hours and 24–48 hours separately.
+
+Run `npm run db:setup-advertising` from `frontend/` before deploying the page.
+It creates the advertising tables and imports the shortlist from
+`telegram/content/2026-11-12/advertising-ranking.json` without replacing
+existing rows or publications. `npm run test:advertising` checks access and
+persistence in a rolled-back PostgreSQL schema.
+
 Create/update an admin:
 
 ```bash
@@ -136,6 +147,11 @@ POST /api/worker/orders/claim-oldest
 ```
 
 ## Notes
+
+- Telegram account tools for Codex are available in [telegram/integration](telegram/integration/README.md).
+  The approved channel format and all Telegram-specific files are under [telegram/](telegram/README.md).
+  Credentials are ignored by Git; account sessions stay in the protected Windows state directory.
+- Instagram connection research and setup steps are under [instagram/](instagram/README.md).
 
 - Supabase data is visible in the Supabase Dashboard Table Editor or SQL Editor.
 - `backend/` is no longer required for normal development.

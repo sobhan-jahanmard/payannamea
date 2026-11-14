@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-09",
+  "username": "daneshyar.web",
+  "display_name": "دانشیار | خدمات دانشگاهی",
+  "bio": "پایان‌نامه و ارائه\nتعرفه‌ها در هایلایت\nسفارش: t.me/daneshyar_academic\nنمونه‌کار: t.me/daneshyar_samples\ndaneshyar.vercel.app\nadmin.daneshyar@gmail.com",
+  "photo_source": "telegram/content/2026-11-09/daneshyar-telegram-avatar.png",
+  "category": "Education website",
+  "category_visible": true,
+  "business_email": "admin.daneshyar@gmail.com",
+  "website_in_bio": "daneshyar.vercel.app",
+  "clickable_website_link": "not verified; Instagram web editor requires the mobile app",
+  "verification": [
+    "Instagram public profile rendered updated name, avatar, category and complete bio",
+    "Authenticated Instagram MCP returned matching display name and biography"
+  ],
+  "screenshot": "instagram/content/2026-11-10/profile-highlight-telegram.jpg",
+  "contact_footer_verified_on": "2026-11-10",
+  "tariffs_highlight": "https://www.instagram.com/stories/highlights/18025484594717945/",
+  "contact_bio_updated_on": "2026-11-11",
+  "contact_bio_verification": {
+    "authenticated_profile_readback": true,
+    "public_business_email": "admin.daneshyar@gmail.com",
+    "display_contact_info_enabled": true,
+    "website_field_requires_mobile_app": true
+  }
+}

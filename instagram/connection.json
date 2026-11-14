@@ -1,0 +1,185 @@
+{
+  "checked_on": "2026-11-09",
+  "account": {
+    "username": "daneshyar.web",
+    "profile_url": "https://instagram.com/daneshyar.web",
+    "type": "BUSINESS",
+    "type_confirmed_by": "user"
+  },
+  "recommended_initial_route": "mcp_ai_basic_official_api",
+  "status": "connected_and_publishing_verified",
+  "authenticated_identity_verified": true,
+  "routes": {
+    "metricool_plugin": {
+      "plugin_id": "plugin_asdk_app_69d73fc8aa5c8191bec1583760b130c7",
+      "display_name": "Metricool",
+      "installed_at_last_check": true,
+      "connected_at_last_check": false,
+      "mcp_endpoint": "https://ai.metricool.com/mcp",
+      "authentication": "provider OAuth",
+      "purpose": [
+        "connected brand discovery",
+        "analytics",
+        "scheduled post creation and editing"
+      ],
+      "not_available_via_current_mcp": [
+        "inbox messages",
+        "comments",
+        "bio or profile-photo editing"
+      ],
+      "next_step": "Plugin is now installed and its tools are available; target Instagram identity has not been verified. User currently prefers researching alternative free tools.",
+      "tools_available": true
+    },
+    "direct_meta_mcp_candidate": {
+      "repository": "https://github.com/William-Gao/instagram-mcp",
+      "reviewed_commit": "d8e1adf7ae1cb071c490d0fca379386d020b6cd0",
+      "review_scope": "README, environment example and package manifest only; no full source security audit or account test",
+      "upstream_maturity": "Alpha",
+      "installed": false,
+      "connected": false,
+      "purpose": [
+        "official-API account/media reads",
+        "publishing",
+        "comments",
+        "permission-dependent DMs"
+      ],
+      "requires": [
+        "compatible Meta app and approved auth flow",
+        "account access token",
+        "appropriate granted permissions",
+        "source review before running"
+      ],
+      "note": "Candidate only. Do not infer support for newer Meta app login flows or profile editing from the project name."
+    },
+    "instagram_agent_skills": {
+      "repository": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "license": "MIT",
+      "skill_count": 13,
+      "installed": true,
+      "role": "content drafting and profile recommendations, not authenticated account connectivity",
+      "repository_created_at": "2026-09-13T14:09:50Z",
+      "matches_user_seen_post": "plausible but unconfirmed",
+      "installed_on": "2026-11-09",
+      "pinned_commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "canonical_path": "instagram/skills",
+      "discovery_path": ".agents/skills",
+      "brand_path": "instagram/brand/voice.md",
+      "adapted_for": "Codex project skills; Persian editorial guidance and ZWNJ preservation"
+    },
+    "free_hosted_mcp_candidate": {
+      "repository": "https://github.com/mcp-dir/instagram-mcp",
+      "endpoint": "https://api.mcp.ai/<instance-id>",
+      "plan": "Basic",
+      "cost_claim": "Provider documentation says Basic is free; live product/account limits not tested.",
+      "hosting": "proprietary hosted server; wrapper and documentation are MIT",
+      "installed": true,
+      "connected": true,
+      "purpose": [
+        "official API publishing",
+        "comments",
+        "permission-dependent messaging",
+        "insights"
+      ],
+      "registered_server": "daneshyar_instagram",
+      "registered_in": ".codex/config.toml",
+      "provider_login_verified": true,
+      "provider_account_email": "admin.daneshyar@gmail.com",
+      "plan_price_verified_in_product": "Basic Free; Community R$0/month, displayed unlimited usage and 60 requests/min",
+      "provider_instance_id": "mi_3zco9ymi54n5",
+      "instagram_auth_provider": "Composio official Instagram OAuth",
+      "requested_instagram_scopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_messages",
+        "instagram_business_manage_comments",
+        "instagram_business_content_publish",
+        "instagram_business_manage_insights"
+      ],
+      "oauth_status": "Codex OAuth succeeded",
+      "tool_catalog_count_in_product": 24,
+      "codex_oauth_verified": true,
+      "credential_status": "active",
+      "credential_username": "daneshyar.web",
+      "granted_instagram_scopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_messages",
+        "instagram_business_manage_comments",
+        "instagram_business_content_publish",
+        "instagram_business_manage_insights"
+      ],
+      "native_mcp_initialization_verified": true,
+      "native_auth_status": "oAuth",
+      "server_version": "0.9.410",
+      "native_tool_count": 33,
+      "verified_tool_names": [
+        "authenticate",
+        "connect",
+        "instagram_actions_follow",
+        "instagram_actions_get_job_status",
+        "instagram_actions_like",
+        "instagram_actions_like_comment",
+        "instagram_actions_list_accounts",
+        "instagram_actions_list_comments",
+        "instagram_actions_list_jobs",
+        "instagram_actions_list_stories",
+        "instagram_actions_send_message",
+        "instagram_actions_unfollow",
+        "instagram_actions_view_story",
+        "instagram_create_carousel_container",
+        "instagram_get_conversation",
+        "instagram_get_ig_media",
+        "instagram_get_ig_media_comments",
+        "instagram_get_ig_media_insights",
+        "instagram_get_ig_user_media",
+        "instagram_get_user_info",
+        "instagram_get_user_insights",
+        "instagram_list_all_conversations",
+        "instagram_list_all_messages",
+        "instagram_mark_seen",
+        "instagram_post_ig_comment_replies",
+        "instagram_post_ig_user_media",
+        "instagram_post_ig_user_media_publish",
+        "instagram_send_image",
+        "instagram_send_text_message",
+        "marketplace",
+        "report_bug",
+        "show_version",
+        "toolkit_info"
+      ],
+      "verified_account_selector": "official:28260988060241683"
+    }
+  },
+  "automatic_replies_enabled": false,
+  "content_published_during_setup": false,
+  "preferences": {
+    "free_tools_first": true,
+    "metricool_selected": false,
+    "exact_seen_social_post_identified": false
+  },
+  "capabilities": {
+    "content_skills": "installed",
+    "publishing": "Four authorized feed posts verified live on 2026-11-09, including a six-slide carousel.",
+    "comments": "OAuth permission granted; tools discovered",
+    "existing_conversation_dms": "OAuth permission granted; tools discovered; subject to Meta messaging rules",
+    "insights": "OAuth permission granted; tools discovered",
+    "profile_bio_photo_editing": "authenticated Instagram browser controls verified; selected MCP does not provide profile editing",
+    "unsolicited_first_dm_follow_like": "Advanced paid route excluded by free-tools preference"
+  },
+  "browser_session": {
+    "username_verified": "daneshyar.web",
+    "verified_on": "2026-11-09",
+    "verification": "Authenticated Edit profile page showed daneshyar.web; bio and photo controls available.",
+    "profile_editing": "browser_available",
+    "website_editing": "desktop page says links can only be changed in mobile app"
+  },
+  "authenticated_identity_evidence": [
+    "Authenticated Instagram Edit profile page identified daneshyar.web",
+    "MCP.ai credential dropdown showed daneshyar.web Active and CONNECTED after official OAuth"
+  ],
+  "verification_limits": [
+    "Native MCP tool discovery and OAuth checked successfully; no post or DM sent during setup",
+    "Direct native profile tool invocation was not completed in this setup turn; identity verified in authenticated Instagram UI and provider credential UI",
+    "Current chat tool inventory did not hot-load the new MCP namespace during setup; open a fresh turn/session or reload project if tools do not appear"
+  ],
+  "latest_profile_update": "instagram/content/2026-11-09/profile-applied.json",
+  "latest_publication_log": "instagram/content/2026-11-09/channel-republished.json"
+}

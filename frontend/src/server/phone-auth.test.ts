@@ -84,7 +84,7 @@ test("mandatory password setup, returning customer login and duplicate consultat
     assert.equal(initialStatus.status, 200);
     const initialBody = await initialStatus.json();
     assert.deepEqual(initialBody, { exists: false, next_step: "setup" });
-    assert.equal(initialBody.access_token, undefined);
+    assert.equal("access_token" in initialBody, false);
     assert.equal((await phoneStatus(request("/api/auth/phone/status", { phone: "09121234567" }, { "sec-fetch-site": "cross-site" }))).status, 403);
     assert.equal((await status("invalid-phone")).status, 422);
     for (const body of [

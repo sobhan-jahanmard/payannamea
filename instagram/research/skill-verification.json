@@ -1,0 +1,52 @@
+{
+  "checked_on": "2026-11-09",
+  "upstream_commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+  "skill_validation": {
+    "validator": "skill-creator/scripts/quick_validate.py",
+    "passed": 13,
+    "failed": 0
+  },
+  "cli_help_checks": 6,
+  "cli_input_checks": {
+    "ig-caption/caption.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 1
+    },
+    "ig-human/humanize.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 0
+    },
+    "ig-human/detect.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 0
+    },
+    "ig-reel/beats.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 0
+    },
+    "ig-reel/hookscore.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 0
+    },
+    "ig-viral/swipe.py": {
+      "execution": "PASS",
+      "json_output": "valid",
+      "exit_code": 0
+    }
+  },
+  "exit_code_note": "caption.py returns 1 for a valid lint result that needs editorial revision; this is expected, not a runtime error.",
+  "regressions": [
+    "Persian ZWNJ retained by cleanup",
+    "Persian ZWNJ ignored by format-character heuristic",
+    "Persian text and homepage URL unchanged in cleanup sample",
+    "Persian half-space token counted as one word",
+    "English dollar amount word count retained"
+  ],
+  "discovery": "13 project junctions registered; registration rerun successfully; duplicate discovery paths ignored by Git",
+  "scope": "Local helper checks only; synthetic swipe data; no network login, account test or publishing."
+}

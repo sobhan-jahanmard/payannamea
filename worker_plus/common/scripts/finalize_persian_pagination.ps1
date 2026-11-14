@@ -137,6 +137,8 @@ try {
     }
   }
   $document.Fields.Update(); $document.Repaginate()
+  # PAGEREF caches depend on the final layout, including the index itself.
+  $document.Fields.Update(); $document.Repaginate()
   Set-DocumentDigitLanguageToPersian $document
   Set-PageFieldFont $document $pageNumberFont
   foreach ($field in $document.Fields) { $field.ShowCodes = $false }
