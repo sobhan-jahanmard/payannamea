@@ -70,7 +70,19 @@ test("admin can seed channels and record distinct 24/48-hour checkpoints", { ski
       subscribers_after_24h: null,
       subscribers_after_48h: null,
       orders_first_24h: null,
-      orders_second_24h: null
+      orders_second_24h: null,
+      archive: {
+        post_url: "https://t.me/daneshjo_report/123",
+        price_toman: 900000,
+        notes: "گزارش اولیه",
+        observation: {
+          baseline_start: "2026-11-12T10:30:00Z", observed_at: "2026-11-12T18:30:00Z",
+          post_views: 200, post_forwards: 1, subscribers: 23, joins: 3, leaves: 0,
+          incoming_messages: 0, new_chats: 0,
+          traffic_before: { pageviews: 4, visitors: 3, sessions: 3, orders: 0 },
+          traffic_after: { pageviews: 9, visitors: 5, sessions: 5, orders: 0 }
+        }
+      }
     };
     assert.equal((await POST(request("POST", admin, { ...input, subscribers_before: -1 }))).status, 422);
     const create = await POST(request("POST", admin, input));
@@ -78,18 +90,20 @@ test("admin can seed channels and record distinct 24/48-hour checkpoints", { ski
     const saved = await create.json();
     assert.equal(saved.channel_username, "daneshjo_report");
     assert.equal(saved.orders_first_24h, null);
+    assert.deepEqual(saved.archive, input.archive);
     assert.equal(campaignCheckpoint(saved.published_at, 24), "2026-11-13T14:30:00.000Z");
     assert.equal(campaignCheckpoint(saved.published_at, 48), "2026-11-14T14:30:00.000Z");
     assert.equal((await POST(request("POST", admin, input))).status, 409);
 
     const update = {
-      ...input, id: saved.id, version: saved.version,
+      ...input, archive: undefined, id: saved.id, version: saved.version,
       subscribers_after_24h: 25, subscribers_after_48h: 23,
       orders_first_24h: 0, orders_second_24h: 3
     };
     assert.equal((await PATCH(request("PATCH", admin, update))).status, 200);
     assert.equal((await PATCH(request("PATCH", admin, update))).status, 409);
     const { campaigns } = await (await GET(request("GET", admin))).json();
+    assert.deepEqual(campaigns[0].archive, input.archive);
     assert.deepEqual(campaigns.map((campaign: typeof saved) => [
       campaign.subscribers_before, campaign.subscribers_after_24h, campaign.subscribers_after_48h,
       campaign.orders_first_24h, campaign.orders_second_24h

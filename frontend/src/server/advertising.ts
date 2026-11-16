@@ -24,7 +24,8 @@ function campaignParameters(input: CampaignInput) {
   return [
     input.channel_username, input.channel_name, input.published_at,
     input.subscribers_before, input.subscribers_after_24h, input.subscribers_after_48h,
-    input.orders_first_24h, input.orders_second_24h
+    input.orders_first_24h, input.orders_second_24h,
+    input.archive ? JSON.stringify(input.archive) : null
   ];
 }
 
@@ -34,8 +35,8 @@ export async function createAdvertisingCampaign(value: unknown): Promise<Adverti
   const rows: AdvertisingCampaign[] = await db.query(
     `INSERT INTO advertising_campaigns (
       channel_username, channel_name, published_at, subscribers_before,
-      subscribers_after_24h, subscribers_after_48h, orders_first_24h, orders_second_24h, id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      subscribers_after_24h, subscribers_after_48h, orders_first_24h, orders_second_24h, archive, id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::jsonb,'{}'::jsonb),$10)
     ON CONFLICT (channel_username, published_at) DO NOTHING
     RETURNING *`,
     [...campaignParameters(input), randomUUID()]
@@ -53,8 +54,9 @@ export async function updateAdvertisingCampaign(value: unknown): Promise<Adverti
         UPDATE advertising_campaigns SET
           channel_username = $1, channel_name = $2, published_at = $3,
           subscribers_before = $4, subscribers_after_24h = $5, subscribers_after_48h = $6,
-          orders_first_24h = $7, orders_second_24h = $8, version = version + 1
-        WHERE id = $9 AND version = $10
+          orders_first_24h = $7, orders_second_24h = $8,
+          archive = COALESCE($9::jsonb, archive), version = version + 1
+        WHERE id = $10 AND version = $11
         RETURNING *
       ) SELECT * FROM changed`,
       [...campaignParameters(input), input.id, input.version]

@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Select } from "../../../components/ui/select";
+import { Textarea } from "../../../components/ui/textarea";
 import { campaignCheckpoint, type AdvertisingCampaign, type AdvertisingChannel, type CampaignInput } from "../../../lib/advertising";
 import { getAdminAdvertising, saveAdminAdvertising } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/format";
@@ -28,6 +29,11 @@ type Draft = Record<CountField, string> & {
   channel_name: string;
   channel_choice: string;
   published_at: string;
+  original_published_at?: string;
+  post_url: string;
+  price_toman: string;
+  notes: string;
+  observation?: NonNullable<CampaignInput["archive"]>["observation"];
 };
 
 function campaignDraft(channels: AdvertisingChannel[], campaign?: AdvertisingCampaign): Draft {
@@ -40,6 +46,11 @@ function campaignDraft(channels: AdvertisingChannel[], campaign?: AdvertisingCam
     channel_name: campaign?.channel_name ?? choice?.name ?? "",
     channel_choice: choice ? handle : "other",
     published_at: tehranInputDate.format(campaign ? new Date(campaign.published_at) : new Date()).replace(" ", "T"),
+    original_published_at: campaign?.published_at,
+    post_url: campaign?.archive?.post_url ?? "",
+    price_toman: String(campaign?.archive?.price_toman ?? ""),
+    notes: campaign?.archive?.notes ?? "",
+    observation: campaign?.archive?.observation,
     subscribers_before: String(campaign?.subscribers_before ?? ""),
     subscribers_after_24h: String(campaign?.subscribers_after_24h ?? ""),
     subscribers_after_48h: String(campaign?.subscribers_after_48h ?? ""),
@@ -75,6 +86,51 @@ function Checkpoint({ campaign, hours }: { campaign: AdvertisingCampaign; hours:
           <dd className="mt-1 font-semibold">{displayCount(orders)}</dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+function CampaignArchive({ archive }: { archive: CampaignInput["archive"] }) {
+  if (!archive || !Object.keys(archive).length) return null;
+  const observation = archive.observation;
+  return (
+    <div className="grid min-w-0 gap-3 rounded-md border border-border bg-white p-4 lg:col-span-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <h4 className="font-semibold">گزارش انتشار</h4>
+        {archive.post_url && <a href={archive.post_url} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">پست تبلیغ</a>}
+        {archive.price_toman !== undefined && <span>{number.format(archive.price_toman)} تومان</span>}
+      </div>
+      {observation && <>
+        <p className="text-xs text-muted-foreground">زمان اندازه‌گیری {formatDateTime(observation.observed_at)}</p>
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+          {([
+            ["بازدید پست تبلیغ", observation.post_views],
+            ["فوروارد پست", observation.post_forwards],
+            ["اعضای دانشیار در زمان بررسی", observation.subscribers],
+            ["عضویت جدید", observation.joins],
+            ["خروج از کانال", observation.leaves],
+            ["پیام ورودی تلگرام", observation.incoming_messages],
+            ["گفت‌وگوی تازه", observation.new_chats],
+            ["سفارش ثبت‌شده", observation.traffic_after.orders]
+          ] as const).map(([label, value]) => (
+            <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 font-semibold tabular-nums">{number.format(value)}</dd></div>
+          ))}
+        </dl>
+        <table className="w-full border-t border-border text-right text-sm">
+          <caption className="py-2 text-right text-xs text-muted-foreground">آمار کل سایت در دو بازهٔ هم‌طول</caption>
+          <thead><tr><th scope="col" className="py-1">معیار</th><th scope="col" className="py-1">قبل از انتشار</th><th scope="col" className="py-1">بعد از انتشار</th></tr></thead>
+          <tbody>
+            {([["بازدید صفحه", "pageviews"], ["بازدیدکننده", "visitors"], ["نشست", "sessions"]] as const).map(([label, key]) => (
+              <tr key={key} className="border-t border-border/70">
+                <th scope="row" className="py-1 font-normal">{label}</th>
+                <td className="py-1 tabular-nums">{number.format(observation.traffic_before[key])}</td>
+                <td className="py-1 tabular-nums">{number.format(observation.traffic_after[key])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>}
+      {archive.notes && <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{archive.notes}</p>}
     </div>
   );
 }
@@ -168,7 +224,7 @@ function AdvertisingPanel() {
     setDraft(campaignDraft(dashboard?.channels ?? [], campaign));
   }
 
-  function setField(field: CountField | "channel_name" | "channel_username" | "published_at", value: string) {
+  function setField(field: CountField | "channel_name" | "channel_username" | "published_at" | "post_url" | "price_toman" | "notes", value: string) {
     setDraft((current) => current ? { ...current, [field]: value } : null);
   }
 
@@ -188,15 +244,24 @@ function AdvertisingPanel() {
     setFormError("");
     try {
       const optionalCount = (value: string) => value === "" ? null : Number(value);
+      const originalLocalMinute = draft.original_published_at
+        ? tehranInputDate.format(new Date(draft.original_published_at)).replace(" ", "T") : "";
       const input: CampaignInput = {
         channel_username: draft.channel_username.trim().replace(/^@/, ""),
         channel_name: draft.channel_name.trim(),
-        published_at: new Date(`${draft.published_at}:00+03:30`).toISOString(),
+        published_at: draft.original_published_at && draft.published_at === originalLocalMinute
+          ? draft.original_published_at : new Date(`${draft.published_at}:00+03:30`).toISOString(),
         subscribers_before: Number(draft.subscribers_before),
         subscribers_after_24h: optionalCount(draft.subscribers_after_24h),
         subscribers_after_48h: optionalCount(draft.subscribers_after_48h),
         orders_first_24h: optionalCount(draft.orders_first_24h),
-        orders_second_24h: optionalCount(draft.orders_second_24h)
+        orders_second_24h: optionalCount(draft.orders_second_24h),
+        archive: {
+          post_url: draft.post_url.trim() || undefined,
+          price_toman: optionalCount(draft.price_toman) ?? undefined,
+          notes: draft.notes.trim() || undefined,
+          observation: draft.observation
+        }
       };
       const saved = await saveAdminAdvertising(draft.id && draft.version ? { ...input, id: draft.id, version: draft.version } : input);
       setDashboard((previous) => previous ? {
@@ -283,6 +348,20 @@ function AdvertisingPanel() {
               {countField("orders_second_24h", "سفارش‌ها از ساعت ۲۴ تا ۴۸")}
             </fieldset>
           </div>
+          <fieldset disabled={saving} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+            <legend className="px-1 text-sm font-semibold">جزئیات آرشیو</legend>
+            <Field id="campaign-post-url" label="لینک پست تلگرام">
+              <Input id="campaign-post-url" type="url" dir="ltr" value={draft.post_url} onChange={(event) => setField("post_url", event.target.value)} />
+            </Field>
+            <Field id="campaign-price" label="هزینه به تومان">
+              <Input id="campaign-price" type="number" min={0} max={2147483647} step={1} value={draft.price_toman} onChange={(event) => setField("price_toman", event.target.value)} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field id="campaign-notes" label="یادداشت و نتیجه">
+                <Textarea id="campaign-notes" maxLength={4000} value={draft.notes} onChange={(event) => setField("notes", event.target.value)} />
+              </Field>
+            </div>
+          </fieldset>
           {formError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{formError}</p>}
           <div className="flex gap-2">
             <Button type="submit" loading={saving}>ذخیره</Button>
@@ -312,6 +391,7 @@ function AdvertisingPanel() {
                   <Button variant="outline" type="button" disabled={saving} onClick={() => start(campaign)}>
                     <Pencil className="h-4 w-4" aria-hidden="true" /> ویرایش آمار
                   </Button>
+                  <CampaignArchive archive={campaign.archive} />
                 </article>
               ))}
             </div>}

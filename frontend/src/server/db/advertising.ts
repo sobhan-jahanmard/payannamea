@@ -20,6 +20,8 @@ export async function ensureAdvertisingTables(dataSource: Pick<DataSource, "quer
     version integer NOT NULL DEFAULT 1,
     UNIQUE (channel_username, published_at)
   )`);
+  await dataSource.query(`ALTER TABLE advertising_campaigns
+    ADD COLUMN IF NOT EXISTS archive jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(archive) = 'object')`);
   await dataSource.query("ALTER TABLE advertising_channels ENABLE ROW LEVEL SECURITY");
   await dataSource.query("ALTER TABLE advertising_campaigns ENABLE ROW LEVEL SECURITY");
 }
