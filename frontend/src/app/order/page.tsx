@@ -33,6 +33,8 @@ import { jalaliDateToUtcIso, jalaliMonthLength, utcIsoToJalaliDate } from "../..
 import {
   academicDetailLabels,
   degreeOptions,
+  editingService,
+  isEditingOrder,
   languageOptions,
   majorOptions,
   methodologyOptions,
@@ -54,13 +56,13 @@ const optionalQuantity = z.preprocess((value) => {
 const formSchema = z.object({
   customer_phone: z.string().trim().max(40).optional(),
   correspondence_email: z.string().trim().email("ایمیل معتبر برای سفارش وارد کنید"),
-  degree: z.string().min(1, "مقطع الزامی است"),
-  university: z.string().min(1, "دانشگاه الزامی است"),
+  degree: z.string(),
+  university: z.string(),
   title: z.string().min(3, "عنوان یا موضوع سفارش را وارد کنید"),
   student_name: z.string().min(2, "نام و نام خانوادگی دانشجو را وارد کنید"),
-  student_number: z.string().trim().min(1, "شماره دانشجویی الزامی است").max(80, "شماره دانشجویی باید کوتاه‌تر باشد"),
+  student_number: z.string().trim().max(80, "شماره دانشجویی باید کوتاه‌تر باشد"),
   order_type: z.enum(orderTypeOptions as [string, ...string[]], { message: "نوع سفارش معتبر نیست" }),
-  methodology: z.string().min(1, "روش یا رویکرد انجام الزامی است"),
+  methodology: z.string(),
   language: z.string().min(1, "زبان الزامی است"),
   field_of_study: z.string().optional(),
   faculty: z.string().optional(),
@@ -82,6 +84,11 @@ const formSchema = z.object({
   moarref_code: z.string().max(120, "کد معرف باید کوتاه‌تر باشد").optional()
 }).superRefine((values, ctx) => {
   const fieldConfig = orderTypeFieldConfig(values.order_type);
+  if (!isEditingOrder(values)) {
+    for (const field of ["degree", "university", "student_number", "methodology"] as const) {
+      if (!values[field].trim()) ctx.addIssue({ code: "custom", path: [field], message: "این فیلد الزامی است." });
+    }
+  }
   for (const field of orderTypeFieldConfig(values.order_type).required) {
     const value = values[field];
     const isMissing = typeof value === "number" ? value < 1 : !compact(value);
@@ -298,11 +305,16 @@ function OrderForm() {
 
   const watched = watch();
   const presentation = isPresentationOrder(watched);
+  const editing = isEditingOrder(watched);
+  const needsSource = presentation || editing;
+  const sourceExtensions = editing ? [".docx"] : INFORMATION_SOURCE_EXTENSIONS;
+  const validInformationSource = informationSource && sourceExtensions.some(ext => informationSource.name.toLowerCase().endsWith(ext));
+  const sourceError = editing ? "فایل Word متن اصلی با پسوند DOCX را اضافه کنید." : "فایل «منبع اطلاعات» را برای ساخت پاورپوینت اضافه کنید.";
   const selectedFieldConfig = orderTypeFieldConfig(watched.order_type);
   const isDetailVisible = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.visible.includes(field);
   const requiredMark = (field: keyof typeof academicDetailLabels) => selectedFieldConfig.required.includes(field) ? " *" : "";
   const quantityTypes = selectedFieldConfig.quantityTypes;
-  const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length + (presentation && informationSource ? 1 : 0);
+  const totalFiles = guidelineFiles.length + referenceFiles.length + supportingFiles.length + (needsSource && validInformationSource ? 1 : 0);
 
   useEffect(() => {
     if (!quantityTypes.includes(watched.quantity_type as QuantityType)) {
@@ -346,8 +358,8 @@ function OrderForm() {
   );
 
   async function goNext() {
-    if (step === 2 && presentation && !informationSource) {
-      setSubmitError("برای ادامه، فایل «منبع اطلاعات» ارائه را بارگذاری کنید.");
+    if (step === 2 && needsSource && !validInformationSource) {
+      setSubmitError(sourceError);
       document.getElementById("information-source")?.focus();
       return;
     }
@@ -401,8 +413,8 @@ function OrderForm() {
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
     setCreatedOrder(null);
-    if (isPresentationOrder(values) && !informationSource) {
-      setSubmitError("فایل «منبع اطلاعات» را برای ساخت پاورپوینت اضافه کنید.");
+    if (needsSource && !validInformationSource) {
+      setSubmitError(sourceError);
       setStep(2);
       return;
     }
@@ -414,13 +426,13 @@ function OrderForm() {
     const payload: OrderCreatePayload = {
       ...(isStaff ? { customer_phone: values.customer_phone!.trim() } : {}),
       correspondence_email: values.correspondence_email.trim(),
-      degree: values.degree,
-      university: values.university,
+      degree: editing ? "" : values.degree,
+      university: editing ? "" : values.university,
       title: values.title.trim(),
       student_name: values.student_name.trim(),
-      student_number: values.student_number.trim(),
+      student_number: editing ? "" : values.student_number.trim(),
       order_type: values.order_type,
-      methodology: values.methodology,
+      methodology: editing ? "" : values.methodology,
       language: values.language,
       field_of_study: compact(values.field_of_study),
       faculty: compact(values.faculty),
@@ -434,7 +446,7 @@ function OrderForm() {
       abstract: compact(values.abstract),
       quantity_type: values.quantity_type,
       quantity_value: values.quantity_value,
-      requires_charts: values.requires_charts,
+      requires_charts: !editing && values.requires_charts,
       ...(presentation ? { presentation_style: values.presentation_style, presentation_font: values.presentation_font } : {}),
       deadline: compact(values.deadline),
       notes: compact(values.notes),
@@ -448,7 +460,7 @@ function OrderForm() {
         file_count: totalFiles,
         has_referral_code: Boolean(compact(values.moarref_code))
       });
-      const order = await createOrder(payload, presentation ? informationSource ?? undefined : undefined);
+      const order = await createOrder(payload, needsSource ? informationSource ?? undefined : undefined);
       for (const file of guidelineFiles) {
         await uploadOrderFile(order.id, "university_guideline", file);
       }
@@ -578,6 +590,9 @@ function OrderForm() {
                     >
                       <input type="radio" className="sr-only" value={option} {...register("order_type")} />
                       {option}
+                      {option === editingService.label && (
+                        <span className="ms-2 text-xs text-teal-800">هر صفحه {editingService.price_per_unit_toman.toLocaleString("fa-IR")} تومان</span>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -594,27 +609,29 @@ function OrderForm() {
           {step === 1 ? (
             <div className="grid gap-6">
               <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
-                <h2 className="text-base font-semibold lg:col-span-2">موضوع و دانشگاه</h2>
-                <Field label="عنوان یا موضوع پیشنهادی *" error={errors.title?.message}>
+                <h2 className="text-base font-semibold lg:col-span-2">{editing ? "مشخصات متن" : "موضوع و دانشگاه"}</h2>
+                <Field label={editing ? "عنوان متن *" : "عنوان یا موضوع پیشنهادی *"} error={errors.title?.message}>
                   <Input {...register("title")} />
                 </Field>
-                <Field label="نام و نام خانوادگی دانشجو *" error={errors.student_name?.message}>
+                <Field label={editing ? "نام و نام خانوادگی *" : "نام و نام خانوادگی دانشجو *"} error={errors.student_name?.message}>
                   <Input autoComplete="name" {...register("student_name")} />
                 </Field>
-                <Field label="شماره دانشجویی *" error={errors.student_number?.message}>
+                {!editing && <Field label="شماره دانشجویی *" error={errors.student_number?.message}>
                   <Input className="ltr text-left" inputMode="numeric" {...register("student_number")} />
-                </Field>
+                </Field>}
                 <Field label="ایمیل سفارش *" error={errors.correspondence_email?.message}>
                   <Input className="ltr text-left" type="email" autoComplete="email" placeholder="name@example.com" {...register("correspondence_email")} />
                 </Field>
+                {!editing && <>
                 <SearchableField id="majors" label="رشته یا گرایش تحصیلی" error={errors.field_of_study?.message} options={majorOptions} inputProps={register("field_of_study")} />
                 <Field label="مقطع تحصیلی" error={errors.degree?.message}>
                   <Select {...register("degree")}>{degreeOptions.map((option) => <option key={option}>{option}</option>)}</Select>
                 </Field>
                 <SearchableField id="universities" label="دانشگاه یا مؤسسه آموزشی" error={errors.university?.message} options={universityOptions} inputProps={register("university")} />
+                </>}
               </div>
 
-              <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
+              {!editing && <div className="grid gap-4 border-b border-border pb-5 lg:grid-cols-2">
                 <h2 className="text-base font-semibold lg:col-span-2">اطلاعات آموزشی</h2>
                 {isDetailVisible("faculty") ? (
                   <Field label={`${academicDetailLabels.faculty}${requiredMark("faculty")}`} error={errors.faculty?.message}>
@@ -663,21 +680,21 @@ function OrderForm() {
                     </Field>
                   </div>
                 ) : null}
-              </div>
+              </div>}
 
               {presentation && <PresentationOptions style={watched.presentation_style} font={watched.presentation_font} onStyle={id => setValue("presentation_style", id, { shouldDirty: true, shouldValidate: true })} onFont={id => setValue("presentation_font", id, { shouldDirty: true, shouldValidate: true })}/>}
               <div className="grid gap-4 lg:grid-cols-2">
                 <h2 className="text-base font-semibold lg:col-span-2">الزامات خروجی</h2>
-                <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
+                {!editing && <Field label="روش یا رویکرد انجام" error={errors.methodology?.message}>
                   <Select {...register("methodology")}>{methodologyOptions.map((option) => <option key={option}>{option}</option>)}</Select>
-                </Field>
+                </Field>}
                 <Field label="زبان" error={errors.language?.message}>
                   <Select {...register("language")}>
                     {languageOptions.map((option) => <option key={option}>{option}</option>)}
                   </Select>
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
-                  <Field label="حجم موردنیاز" error={errors.quantity_value?.message}>
+                  <Field label={editing ? "تعداد صفحات متن اصلی" : "حجم موردنیاز"} error={errors.quantity_value?.message}>
                     <Input className="ltr text-left" {...register("quantity_value")} type="number" min={1} placeholder="بعداً مشخص می‌شود" />
                   </Field>
                   <Field label="واحد" error={errors.quantity_type?.message}>
@@ -686,10 +703,10 @@ function OrderForm() {
                     </Select>
                   </Field>
                 </div>
-                <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
+                {!editing && <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-border bg-white px-3 py-2 text-sm font-medium">
                   <input type="checkbox" className="h-4 w-4 rounded border-input accent-teal-700" {...register("requires_charts")} />
                   افزودن گراف و چارت در صورت نیاز
-                </label>
+                </label>}
                 <JalaliDateField
                   label="مهلت موردنظر برای تحویل"
                   error={errors.deadline?.message}
@@ -697,7 +714,7 @@ function OrderForm() {
                   onChange={(value) => setValue("deadline", value ?? "", { shouldDirty: true, shouldValidate: true })}
                 />
                 <div className="lg:col-span-2">
-                  <Field label="توضیحات تکمیلی، خواسته‌های استاد یا نکات ضروری" error={errors.notes?.message}>
+                  <Field label={editing ? "توضیحات ویراستاری" : "توضیحات تکمیلی، خواسته‌های استاد یا نکات ضروری"} error={errors.notes?.message}>
                     <Textarea {...register("notes")} placeholder="مثلاً: دانشگاه فرمت خاصی دارد، استاد روی مدل خاصی تأکید کرده، داده‌ها آماده هستند، یا فقط اصلاح فصل‌ها لازم است." />
                   </Field>
                 </div>
@@ -713,19 +730,19 @@ function OrderForm() {
                   شیوه‌نامه و فایل‌های منبع بیشترین اثر را روی بررسی سریع و خروجی درست دارند.
                 </p>
               </div>
-              {presentation && <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
-                <label htmlFor="information-source" className="mb-2 block font-medium">منبع اطلاعات *</label>
-                <p id="information-source-help" className="mb-3 text-sm text-muted-foreground">فایل پایان‌نامه، گزارش یا متن اصلی که ارائه باید از آن ساخته شود. DOCX، PDF متنی، PPTX، TXT یا MD؛ حداکثر ۵۰ مگابایت.</p>
-                <Input id="information-source" type="file" accept={INFORMATION_SOURCE_EXTENSIONS.join(",")} aria-required="true" aria-describedby="information-source-help" onChange={event => {
+              {needsSource && <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
+                <label htmlFor="information-source" className="mb-2 block font-medium">{editing ? "فایل Word برای ویراستاری *" : "منبع اطلاعات *"}</label>
+                <p id="information-source-help" className="mb-3 text-sm text-muted-foreground">{editing ? "نسخهٔ قابل‌ویرایش متن اصلی را با پسوند DOCX بارگذاری کنید." : "فایل پایان‌نامه، گزارش یا متن اصلی که ارائه باید از آن ساخته شود. DOCX، PDF متنی، PPTX، TXT یا MD؛ حداکثر ۵۰ مگابایت."}</p>
+                <Input id="information-source" type="file" accept={sourceExtensions.join(",")} aria-required="true" aria-describedby="information-source-help" onChange={event => {
                   const file = event.currentTarget.files?.[0];
                   event.currentTarget.value = "";
                   if (!file) return;
-                  if (!INFORMATION_SOURCE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)) || !file.size || file.size > 50 * 1024 * 1024) {
+                  if (!sourceExtensions.some(ext => file.name.toLowerCase().endsWith(ext)) || !file.size || file.size > 50 * 1024 * 1024) {
                     setSubmitError("منبع اطلاعات باید فایل مجاز، غیرخالی و حداکثر ۵۰ مگابایت باشد."); return;
                   }
                   setSubmitError(null); setInformationSource(file);
                 }}/>
-                <FileSummary files={informationSource ? [informationSource] : []} onRemove={() => setInformationSource(null)}/>
+                <FileSummary files={validInformationSource && informationSource ? [informationSource] : []} onRemove={() => setInformationSource(null)}/>
               </div>}
               <div className="grid gap-5 lg:grid-cols-3">
                 <div className="rounded-md border border-border bg-white p-4">
@@ -779,7 +796,7 @@ function OrderForm() {
                     <dt className="text-muted-foreground">ایمیل سفارش</dt>
                     <dd className="ltr text-left font-medium">{watched.correspondence_email || "-"}</dd>
                   </div>
-                  <div>
+                  {!editing && <><div>
                     <dt className="text-muted-foreground">شماره دانشجویی</dt>
                     <dd className="ltr text-left font-medium">{watched.student_number || "-"}</dd>
                   </div>
@@ -790,7 +807,7 @@ function OrderForm() {
                   <div>
                     <dt className="text-muted-foreground">دانشگاه</dt>
                     <dd className="font-medium">{watched.university}</dd>
-                  </div>
+                  </div></>}
                   <div className="sm:col-span-2">
                     <dt className="text-muted-foreground">عنوان یا موضوع</dt>
                     <dd className="font-medium">{watched.title || "-"}</dd>
@@ -799,20 +816,24 @@ function OrderForm() {
                     <dt className="text-muted-foreground">نوع سفارش</dt>
                     <dd className="font-medium">{watched.order_type || "-"}</dd>
                   </div>
-                  <div>
+                  {!editing && <div>
                     <dt className="text-muted-foreground">روش یا رویکرد انجام</dt>
                     <dd className="font-medium">{watched.methodology}</dd>
-                  </div>
+                  </div>}
                   <div>
                     <dt className="text-muted-foreground">حجم موردنیاز</dt>
                     <dd className="font-medium">
                       {watched.quantity_value ? `${watched.quantity_value.toLocaleString("fa-IR")} ${quantityLabel(watched.quantity_type)}` : "-"}
                     </dd>
                   </div>
-                  <div>
+                  {editing && watched.quantity_value && <div>
+                    <dt className="text-muted-foreground">برآورد هزینهٔ ویراستاری</dt>
+                    <dd className="font-medium">{(watched.quantity_value * editingService.price_per_unit_toman).toLocaleString("fa-IR")} تومان</dd>
+                  </div>}
+                  {!editing && <div>
                     <dt className="text-muted-foreground">گراف و چارت</dt>
                     <dd className="font-medium">{watched.requires_charts ? "نیاز است" : "نیاز نیست"}</dd>
-                  </div>
+                  </div>}
                   {presentation && <><div><dt className="text-muted-foreground">سبک ارائه</dt><dd className="font-medium">{presentationStyleLabel(watched.presentation_style)}</dd></div><div><dt className="text-muted-foreground">فونت ارائه</dt><dd className="font-medium">{watched.presentation_font}</dd></div></>}
                   <div>
                     <dt className="text-muted-foreground">فایل‌ها</dt>

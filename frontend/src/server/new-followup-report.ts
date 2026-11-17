@@ -1,21 +1,9 @@
 import { getDataSource } from "./db/data-source";
 import { email } from "./email";
+import catalog from "../lib/service-catalog.json";
+import { getServicePricing, type ServicePricing } from "./service-pricing";
 
-// قیمت‌ها را به صورت بازه (مثلاً "15-20") وارد کنید.
-const bachelorThesisPrice = "10-20";
-const masterThesisPrice = "20-30";
-const thesisProposalPrice = "5-10";
-const universityResearchPrice = "2-10";
-const presentationAndPowerpointPrice = "2-10";
 const depositPercentage = "20%";
-
-const orderPrices = [
-  { label: "پایان‌نامه کارشناسی", price: bachelorThesisPrice },
-  { label: "پایان‌نامه کارشناسی ارشد", price: masterThesisPrice },
-  { label: "پروپوزال پایان‌نامه", price: thesisProposalPrice },
-  { label: "تحقیق دانشگاهی", price: universityResearchPrice },
-  { label: "ارائه و پاورپوینت", price: presentationAndPowerpointPrice },
-];
 
 type UserCandidateRow = {
   id: string;
@@ -82,7 +70,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
+function buildFollowupReport(userRows: UserCandidateRow[], title: string, rates: ServicePricing[]) {
   const candidatesByPhone = new Map<string, ReportCandidate>();
 
   // Include all phone registrations, preserving historical verification information.
@@ -115,15 +103,16 @@ function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
 
   const generatedAt = formatIranDate(new Date());
 
-  const priceItems = orderPrices
-    .map(
-      ({ label, price }) => `
+  const ratesByType = new Map(rates.map(rate => [rate.order_type, rate]));
+  const priceItems = catalog.map(({ label, order_type }) => {
+    const rate = ratesByType.get(order_type);
+    const price = rate ? `هر ${rate.unit === "slide" ? "اسلاید" : "صفحه"} ${rate.price_per_unit_toman.toLocaleString("fa-IR")} تومان` : "تعرفه در دسترس نیست";
+    return `
         <li style="margin: 0 0 6px;">
           ${escapeHtml(label)}: <strong>${escapeHtml(price)}</strong>
         </li>
-      `,
-    )
-    .join("");
+      `;
+  }).join("");
 
   const rows = candidates
     .map(
@@ -223,7 +212,7 @@ function buildFollowupReport(userRows: UserCandidateRow[], title: string) {
       background-color: #f9fafb;
       text-align: right;
     ">
-      <h3 style="margin: 0 0 10px; color: #111827;">بازه قیمت انواع سفارش</h3>
+      <h3 style="margin: 0 0 10px; color: #111827;">تعرفهٔ خدمات</h3>
       <ul style="margin: 0; padding-right: 20px; color: #374151;">
         ${priceItems}
       </ul>
@@ -344,7 +333,7 @@ export async function sendNewFollowupCandidatesReport() {
        order by u.created_at desc`,
   )) as UserCandidateRow[];
 
-  const report = buildFollowupReport(users, "New follow-up candidates report");
+  const report = buildFollowupReport(users, "New follow-up candidates report", await getServicePricing());
 
   const sent = await email.sendNewFollowupCandidatesReport(
     "",
@@ -377,6 +366,7 @@ export async function sendContactedFollowupCandidatesReport() {
   const report = buildFollowupReport(
     users,
     "Contacted follow-up candidates report",
+    await getServicePricing(),
   );
 
   const sent = await email.sendContactedFollowupCandidatesReport(

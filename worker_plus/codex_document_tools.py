@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +11,7 @@ from codex_order_tools import OrderTools, hashes, read
 from common.helpers import write_json, write_text
 from common.input_files import target_name
 from common.profiles import profile_for
+from common.sample_policy import sample_count
 
 OUTPUTS = ["final/final.docx", "final/final.pdf", "final/sample.docx", "final/sample.pdf"]
 STEPS = ["دریافت سفارش", "بررسی ورودی و قرارداد", "خواندن منابع و شیوه‌نامه",
@@ -34,7 +34,7 @@ class DocumentTools(OrderTools):
     outputs = OUTPUTS
     upload_keys = ("docx_file", "pdf_file", "sample_file", "sample_pdf_file")
     steps = STEPS
-    publication_note = "Academic document reviewed in Codex; full Word/PDF and first-half samples."
+    publication_note = "Academic document reviewed in Codex; full Word/PDF and 20% samples."
 
     def services(self, audit_text=None):
         from common.runner import Services
@@ -237,12 +237,8 @@ class DocumentTools(OrderTools):
         details = payload("ISSUES_JSON")
         if not isinstance(details, dict) or not isinstance(details.get("issues"), list):
             raise ValueError("Review needs ISSUES_JSON with issues array")
-        if kind == "visual":
-            required = set(read(self.workspace / "reports/document_render.json")["images"])
-            reviewed = details.get("reviewed_images", [])
-        else:
-            required = {s["id"] for s in read(self.workspace / "planning/document_plan.json")["sections"]}
-            reviewed = details.get("reviewed_sections", [])
+        field, required = self.review_coverage(kind)
+        reviewed = details.get(field, [])
         if not isinstance(reviewed, list) or len(reviewed) != len(set(reviewed)) or set(reviewed) != required:
             raise ValueError("Review must cover all current sections/images exactly once")
         target = f"reports/document_{kind}_audit.md"
@@ -251,6 +247,11 @@ class DocumentTools(OrderTools):
             raise ValueError("Review failed; repair the documented issues before recording PASS")
         self.record(f"review_{kind}", [*expected, target])
         return {"passed": True, "review": kind}
+
+    def review_coverage(self, kind):
+        if kind == "visual":
+            return "reviewed_images", set(read(self.workspace / "reports/document_render.json")["images"])
+        return "reviewed_sections", {s["id"] for s in read(self.workspace / "planning/document_plan.json")["sections"]}
 
     def build(self):
         self.verify_inputs()
@@ -291,7 +292,7 @@ class DocumentTools(OrderTools):
         latin_numbers = bool(rules.get("native_typesetting", {}).get("latin_numbers")) or "https://" in (self.workspace / "final/deliverable_source.md").read_text(encoding="utf-8")
         export_options = {"preserve_latin_numbers": True} if latin_numbers else {}
         services.export_pdf(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[1], font, **export_options)
-        full, sample = services.create_first_half_sample(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[2])
+        full, sample = services.create_sample(self.workspace / OUTPUTS[0], self.workspace / OUTPUTS[2])
         services.export_pdf(self.workspace / OUTPUTS[2], self.workspace / OUTPUTS[3], font, **export_options)
         if rules.get("native_typesetting", {}).get("optimize_fonts"):
             from common.docx_typesetting import optimize_package
@@ -342,8 +343,8 @@ class DocumentTools(OrderTools):
                     raise ValueError("Empty PDF: " + relative)
                 counts[relative] = len(document)
         full, sample = counts[OUTPUTS[1]], counts[OUTPUTS[3]]
-        if sample != math.ceil(full / 2) or render["word_full_pages"] != full or render["word_sample_pages"] != sample:
-            raise ValueError("Word/PDF or first-half sample page counts disagree")
+        if sample != sample_count(full) or render["word_full_pages"] != full or render["word_sample_pages"] != sample:
+            raise ValueError("Word/PDF or sample page counts disagree")
         budget = page_budget(self.context()["order"])
         if budget and not budget["minimum"] <= full <= budget["maximum"]:
             raise ValueError(f"Final PDF outside page budget: {full}; {budget['minimum']}–{budget['maximum']}")

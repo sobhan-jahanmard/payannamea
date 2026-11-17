@@ -45,6 +45,7 @@ Read the stored order type and the corresponding reference:
 | پروپوزال پایان‌نامه | [Document review](references/documents.md), prospective research design |
 | تحقیق دانشگاهی | [Document review](references/documents.md), course assignment scope |
 | ارائه و پاورپوینت | [PowerPoint review](references/presentation.md) |
+| ویراستاری | [Editing review](references/editing.md) |
 
 The helper snapshots the matching native/PDF/sample files and required document
 companions. For documents it also freezes research evidence/calculation records,

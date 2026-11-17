@@ -1,8 +1,9 @@
 param(
   [Parameter(Mandatory = $true)][string]$Path,
   [Parameter(Mandatory = $true)][string]$OutputPath,
-  [Parameter(Mandatory = $true)][string]$FontName,
-  [switch]$PreserveLatinNumbers
+  [string]$FontName,
+  [switch]$PreserveLatinNumbers,
+  [switch]$PreserveLayout
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,14 +41,16 @@ public static extern bool RemoveFontResource(string path);
   $word.Visible = $false
   $word.DisplayAlerts = 0
   $word.ScreenUpdating = $false
+  $word.AutomationSecurity = 3 # msoAutomationSecurityForceDisable
   # A PAGE field is a standalone number, so context mode can render it as 4.
   # Hindi numeral mode makes Word paint it as ۴ during this final PDF export.
-  $word.Options.ArabicNumeral = 1 # wdNumeralHindi
+  if (!$PreserveLayout) { $word.Options.ArabicNumeral = 1 } # wdNumeralHindi
   $stage = "open DOCX"
   # Open writable in memory. Word may reject Font.NameBi on the main story of a
   # read-only document, silently leaving Calibri/Cambria in the exported PDF.
   # Close(false) below guarantees the source DOCX is not overwritten.
-  $document = $word.Documents.Open($Path, $false, $false, $false)
+  $document = $word.Documents.Open($Path, $false, [bool]$PreserveLayout, $false)
+  if (!$PreserveLayout) {
   # The exporter runs in a separate Word process. Reapply the DOCX's intended
   # complex-script font to every story (body, headers, footers, notes, and text
   # boxes) immediately before fixed-format conversion. NameBi is what Word uses
@@ -107,6 +110,9 @@ public static extern bool RemoveFontResource(string path);
         }
       }
     }
+  }
+  } else {
+    $document.Repaginate()
   }
   # BitmapMissingFonts must remain false: a raster fallback hides the missing
   # font problem and produces a PDF whose typography differs from the DOCX.

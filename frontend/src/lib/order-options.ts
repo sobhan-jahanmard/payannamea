@@ -1,3 +1,11 @@
+import serviceCatalog from "./service-catalog.json";
+
+export const editingService = serviceCatalog.find(({ order_type }) => order_type === "editing")!;
+
+export function isEditingOrder(order: { order_type?: string | null }): boolean {
+  return order.order_type === editingService.label;
+}
+
 export const degreeOptions = [
   "کارشناسی ارشد",
   "دکتری تخصصی",
@@ -6,13 +14,7 @@ export const degreeOptions = [
   "سایر"
 ];
 
-export const orderTypeOptions = [
-  "پایان‌نامه کارشناسی",
-  "پایان‌نامه کارشناسی ارشد",
-  "پروپوزال پایان‌نامه",
-  "تحقیق دانشگاهی",
-  "ارائه و پاورپوینت"
-];
+export const orderTypeOptions = serviceCatalog.map(({ label }) => label);
 
 export const academicDetailLabels = {
   faculty: "دانشکده",
@@ -91,6 +93,13 @@ export const orderTypeFieldConfigs: Record<string, OrderTypeFieldConfig> = {
     quantityTypes: ["slides"],
     defaultQuantityType: "slides",
     defaultDegree: "کارشناسی"
+  },
+  [editingService.label]: {
+    visible: [],
+    required: [],
+    quantityTypes: ["pages"],
+    defaultQuantityType: "pages",
+    defaultDegree: "سایر"
   }
 };
 

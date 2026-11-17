@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Path,
-  [Parameter(Mandatory = $true)][string]$OutputPath
+  [Parameter(Mandatory = $true)][string]$OutputPath,
+  [Parameter(Mandatory = $true)][ValidateRange(1, 100)][int]$Percent
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,12 +14,12 @@ try {
   $word = New-Object -ComObject Word.Application
   $word.Visible = $false
   $word.DisplayAlerts = 0
+  $word.AutomationSecurity = 3 # msoAutomationSecurityForceDisable
   $source = $word.Documents.Open($Path, $false, $true, $false)
   $source.Repaginate()
   $pages = [int]$source.ComputeStatistics(2) # wdStatisticPages
-  if ($pages -lt 2) { throw "A first-half sample requires at least two pages." }
-  $samplePages = [math]::Ceiling($pages / 2.0)
-  $end = if ($samplePages -ge $pages) { $source.Content.End } else { $source.GoTo(1, 1, $samplePages + 1).Start }
+  if ($pages -lt 1) { throw "A sample requires at least one page." }
+  $samplePages = [math]::Ceiling($pages * $Percent / 100.0)
 
   # Do not paste the excerpt into a blank LTR Word document. A blank document
   # loses the source's styles, section settings, RTL defaults, headers, footers,

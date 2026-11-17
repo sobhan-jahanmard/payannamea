@@ -10,6 +10,7 @@ _PROFILE_MODULES = {
     "پروپوزال پایان‌نامه": "thesis_proposal.profile",
     "تحقیق دانشگاهی": "university_research.profile",
     "ارائه و پاورپوینت": "presentation.profile",
+    "ویراستاری": "editing.profile",
 }
 
 

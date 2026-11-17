@@ -23,7 +23,7 @@ Use validate rules --candidate when typography changes, then prepare/extract as
 required by freshness checks. Revalidate evidence if its inputs change, followed
 by validate document --candidate. Refresh content and source reviews using their
 exact hashes and every plan section ID. Rebuild and render, including required
-companions and first-half samples. Open every current page image and inspect the
+companions and opening 20% samples. Open every current page image and inspect the
 native DOCX; record all image paths in the visual review. Regeneration of samples
 is required even if a repair only changed the full file's pagination.
 

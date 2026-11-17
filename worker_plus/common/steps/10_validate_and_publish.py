@@ -221,10 +221,10 @@ def run(context: dict[str, Any], services: Any) -> None:
         word_name.write_bytes(docx.read_bytes())
     pdf_font = rules["font"]["persian"]
     services.export_pdf(word_name, pdf, pdf_font)
+    from pypdf import PdfReader
+    pdf_pages = len(PdfReader(str(pdf)).pages)
     budget = page_budget(context["order"])
     if budget:
-        from pypdf import PdfReader
-        pdf_pages = len(PdfReader(str(pdf)).pages)
         write_json(services.workspace / "reports" / "stage_checks" / "final_pdf_page_budget.json", {
             "passed": budget["minimum"] <= pdf_pages <= budget["maximum"],
             "actual_pages": pdf_pages,
@@ -236,8 +236,11 @@ def run(context: dict[str, Any], services: Any) -> None:
     audit_visual_quality(context, services, pdf)
     sample_docx = services.workspace / "final" / "sample.docx"
     sample_pdf = services.workspace / "final" / "sample.pdf"
-    full_pages, sample_pages = services.create_first_half_sample(word_name, sample_docx)
+    full_pages, sample_pages = services.create_sample(word_name, sample_docx)
     services.export_pdf(sample_docx, sample_pdf, pdf_font)
+    from common.sample_policy import sample_count
+    if full_pages != pdf_pages or sample_pages != sample_count(full_pages) or len(PdfReader(str(sample_pdf)).pages) != sample_pages:
+        raise ValueError("Word and PDF page counts must agree with the 20% sample policy")
     context["artifacts"].update({
         "final_docx": str(word_name.relative_to(services.workspace)),
         "final_pdf": str(pdf.relative_to(services.workspace)),
@@ -245,7 +248,7 @@ def run(context: dict[str, Any], services: Any) -> None:
         "sample_pdf": str(sample_pdf.relative_to(services.workspace)),
     })
     write_json(services.workspace / "reports" / "stage_checks" / "sample_excerpt.json", {
-        "full_pages": full_pages, "sample_pages": sample_pages, "source": "first half of rendered final.docx pages",
+        "full_pages": full_pages, "sample_pages": sample_pages, "source": "first 20% of rendered final.docx pages",
     })
     if services.args.offline:
         context["status"] = "dry_run_complete"
@@ -257,7 +260,7 @@ def run(context: dict[str, Any], services: Any) -> None:
         services.config,
         order_id,
         files,
-        "Worker generated the full and first-half sample review package.",
+        "Worker generated the full and 20% sample review package.",
         sample_status=is_sample_status,
     )
     context["status"] = "sample_pending_customer_approval" if is_sample_status else "worker_done_pending_approval"

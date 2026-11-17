@@ -19,7 +19,8 @@ SKILL = Path(__file__).resolve().parents[1]
 WORKSPACES = SKILL.parents[1] / 'worker_plus' / 'workspace'
 TYPE = 'ارائه و پاورپوینت'
 OUTPUTS = ('final/final.pptx', 'final/final.pdf', 'final/sample.pptx', 'final/sample.pdf')
-DOCUMENT_TYPES = ('پایان‌نامه کارشناسی', 'پایان‌نامه کارشناسی ارشد', 'پروپوزال پایان‌نامه', 'تحقیق دانشگاهی')
+EDITING_TYPE = 'ویراستاری'
+DOCUMENT_TYPES = ('پایان‌نامه کارشناسی', 'پایان‌نامه کارشناسی ارشد', 'پروپوزال پایان‌نامه', 'تحقیق دانشگاهی', EDITING_TYPE)
 DOCUMENT_OUTPUTS = ('final/final.docx', 'final/final.pdf', 'final/sample.docx', 'final/sample.pdf')
 RUBRIC = {'accuracy': 5, 'requirements': 4, 'reasoning': 4, 'visual': 3, 'delivery': 2, 'technical': 2}
 LABELS = {'accuracy': 'صحت و وفاداری به منابع', 'requirements': 'پوشش سفارش',
@@ -100,6 +101,7 @@ def prepare(order, workspace=None):
     original_order = workspace / 'customer_input.json'
     details = read(original_order)
     document = details.get('order_type') in DOCUMENT_TYPES
+    editing = details.get('order_type') == EDITING_TYPE
     if details.get('order_type') != TYPE and not document:
         raise ValueError('Unsupported review order type: ' + str(details.get('order_type')))
     originals = []
@@ -120,14 +122,14 @@ def prepare(order, workspace=None):
         if expected and sha(source) != expected:
             raise ValueError('Original input hash changed: ' + source.name)
         originals.append((source, role, item.get('original_name') or source.name))
-    if not document and not any(role == 'information_source' for _, role, _ in originals):
+    if (not document or editing) and not any(role == 'information_source' for _, role, _ in originals):
         raise ValueError('No supplied information_source files are available')
     output_paths = list(DOCUMENT_OUTPUTS if document else OUTPUTS)
     if document and state_path.is_file():
         context_path = workspace / 'order_context.json'
         if context_path.is_file():
             output_paths += read(context_path).get('artifacts', {}).get('document_companions', [])
-    if document:
+    if document and not editing:
         plan_path = workspace / 'planning/document_plan.json'
         workbook = read(plan_path).get('calculation_workbook') if plan_path.is_file() else None
         if workbook:
@@ -168,7 +170,7 @@ def prepare(order, workspace=None):
         add(source, f'inputs/originals/{index:02d}_{Path(name).name}', role)
     for source in outputs:
         add(source, 'inputs/' + source.relative_to(workspace).as_posix(), 'deliverable')
-    if document:
+    if document and not editing:
         # Frozen provenance for external desk research; exclude earlier author verdicts.
         for directory in ('research',):
             for source in sorted((workspace / directory).rglob('*')):
@@ -194,7 +196,8 @@ def prepare(order, workspace=None):
                         page_counts['inputs/' + source.relative_to(workspace).as_posix()] = len(pdf)
                 except (OSError, ValueError, RuntimeError):
                     pass  # A broken PDF is evidence for the reviewer, not silently repaired.
-    add(SKILL / ('references/documents.md' if document else 'references/presentation.md'), 'inputs/review_rules.md', 'review_instructions')
+    rules = 'editing' if editing else 'documents' if document else 'presentation'
+    add(SKILL / f'references/{rules}.md', 'inputs/review_rules.md', 'review_instructions')
     manifest = {'version': 1, 'order_id': order_id, 'run_id': run_id, 'order_type': details['order_type'],
                 'expected_slide_count': details.get('quantity_value'), 'submitted_slide_count': submitted_count,
                 'rubric_maxima': RUBRIC, 'document': document, 'submitted_page_counts': page_counts,
@@ -204,7 +207,9 @@ def prepare(order, workspace=None):
     write(bundle / 'manifest.json', manifest)
     write(bundle / 'run_state.json', {'workspace': str(workspace), 'order_id': order_id,
                                      'origins': origins, 'manifest_sha256': sha(bundle / 'manifest.json')})
-    inspection = ('Inspect every submitted Word/PDF and companion report, including native headings, tables and fields.\n'
+    inspection = ('Compare the original Word file against the copyedited Word and PDF. Inspect each rendered page and the opening 20% excerpt.'
+                  if editing else
+                  'Inspect every submitted Word/PDF and companion report, including native headings, tables and fields.\n'
                   'If an XLSX is submitted, inspect its native formulas, cached values, editable inputs and consistency with the financial/scenario tables.\n'
                   'Render and OPEN every page of every supplied PDF. Check samples against the full document.\n'
                   'Use the frozen research records and original sources; verify source links when needed for accuracy.\n'

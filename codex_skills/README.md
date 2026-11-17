@@ -1,6 +1,6 @@
 # اجرای سفارش‌های دانش‌یار در Codex
 
-این مجموعه هر پنج نوع سفارش ثبت‌شده در پروژه را پوشش می‌دهد. تولید، پژوهش و
+این مجموعه هر شش نوع سفارش ثبت‌شده در پروژه را پوشش می‌دهد. تولید، پژوهش و
 اصلاح در همان گفت‌وگوی Codex انجام می‌شود؛ ابزارهای محلی دریافت فایل، استخراج،
 اعتبارسنجی و ساخت خروجی را انجام می‌دهند و مدل یا Worker دیگری اجرا نمی‌کنند.
 
@@ -11,6 +11,7 @@
 | پروپوزال پایان‌نامه | [daneshyar-thesis-proposal](daneshyar-thesis-proposal/SKILL.md) |
 | تحقیق دانشگاهی | [daneshyar-university-research](daneshyar-university-research/SKILL.md) |
 | ارائه و پاورپوینت | [daneshyar-presentation](daneshyar-presentation/SKILL.md) |
+| ویراستاری | [daneshyar-editing](daneshyar-editing/SKILL.md) |
 
 مهارت [daneshyar-order](daneshyar-order/SKILL.md) سفارش را دریافت و مسیر درست را
 انتخاب می‌کند. [daneshyar-review](daneshyar-review/SKILL.md) بازبینی مستقل و نمرهٔ

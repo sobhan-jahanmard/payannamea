@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "دانشیار | خدمات دانشگاهی",
-  description: "دانشیار؛ ثبت، پیگیری و مدیریت سفارش پایان‌نامه، رساله، پروپوزال، تحقیق و ارائه",
+  description: "ثبت و پیگیری سفارش پایان‌نامه، پروپوزال، تحقیق، پاورپوینت و ویراستاری در دانشیار",
   icons: {
     icon: "/images/daneshyar-logo.png",
     apple: "/images/daneshyar-logo.png",

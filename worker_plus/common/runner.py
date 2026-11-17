@@ -956,7 +956,7 @@ class Services:
             raise RuntimeError("Word page count returned no numeric result")
         return int(counts[-1])
 
-    def export_pdf(self, docx: Path, pdf: Path, font_name: str, preserve_latin_numbers: bool = False) -> None:
+    def export_pdf(self, docx: Path, pdf: Path, font_name: str | None, preserve_latin_numbers: bool = False) -> None:
         if os.name != "nt":
             raise RuntimeError("PDF export requires the Windows Word runtime")
         script = Path(__file__).resolve().parent / "scripts" / "export_pdf.ps1"
@@ -966,7 +966,8 @@ class Services:
             self.release_docx_lock(pdf)
             if pdf.exists():
                 pdf.unlink()
-            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf), "-FontName", font_name]
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(pdf)]
+            command.extend(["-FontName", font_name] if font_name else ["-PreserveLayout"])
             if preserve_latin_numbers:
                 command.append("-PreserveLatinNumbers")
             process = subprocess.Popen(
@@ -985,7 +986,8 @@ class Services:
                 raise RuntimeError("Word PDF export timed out after retry")
             last_output = output
             if process.returncode == 0 and pdf.exists() and pdf.stat().st_size:
-                self.verify_pdf_font(pdf, font_name)
+                if font_name:
+                    self.verify_pdf_font(pdf, font_name)
                 return
             self.release_docx_lock(docx)
         raise RuntimeError("Word PDF export failed: " + last_output[-500:])
@@ -1017,18 +1019,19 @@ class Services:
                 f"PDF font verification failed: expected '{font_name}', found {sorted(exported_fonts)}"
             )
 
-    def create_first_half_sample(self, docx: Path, sample_docx: Path) -> tuple[int, int]:
-        """Save the actual first half of rendered Word pages as a separate DOCX."""
+    def create_sample(self, docx: Path, sample_docx: Path) -> tuple[int, int]:
+        """Save the opening pages of a rendered Word document as a separate DOCX."""
+        from common.sample_policy import SAMPLE_PERCENT
         self.release_docx_lock(docx)
         self.release_docx_lock(sample_docx)
-        script = Path(__file__).resolve().parent / "scripts" / "create_first_half_sample.ps1"
+        script = Path(__file__).resolve().parent / "scripts" / "create_sample.ps1"
         result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(sample_docx)],
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", str(script), "-Path", str(docx), "-OutputPath", str(sample_docx), "-Percent", str(SAMPLE_PERCENT)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=300, check=False,
         )
         counts = re.findall(r"^\s*(\d+)\s*,\s*(\d+)\s*$", result.stdout, re.M)
         if result.returncode or not sample_docx.exists() or not sample_docx.stat().st_size or not counts:
-            raise RuntimeError("Word first-half sample creation failed: " + result.stdout[-500:])
+            raise RuntimeError("Word sample creation failed: " + result.stdout[-500:])
         return tuple(map(int, counts[-1]))
 
     def validate_docx(self, source: Path, docx: Path, rules: dict[str, Any], report: Path, mode: str, order: dict[str, Any]) -> None:
@@ -1053,7 +1056,7 @@ class Services:
         elif any(abs(s.page_width.cm - expected_paper[0]) > 0.02 or abs(s.page_height.cm - expected_paper[1]) > 0.02 for s in document.sections):
             errors.append(f"DOCX page dimensions do not match requested {requested_paper}")
         # `--sample` controls submission status only; every run generates the
-        # same complete package and its first-half excerpt.
+        # same complete package and its opening excerpt.
         from common.page_budget import planned_page_budget
         budget = planned_page_budget(order, self.workspace / "planning" / "visual_plan.json", rules)
         min_words = min(rules["quality"]["min_full_words"], budget["minimum_content_words"]) if budget else rules["quality"]["min_full_words"]
@@ -1451,9 +1454,15 @@ def main() -> None:
                 continue
             module = importlib.import_module(f"common.steps.{name}")
             presentation_order = context.get("order", {}).get("order_type") == "ارائه و پاورپوینت"
+            editing_order = context.get("order", {}).get("order_type") == "ویراستاری"
             if presentation_order:
                 from presentation.workflow import LABELS as presentation_labels, run_step as run_presentation_step
-            header(cursor + 1, presentation_labels.get(name, module.TITLE) if presentation_order else module.TITLE, context)
+            if editing_order:
+                from editing.worker import LABELS as editing_labels, run_step as run_editing_step
+            label = presentation_labels.get(name, module.TITLE) if presentation_order else module.TITLE
+            if editing_order:
+                label = editing_labels.get(name, label)
+            header(cursor + 1, label, context)
             context["current_step"] = name
             trace_attempt = begin_attempt(context, STEPS, name, trace_session)
             services.active_attempt_id = trace_attempt
@@ -1480,7 +1489,9 @@ def main() -> None:
                     context["artifacts"]["operator_note_analysis"] = str(analysis_report.relative_to(workspace))
                     save(workspace, context)
                     pending_note_preflight = False
-                if not presentation_order or not run_presentation_step(name, context, services):
+                handled = ((presentation_order and run_presentation_step(name, context, services))
+                           or (editing_order and run_editing_step(name, context, services)))
+                if not handled:
                     module.run(context, services)
             except Exception as exc:
                 deferred = is_deferred_service_error(exc) or is_file_access_error(exc)

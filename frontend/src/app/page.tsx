@@ -9,6 +9,7 @@ import {
   FileText,
   Gauge,
   Presentation,
+  PenLine,
   SearchCheck,
   ShieldCheck,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { Button } from "../components/ui/button";
 
 import { FreeConsultationForm } from "../components/landing/FreeConsultationForm";
 import { getServicePricing, type ServicePricing } from "../server/service-pricing";
+import { editingService } from "../lib/order-options";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +84,13 @@ const services = [
     icon: Presentation,
     title: "ارائه و پاورپوینت",
     body: "طراحی اسلاید دفاع، ارائه کلاسی یا ارائه پژوهشی با متن منسجم، ساختار روشن و فایل قابل تحویل.",
+  },
+  {
+    analyticsKey: editingService.order_type,
+    sampleFile: "editing.pdf",
+    icon: PenLine,
+    title: editingService.label,
+    body: "اصلاح املا، نشانه‌گذاری و نثر متن موجود، با حفظ معنی و ساختار و تحویل Word قابل‌ویرایش و PDF.",
   },
 ];
 
@@ -206,11 +215,11 @@ export default async function LandingPage() {
                 <p className="text-xs font-medium text-teal-200">نمونه‌کارهای واقعی</p>
                 <h2 id="samples-heading" className="mt-2 text-xl font-semibold sm:text-2xl">نمونه‌کارها و تعرفه خدمات</h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                  فایل نهایی هر یک از پنج نوع خدمات را با فرمت PDF ببینید و با ساختار و کیفیت خروجی آشنا شوید.
+                  پیش‌نمایش PDF از ۲۰٪ ابتدایی خروجی را ببینید. تعداد صفحات یا اسلایدهای نمونه به بالا گرد می‌شود.
                 </p>
               </div>
             </div>
-            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {services.map((service) => {
                 const Icon = service.icon;
                 const rate = pricingByType.get(service.analyticsKey);

@@ -47,8 +47,9 @@ current chat.
 | پروپوزال پایان‌نامه | Read [daneshyar-thesis-proposal](../daneshyar-thesis-proposal/SKILL.md) |
 | تحقیق دانشگاهی | Read [daneshyar-university-research](../daneshyar-university-research/SKILL.md) |
 | ارائه و پاورپوینت | Read [daneshyar-presentation](../daneshyar-presentation/SKILL.md) |
+| ویراستاری | Read [daneshyar-editing](../daneshyar-editing/SKILL.md) |
 
-The five stored types above match the frontend and worker profiles. Reject an
+The six stored types above match the frontend and worker profiles. Reject an
 unknown type explicitly. Documents share [the document workflow](references/documents.md)
 and their own type guide; presentations retain supplied-files-only sourcing.
 The CLI dispatches subsequent commands from the stored workspace order type.

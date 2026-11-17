@@ -14,7 +14,7 @@ from codex_document_tools import DocumentTools, BASE, word_count
 from common.helpers import write_json, write_text
 
 
-TYPES = [kind for kind in SKILLS if kind != "ارائه و پاورپوینت"]
+TYPES = [kind for kind in SKILLS if kind not in {"ارائه و پاورپوینت", "ویراستاری"}]
 
 
 def fixture(root, kind="تحقیق دانشگاهی"):
@@ -63,9 +63,8 @@ class DocumentToolsTest(unittest.TestCase):
 
     def test_every_frontend_type_has_executable_route_and_installed_skill_source(self):
         repo = Path(__file__).resolve().parents[2]
-        source = (repo / "frontend/src/lib/order-options.ts").read_text(encoding="utf-8")
-        import re
-        values = re.findall(r'"([^"]+)"', source.split("export const orderTypeOptions = [", 1)[1].split("];", 1)[0])
+        source = json.loads((repo / "frontend/src/lib/service-catalog.json").read_text(encoding="utf-8"))
+        values = [service["label"] for service in source]
         self.assertEqual(set(values), set(SKILLS))
         for name in SKILLS.values():
             self.assertTrue((repo / "codex_skills" / name / "SKILL.md").is_file())
@@ -211,7 +210,7 @@ class DocumentToolsTest(unittest.TestCase):
     def test_unicode_words_exclude_numeric_citations_and_image_paths(self):
         self.assertEqual(word_count("سلام دنیا [۱۲] ![تصویر](figures/1.png)"), 2)
 
-    def rendered_fixture(self, sample_pages=2):
+    def rendered_fixture(self, sample_pages=1):
         """Exercise orchestration with valid files; only the Office boundary is stubbed."""
         from docx import Document
         import fitz
@@ -233,7 +232,7 @@ class DocumentToolsTest(unittest.TestCase):
         def sample(docx, output):
             Document().save(output)
             return 4, sample_pages
-        service = SimpleNamespace(export_pdf=export, create_first_half_sample=sample)
+        service = SimpleNamespace(export_pdf=export, create_sample=sample)
         with patch.object(tool, "services", return_value=service):
             result = tool.render()
         visual = self.root / "visual.md"
@@ -245,7 +244,7 @@ class DocumentToolsTest(unittest.TestCase):
 
     def test_render_and_finalize_cover_full_and_sample_page_images(self):
         result = self.rendered_fixture()
-        self.assertEqual(len(result["images"]), 6)
+        self.assertEqual(len(result["images"]), 5)
         report = self.tool.finalize()
         self.assertTrue(report["passed"])
         self.assertEqual(set(report["outputs"]), set(self.tool.outputs))
@@ -254,9 +253,9 @@ class DocumentToolsTest(unittest.TestCase):
         self.assertFalse(self.tool.current("render"))
         self.assertFalse(self.tool.current("review_visual"))
 
-    def test_incorrect_first_half_pdf_is_rejected(self):
-        self.rendered_fixture(sample_pages=3)
-        with self.assertRaisesRegex(ValueError, "first-half sample"):
+    def test_old_half_length_sample_is_rejected(self):
+        self.rendered_fixture(sample_pages=2)
+        with self.assertRaisesRegex(ValueError, "sample page counts"):
             self.tool.finalize()
 
     def test_document_publication_uses_document_upload_fields(self):

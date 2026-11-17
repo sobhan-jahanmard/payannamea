@@ -442,9 +442,12 @@ build_pptx(spec, CONTRACT, SOURCES, OUT / "revised.pptx", ORDER)
 package = validate_package(OUT / "revised.pptx", 22)
 (OUT / "package_validation.json").write_text(json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8")
 render_powerpoint(OUT / "revised.pptx", OUT / "revised.pdf", OUT / "rendered_slides")
-sample_contract = {**CONTRACT, "slide_count": 11}
-build_pptx({"slides": slides[:11]}, sample_contract, SOURCES, OUT / "sample.pptx", ORDER)
-validate_package(OUT / "sample.pptx", 11)
+from common.sample_policy import sample_count
+
+excerpt_count = sample_count(len(slides))
+sample_contract = {**CONTRACT, "slide_count": excerpt_count}
+build_pptx({"slides": slides[:excerpt_count]}, sample_contract, SOURCES, OUT / "sample.pptx", ORDER)
+validate_package(OUT / "sample.pptx", excerpt_count)
 render_powerpoint(OUT / "sample.pptx", OUT / "sample.pdf", OUT / "rendered_sample")
 print(json.dumps({"slides": len(slides), "npv": npv(base_flows), "irr": irr(base_flows),
                   "pptx": str(OUT / "revised.pptx"), "pdf": str(OUT / "revised.pdf")}, ensure_ascii=False))

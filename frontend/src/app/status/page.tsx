@@ -104,7 +104,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const fileTypeOptions = [
-  { value: "information_source", label: "منبع اطلاعات ارائه" },
+  { value: "information_source", label: "فایل اصلی سفارش" },
   { value: "format_template", label: "قالب و فرمت Word" },
   { value: "university_guideline", label: "شیوه‌نامه دانشگاه" },
   { value: "reference_file", label: "منابع و مقالات" },

@@ -31,11 +31,12 @@ import {
 } from "./db/entities";
 import { ApiError, compact } from "./http";
 import { deleteStoredUpload, saveUpload } from "./files";
-import { isInformationSource, isPresentationOrder, PRESENTATION_STYLES, PRESENTATION_FONTS, DEFAULT_PRESENTATION_STYLE, DEFAULT_PRESENTATION_FONT } from "../lib/presentation";
-import { assertPresentationSource, validateInformationSource } from "./presentation";
+import { isPresentationOrder, PRESENTATION_STYLES, PRESENTATION_FONTS, DEFAULT_PRESENTATION_STYLE, DEFAULT_PRESENTATION_FONT } from "../lib/presentation";
+import { assertOrderSource, validateInformationSource } from "./presentation";
 import { email } from "./email";
 import {
   academicDetailLabels,
+  isEditingOrder,
   orderTypeFieldConfig,
   orderTypeOptions,
   quantityTypeOptions,
@@ -67,7 +68,7 @@ const academicDetailFields = {
 } as const;
 
 function orderFieldsRefinement(
-  payload: { order_type: string; quantity_type?: string | null; quantity_value?: number | null } & Partial<Record<AcademicDetailKey, string | number | null | undefined>>,
+  payload: { order_type: string; degree: string; university: string; student_number: string; methodology: string; quantity_type?: string | null; quantity_value?: number | null } & Partial<Record<AcademicDetailKey, string | number | null | undefined>>,
   ctx: z.RefinementCtx
 ) {
   if (!orderTypeOptions.includes(payload.order_type)) {
@@ -80,6 +81,11 @@ function orderFieldsRefinement(
   }
 
   const fieldConfig = orderTypeFieldConfig(payload.order_type);
+  if (!isEditingOrder(payload)) {
+    for (const field of ["degree", "university", "student_number", "methodology"] as const) {
+      if (!payload[field].trim()) ctx.addIssue({ code: "custom", path: [field], message: "این فیلد الزامی است." });
+    }
+  }
   const requiredFields = fieldConfig.required;
   for (const field of requiredFields) {
     const value = payload[field];
@@ -108,13 +114,13 @@ function orderFieldsRefinement(
 
 export const orderCreateSchema = z.object({
   correspondence_email: z.string().trim().email().max(255),
-  degree: z.string().min(1).max(120),
-  university: z.string().min(1).max(255),
+  degree: z.string().max(120).default(""),
+  university: z.string().max(255).default(""),
   title: z.string().min(3).max(500),
   student_name: z.string().min(2).max(255),
-  student_number: z.string().trim().min(1).max(80),
+  student_number: z.string().trim().max(80).default(""),
   order_type: z.string().min(1).max(120),
-  methodology: z.string().min(1).max(160),
+  methodology: z.string().max(160).default(""),
   language: z.string().min(1).max(80),
   field_of_study: z.string().max(255).optional().nullable(),
   ...academicDetailFields,
@@ -492,10 +498,10 @@ export async function setOrderStatus(
   if (!ORDER_STATUSES.includes(toStatus)) {
     throw new ApiError(422, `Unknown order status '${toStatus}'`);
   }
-  if (isPresentationOrder(order) && ["approved", "in_progress", "approved_pending_for_final_execution"].includes(toStatus)) {
+  if ((isPresentationOrder(order) || isEditingOrder(order)) && ["approved", "in_progress", "approved_pending_for_final_execution"].includes(toStatus)) {
     // Query the current files, including claims that loaded only an order row.
     const files = await manager.getRepository(OrderFileSchema).findBy({ order_id: order.id });
-    assertPresentationSource({ ...order, files });
+    assertOrderSource({ ...order, files });
   }
   if (order.status === toStatus) {
     return;
@@ -528,6 +534,9 @@ export async function createCustomerOrder(user: UserEntity, rawPayload: unknown,
     throw new ApiError(422, "ثبت سفارش ارائه و پاورپوینت به فایل «منبع اطلاعات» نیاز دارد.");
   }
   if (informationSource) await validateInformationSource(informationSource);
+  assertOrderSource({ ...payload, files: informationSource ? [{
+    file_type: "information_source", original_name: informationSource.name, size_bytes: informationSource.size
+  }] : [] });
   const dataSource = await getDataSource();
   const storedSource = informationSource ? await saveUpload(informationSource, `orders/${orderId}/input`) : null;
 
@@ -704,9 +713,9 @@ export async function deleteOrderFile(order: OrderEntity, fileId: string): Promi
   if (!file) {
     throw new ApiError(404, "Order file not found");
   }
-  if (isPresentationOrder(order) && isInformationSource(file)) {
+  if ((isPresentationOrder(order) || isEditingOrder(order)) && file.file_type === "information_source") {
     const remaining = await repository.findBy({ order_id: order.id });
-    assertPresentationSource({ ...order, files: remaining.filter(item => item.id !== fileId) });
+    assertOrderSource({ ...order, files: remaining.filter(item => item.id !== fileId) });
   }
   await repository.delete({ id: file.id });
   await deleteStoredUpload(file.storage_path);
@@ -719,7 +728,7 @@ export async function deleteOrderFileAsAdmin(orderId: string, fileId: string): P
   const file = await repository.findOneBy({ id: fileId, order_id: orderId });
   if (!file) throw new ApiError(404, "Order file not found");
   const order = await getOrderOr404(orderId);
-  assertPresentationSource({ ...order, files: (order.files ?? []).filter(item => item.id !== fileId) });
+  assertOrderSource({ ...order, files: (order.files ?? []).filter(item => item.id !== fileId) });
   await repository.delete({ id: file.id });
   await deleteStoredUpload(file.storage_path);
   return getOrderOr404(orderId);

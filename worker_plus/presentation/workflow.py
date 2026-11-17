@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import math
 import re
 import shutil
 import hashlib
@@ -11,6 +10,7 @@ from pathlib import Path
 
 from common.helpers import archive_workspace, write_json, write_text
 from common.input_files import target_name
+from common.sample_policy import sample_count
 from common.source_extract import extract_source
 from presentation import profile
 from presentation.deck import build_pptx, render_powerpoint, validate_package, validate_spec
@@ -667,7 +667,7 @@ def cover(context, services):
 
 def sample(context, services):
     full = spec(services)
-    count = math.ceil(len(full["slides"]) / 2)
+    count = sample_count(len(full["slides"]))
     build_pptx({"slides": full["slides"][:count]}, contract(services), source_index(services), services.workspace / "final/sample.pptx", services.workspace)
     validate_package(services.workspace / "final/sample.pptx", count)
     context["artifacts"]["sample_pptx"] = "final/sample.pptx"
@@ -677,7 +677,7 @@ def render(context, services):
     import fitz
     render_powerpoint(services.workspace / "final/final.pptx", services.workspace / "final/final.pdf", services.workspace / "reports/rendered_slides")
     with fitz.open(services.workspace / "final/final.pdf") as full, fitz.open() as excerpt:
-        excerpt.insert_pdf(full, to_page=math.ceil(len(full) / 2)-1)
+        excerpt.insert_pdf(full, to_page=sample_count(len(full)) - 1)
         excerpt.save(services.workspace / "final/sample.pdf")
     preview_file = services.workspace / "reports/presentation_preview.json"
     if contract(services).get("layout_version") == 2:
@@ -737,22 +737,22 @@ def publish(context, services):
     for path in paths.values():
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Presentation output missing: {path.name}")
-    for key, size in (("pptx_file", len(spec(services)["slides"])), ("sample_file", math.ceil(len(spec(services)["slides"]) / 2))):
+    for key, size in (("pptx_file", len(spec(services)["slides"])), ("sample_file", sample_count(len(spec(services)["slides"])))):
         validate_source_comments(paths[key], expected_comments({"slides": spec(services)["slides"][:size]}, source_index(services), contract(services)))
     full_count = contract(services)["slide_count"]
-    sample_count = math.ceil(full_count / 2)
-    validate_package(paths["sample_file"], sample_count)
-    for key, count in (("pdf_file", full_count), ("sample_pdf_file", sample_count)):
+    excerpt_count = sample_count(full_count)
+    validate_package(paths["sample_file"], excerpt_count)
+    for key, count in (("pdf_file", full_count), ("sample_pdf_file", excerpt_count)):
         with fitz.open(paths[key]) as pdf:
             if len(pdf) != count:
                 raise ValueError(f"Presentation PDF count mismatch: {key}")
     write_json(services.workspace / "reports/stage_checks/presentation_final.json", {
-        "passed": True, "slides": full_count, "sample_slides": sample_count,
+        "passed": True, "slides": full_count, "sample_slides": excerpt_count,
         "sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths.values()}})
     if services.args.offline:
         context["status"] = "dry_run_complete"
     else:
-        submit_final(services.config, context["order_id"], paths, "Presentation and first-half sample; content, sources and rendered slides reviewed.", sample_status=context["mode"] == "sample")
+        submit_final(services.config, context["order_id"], paths, "Presentation and 20% sample; content, sources and rendered slides reviewed.", sample_status=context["mode"] == "sample")
         context["status"] = "sample_pending_customer_approval" if context["mode"] == "sample" else "worker_done_pending_approval"
     context["artifacts"]["archive"] = str(archive_workspace(services.workspace, context["order_id"]))
 

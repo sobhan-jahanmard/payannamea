@@ -34,6 +34,10 @@ main skill's routing table and [the document revision guide](references/document
 Apply its Word/PDF branch wherever the steps below mention presentation-only
 models, source policy, slide counts or native PowerPoint comments.
 
+For ویراستاری use [daneshyar-editing](../daneshyar-editing/SKILL.md).
+Snapshot the current copyedit plan and delivery, log the requested changes,
+and apply the skill's revision path against the original Word file.
+
 Use the review bundle explicitly chosen by the user or produced in this chat.
 Otherwise inspect local review manifests and choose the latest completed review
 for this exact order whose submitted-file hashes match the current delivery.

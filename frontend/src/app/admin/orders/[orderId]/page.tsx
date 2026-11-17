@@ -631,7 +631,7 @@ function OrderFilesSection({ files, onDelete }: { files?: OrderFile[]; onDelete:
   const groups = [
     { type: "university_guideline", label: "شیوه‌نامه و قالب" },
     { type: "reference_file", label: "منابع و مقالات" },
-    { type: "information_source", label: "منبع اطلاعات ارائه" },
+    { type: "information_source", label: "فایل اصلی سفارش" },
     { type: "supporting_material", label: "فایل‌های تکمیلی" }
   ].map((group) => ({
     ...group,

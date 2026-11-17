@@ -20,7 +20,7 @@ explicitly disclose missing essential data. Never invent sources or observations
 
 Use `order_tools.py` to prepare/extract, validate evidence and document candidates,
 record honest content/source audits, build/render, inspect actual page images and
-finalize the full editable Word/PDF plus first-half sample package. Include all
+finalize the full editable Word/PDF plus opening 20% sample package. Include all
 required companion reports. After completion and every revision, show the complete
 current delivery using the main skill's fresh file-citation directives. For
 requested revisions use [daneshyar-revise](../daneshyar-revise/SKILL.md); for an

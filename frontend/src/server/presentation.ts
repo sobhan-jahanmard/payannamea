@@ -1,9 +1,20 @@
 import { INFORMATION_SOURCE_EXTENSIONS, isInformationSource, isPresentationOrder } from "../lib/presentation";
+import { isEditingOrder } from "../lib/order-options";
 import { ApiError } from "./http";
 
 export function assertPresentationSource(order: { order_type: string | null; files?: Array<{ file_type: string; original_name: string; size_bytes: number }> }): void {
   if (isPresentationOrder(order) && !order.files?.some(isInformationSource)) {
     throw new ApiError(422, "برای ارائه و پاورپوینت، بارگذاری حداقل یک فایل «منبع اطلاعات» خواندنی الزامی است.");
+  }
+}
+
+export function assertOrderSource(order: Parameters<typeof assertPresentationSource>[0]): void {
+  assertPresentationSource(order);
+  if (isEditingOrder(order)) {
+    const sources = order.files?.filter(file => file.file_type === "information_source");
+    if (sources?.length !== 1 || !sources[0].original_name.toLowerCase().endsWith(".docx") || sources[0].size_bytes < 1) {
+      throw new ApiError(422, "برای ویراستاری، یک فایل Word با پسوند DOCX لازم است.");
+    }
   }
 }
 

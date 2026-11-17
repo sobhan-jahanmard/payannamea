@@ -19,7 +19,7 @@ test("pricing uses stored toman rates and repeated setup preserves edits", { ski
     globalThis.payannameDataSource = { isInitialized: true, ...localDataSource } as unknown as DataSource;
     await ensureServicePricing(localDataSource);
     const rates = await getServicePricing();
-    assert.equal(rates.length, 5);
+    assert.equal(rates.length, 6);
     assert.deepEqual(Object.fromEntries(rates.map(rate => [rate.order_type, [
       rate.unit, rate.price_per_unit_toman, rate.estimate_quantity,
       rate.price_per_unit_toman * rate.estimate_quantity,
@@ -29,13 +29,14 @@ test("pricing uses stored toman rates and repeated setup preserves edits", { ski
       proposal: ["page", 200000, 20, 4000000],
       research_assignment: ["page", 150000, 15, 2250000],
       presentation: ["slide", 300000, 15, 4500000],
+      editing: ["page", 50000, 10, 500000],
     });
     await runner.query("UPDATE service_pricing SET price_per_unit_toman = 310000, estimate_quantity = 20 WHERE order_type = 'presentation'");
     await ensureServicePricing(localDataSource);
     const updated = (await getServicePricing()).find(rate => rate.order_type === "presentation");
     assert.equal(updated?.price_per_unit_toman, 310000);
     assert.equal(updated?.estimate_quantity, 20);
-    assert.equal((await getServicePricing()).length, 5);
+    assert.equal((await getServicePricing()).length, 6);
   } finally {
     globalThis.payannameDataSource = original;
     await runner.rollbackTransaction();

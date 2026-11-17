@@ -27,7 +27,7 @@ Office/compiler diagnostics can precede the final JSON line.
 | `review-inputs content` / `sources` / `visual` | Hash map binding upcoming review to inspected inputs |
 | `review content --report <md>` | Record current agent's full-slide content audit |
 | `review sources --report <md>` | Record full-slide source audit |
-| `build` | Compile reviewed full and first-half editable PPTX |
+| `build` | Compile reviewed full and opening 20% editable PPTX |
 | `render` | Export PDF, sample PDF, PNGs and native visual proof |
 | `review visual --report <md>` | Reconcile actual image review with native proof |
 | `finalize` | Check current prerequisites, package counts and output hashes |
@@ -50,7 +50,7 @@ document types use [the document workflow](documents.md) and
 | `review-inputs content` / `sources` | Exact complete hash map for the upcoming section audit |
 | `review content --report <md>` / `review sources --report <md>` | Commit a complete section audit with the exact input hashes |
 | `build` | Create and validate editable Word with the existing local compiler; no AI invocation |
-| `render` | Export full PDF and first-half Word/PDF samples, optional planned companion reports, current page PNGs |
+| `render` | Export full PDF and opening 20% Word/PDF samples, optional planned companion reports, current page PNGs |
 | `review-inputs visual`, `review visual --report <md>` | Bind actual review of every current full/sample/companion page to its hashes |
 | `finalize` | Recheck fresh gates, real page counts, readable packages and deliverable hashes |
 | `publish` | Four primary document files, only when authorized; companion uploads are explicitly unsupported by this API |

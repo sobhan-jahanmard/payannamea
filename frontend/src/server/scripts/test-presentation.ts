@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isPresentationOrder, PRESENTATION_STYLES, PRESENTATION_FONTS } from "../../lib/presentation";
-import { assertPresentationSource, validateInformationSource } from "../presentation";
+import { assertOrderSource, assertPresentationSource, validateInformationSource } from "../presentation";
 import { customerOutputFileName, customerVisibleFinalOutputs, createCustomerOrder, orderCreateSchema } from "../orders";
 import { requiredFinalOutputTypes } from "../worker";
 import type { FinalOutputEntity, UserEntity } from "../db/entities";
@@ -33,6 +33,19 @@ test("presentation quantity and output matrix differ from Word orders", () => {
   assert.deepEqual(requiredFinalOutputTypes({ order_type: payload.order_type }).sort(), ["pdf", "pptx", "sample", "sample_pdf"]);
   assert.deepEqual(requiredFinalOutputTypes({ order_type: "پایان‌نامه کارشناسی" }), ["docx", "pdf"]);
   assert.equal(isPresentationOrder({ order_type: "تحقیق دانشگاهی" }), false);
+});
+
+test("editing requires one original DOCX and produces both full and sample Word/PDF files", async () => {
+  const editing = { correspondence_email: "fixture@example.com", title: "ویرایش متن آزمون",
+    student_name: "نویسنده نمونه", language: "فارسی", order_type: "ویراستاری" };
+  const original = { file_type: "information_source", original_name: "original.docx", size_bytes: 100 };
+  assert.equal(orderCreateSchema.safeParse(editing).success, true);
+  assert.equal(orderCreateSchema.safeParse({ ...editing, quantity_type: "words" }).success, false);
+  await assert.rejects(createCustomerOrder({} as UserEntity, editing), /DOCX/);
+  assert.throws(() => assertOrderSource({ ...editing, files: [{ ...original, original_name: "original.pdf" }] }), /DOCX/);
+  assert.throws(() => assertOrderSource({ ...editing, files: [original, original] }), /DOCX/);
+  assertOrderSource({ ...editing, files: [original] });
+  assert.deepEqual(requiredFinalOutputTypes(editing), ["docx", "pdf", "sample", "sample_pdf"]);
 });
 
 test("presentation style and font choices use the versioned catalog", () => {

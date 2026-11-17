@@ -70,7 +70,7 @@ actual current artifacts using `status`; do not overwrite a good delivery.
    listed by `reports/document_render.json.images` (full, sample and companions),
    and inspect native editable tables, equations, headings, links and fields.
    Check RTL/LTR, Persian digits, cover, TOC, clipping, captions, repeated headers,
-   blank pages, typography and first-half sample fidelity. Use contact sheets for
+   blank pages, typography and opening 20% sample fidelity. Use contact sheets for
    navigation and full resolution for small content. Record every actual image
    in the visual audit. Fix the source/rules responsible and rebuild all affected
    outputs; never certify an old render.

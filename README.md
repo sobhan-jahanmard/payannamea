@@ -1,8 +1,8 @@
 # Academic Services
 
-Unified Next.js ordering system for bachelor’s and master’s theses, proposals, research assignments, and presentations.
+Unified Next.js ordering system for theses, proposals, research assignments, presentations, and Word copyediting.
 
-For conversation-driven execution of all five order types, independent review,
+For conversation-driven execution of all six order types, independent review,
 and revisions in Codex, see [the Codex skill guide](codex_skills/README.md).
 
 ## Structure
@@ -85,6 +85,10 @@ The landing page reads per-page/per-slide rates and example quantities from
 it for fresh setups). Re-running setup fills missing services and preserves
 edited rates. Run `npm run test:service-pricing` to verify stored rates,
 example totals, and preservation of edits using a temporary PostgreSQL table.
+
+Copyediting (`ویراستاری`) uses the customer's DOCX and costs 50,000 toman
+per page. Sample packages include the first 20% of the delivered pages or
+slides, rounded up to a whole page or slide.
 
 The admin-only Telegram advertising page at `/admin/advertising` shows the
 channel shortlist and records each publication with the Daneshyar subscriber

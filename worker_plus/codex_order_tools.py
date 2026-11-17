@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import re
 import sys
 from datetime import datetime, timezone
@@ -20,6 +19,8 @@ from common.input_files import materialize_local_file, target_name
 from common.local_reviews import collect_review_scores, verify_review_scores
 from common.profiles import profile_for
 from presentation import profile, workflow
+from editing.profile import ORDER_TYPE as EDITING_TYPE
+from common.sample_policy import SAMPLE_PERCENT, sample_count
 
 STEPS = ["دریافت سفارش", "بررسی ورودی و قرارداد", "خواندن فایل‌های منبع",
          "انتخاب مطالب اصلی و مشخص‌کردن محل آن‌ها در منبع", "طرح روایت اسلایدها", "ساخت محتوای اسلایدها",
@@ -45,7 +46,8 @@ SKILLS = {"پایان‌نامه کارشناسی": "daneshyar-bachelor-thesis",
           "پایان‌نامه کارشناسی ارشد": "daneshyar-master-thesis",
           "پروپوزال پایان‌نامه": "daneshyar-thesis-proposal",
           "تحقیق دانشگاهی": "daneshyar-university-research",
-          "ارائه و پاورپوینت": "daneshyar-presentation"}
+          "ارائه و پاورپوینت": "daneshyar-presentation",
+          EDITING_TYPE: "daneshyar-editing"}
 
 
 def now():
@@ -124,6 +126,8 @@ class OrderTools:
 
     def record(self, key, paths, **extra):
         state = self.state()
+        if key in {"render", "review_visual", "delivery"} or (key == "build" and self.context()["order"]["order_type"] == profile.ORDER_TYPE):
+            extra["sample_percent"] = SAMPLE_PERCENT
         if key in {"build", "render", "review_visual", "delivery"} and self.context()["order"]["order_type"] == profile.ORDER_TYPE:
             from presentation.source_comments import POLICY_VERSION
             extra["source_comment_policy"] = POLICY_VERSION
@@ -134,6 +138,9 @@ class OrderTools:
         stamp = self.state().get("checks", {}).get(key)
         if not stamp:
             return False
+        if key in {"render", "review_visual", "delivery"} or (key == "build" and self.context()["order"]["order_type"] == profile.ORDER_TYPE):
+            if stamp.get("sample_percent") != SAMPLE_PERCENT:
+                return False
         if key in {"build", "render", "review_visual", "delivery"} and self.context()["order"]["order_type"] == profile.ORDER_TYPE:
             from presentation.source_comments import POLICY_VERSION
             if stamp.get("source_comment_policy") != POLICY_VERSION:
@@ -212,7 +219,7 @@ class OrderTools:
                    "offline": True, "completed_steps": [], "artifacts": {}, "errors": []}
         write_json(self.workspace / "order_context.json", context)
         self.save_state({"version": 1, "order_id": identifier, "order_signature": signature(order),
-                         "source_policy": ("supplied_files_only" if order["order_type"] == profile.ORDER_TYPE
+                         "source_policy": ("supplied_files_only" if order["order_type"] in {profile.ORDER_TYPE, EDITING_TYPE}
                                            else "supplied_and_verified_research"), "progress": [], "checks": {},
                          "input_hashes": hashes(self.workspace, ["customer_input.json", *paths])})
         incomplete.unlink()
@@ -371,7 +378,7 @@ class OrderTools:
         from presentation.source_comments import expected_comments, validate_source_comments
         sources = read(self.workspace / BASE[2])
         model = read(self.workspace / VALIDATORS["slides"])
-        for editable, pdf, size in ((OUTPUTS[0], OUTPUTS[1], count), (OUTPUTS[2], OUTPUTS[3], math.ceil(count / 2))):
+        for editable, pdf, size in ((OUTPUTS[0], OUTPUTS[1], count), (OUTPUTS[2], OUTPUTS[3], sample_count(count))):
             validate_package(self.workspace / editable, size)
             validate_source_comments(self.workspace / editable, expected_comments({"slides": model["slides"][:size]}, sources, contract))
             with fitz.open(self.workspace / pdf) as document:
@@ -464,7 +471,7 @@ def parser():
     for name in ("prepare", "extract", "build", "render", "finalize", "publish", "status"):
         sub.add_parser(name)
     validate = sub.add_parser("validate")
-    validate.add_argument("kind", choices=[*VALIDATORS, "rules", "evidence", "document"])
+    validate.add_argument("kind", choices=[*VALIDATORS, "rules", "evidence", "document", "copyedits"])
     validate.add_argument("--candidate", type=Path)
     review = sub.add_parser("review")
     review.add_argument("kind", choices=list(REVIEW_NAMES))
@@ -491,9 +498,14 @@ def main(argv=None):
         # The lock is outside the order folder; initialization can require an empty folder.
         with execution_lock(workspace.resolve().parent / f".{workspace.name}.codex-lock"):
             tool = OrderTools(workspace, config)
-            if args.command != "fetch" and tool.context()["order"]["order_type"] != profile.ORDER_TYPE:
-                from codex_document_tools import DocumentTools
-                tool = DocumentTools(workspace, config)
+            if args.command != "fetch":
+                stored_type = tool.context()["order"]["order_type"]
+                if stored_type == EDITING_TYPE:
+                    from editing.codex_tools import EditingTools
+                    tool = EditingTools(workspace, config)
+                elif stored_type != profile.ORDER_TYPE:
+                    from codex_document_tools import DocumentTools
+                    tool = DocumentTools(workspace, config)
             if args.command == "fetch":
                 value = tool.fetch(args.order, args.order_file.resolve() if args.order_file else None)
             elif args.command == "validate":

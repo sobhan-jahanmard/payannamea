@@ -21,7 +21,7 @@ The runner has 20 normal stages plus a failure handler:
 5. Generate the entire Markdown document, extend it if short.
 6. Check visual placement, review decision content/admin instructions, audit source compliance.
 7. Package Word, polish cover, finalize and verify Persian pagination.
-8. Validate, potentially extend content again for page count, render PDF, audit visuals, create first-half sample, submit artifacts.
+8. Validate, potentially extend content again for page count, render PDF, audit visuals, create opening 20% sample, submit artifacts.
 
 Five profiles share this workflow: bachelor thesis, master thesis, proposal, university research, presentation. Most behavior remains shared; profile names do not imply genuinely different artifact pipelines.
 
@@ -45,7 +45,7 @@ Useful foundations to preserve: explicit order contracts, deterministic checks, 
 | P1 | Prompt permissions exceed task needs | `run_codex()` | All calls bypass sandbox/approvals, even read-only auditors. File-read-only prompt text is not runtime enforcement. |
 | P2 | Orchestration and document implementation are coupled | `runner.py` | The same large module owns model calls, workflow, recovery, Word output, rendering and validation. |
 
-Sample mode currently generates a full document and extracts half of the rendered pages. Treat a true sample-first pipeline as a product decision, since it changes current delivery behavior.
+Sample mode currently generates a full document and extracts the first 20% of the rendered pages. Treat a true sample-first pipeline as a product decision, since it changes current delivery behavior.
 
 ## Proposed design
 

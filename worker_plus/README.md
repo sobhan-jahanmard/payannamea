@@ -12,7 +12,7 @@ skill reports ten visible milestones, uses only supplied information sources, an
 reuses the deterministic extraction, validation and rendering tools without starting
 the worker's AI loop. The document path supports bachelor's and master's theses,
 thesis proposals and university research with its own ten milestones, evidence
-ledger, editable Word/PDF, first-half samples and hash-bound page review. See
+ledger, editable Word/PDF, opening 20% samples and hash-bound page review. See
 [`codex_skills/README.md`](../codex_skills/README.md) for installation, all routes,
 prerequisites and execution/artifact guides.
 State lives in a separate `workspace/codex_orders/<id>` directory; generation is local
@@ -134,7 +134,7 @@ available as `python`.
 
 مسیر ارائه از دریافت سفارش، فایل‌ها، runner، بازیابی و گراف مشترک استفاده می‌کند. مراحل محتوایی
 در `presentation/workflow.py` به ساخت مدل اسلاید، PPTX قابل ویرایش، PDF و نمونه تغییر می‌کنند.
-فایل `information_source` اجباری است؛ نمونه، نیمه اول همان اسلایدهاست. برای این نوع خروجی Word
+فایل `information_source` اجباری است؛ نمونه، ۲۰٪ ابتدایی همان اسلایدهاست. برای این نوع خروجی Word
 یا گزارش میانی پایان‌نامه تولید نمی‌شود. شماره مراحل برای حفظ تاریخچه مشترک ثابت است و عنوان
 هر مرحله در UI متناسب با ارائه نمایش داده می‌شود.
 در مرحلهٔ دفتر ادعاهای ارائه، اگر یک ادعا اعتبارسنجی نشود، Worker همان ادعا را با خطای دقیق و

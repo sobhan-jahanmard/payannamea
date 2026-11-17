@@ -48,6 +48,7 @@
       { "from": "../master_thesis", "to": "worker_plus/master_thesis", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../thesis_proposal", "to": "worker_plus/thesis_proposal", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
       { "from": "../university_research", "to": "worker_plus/university_research", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "../editing", "to": "worker_plus/editing", "filter": ["__init__.py", "profile.py", "workflow.py", "worker.py"] },
       { "from": "../presentation", "to": "worker_plus/presentation", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] }
     ],
     "directories": { "output": "release" },

@@ -16,7 +16,7 @@ it by default unless the user explicitly changes the format.
   Direct `/sample/*.pdf` links remain valid for individual sample downloads.
 - Preserve the final newline plus U+2060 WORD JOINER from the saved format. This
   keeps a visually empty final line for Telegram's time/edit indicator.
-- Keep samples in one pinned text post titled `📎 نمونه‌کارها`, with five labeled
+- Keep samples in one pinned text post titled `📎 نمونه‌کارها`, with six labeled
   PDF links. Do not attach a ZIP or recreate separate sample posts.
 - Use `telegram/integration/channel_format.py::format_post` for shared rendering.
   Use Telegram HTML parsing when the body contains bold headings or labeled links;

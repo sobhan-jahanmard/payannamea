@@ -17,6 +17,7 @@ import { deleteStoredUpload } from "./files";
 import { ApiError, compact } from "./http";
 import { estimateOpenAiTextCost } from "./openai-pricing";
 import { isPresentationOrder } from "../lib/presentation";
+import { isEditingOrder } from "../lib/order-options";
 import { deleteWorkerLock, getOrderOr404, serializeOrder, setOrderStatus } from "./orders";
 
 export const workerActionSchema = z.object({
@@ -324,8 +325,9 @@ export async function submitSamplePackage(
 }
 
 export function requiredFinalOutputTypes(order: Pick<OrderEntity, "order_type">): string[] {
-  const required = new Set<string>(isPresentationOrder(order) ? ["pptx", "pdf", "sample", "sample_pdf"] : baseFinalOutputTypes);
-  return [...required];
+  if (isPresentationOrder(order)) return ["pptx", "pdf", "sample", "sample_pdf"];
+  if (isEditingOrder(order)) return ["docx", "pdf", "sample", "sample_pdf"];
+  return [...baseFinalOutputTypes];
 }
 
 function validateFinalUploadMatrix(

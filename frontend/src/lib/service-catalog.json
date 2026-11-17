@@ -1,0 +1,8 @@
+[
+  {"order_type":"bachelor_thesis","label":"پایان‌نامه کارشناسی","unit":"page","price_per_unit_toman":200000,"estimate_quantity":30},
+  {"order_type":"master_thesis","label":"پایان‌نامه کارشناسی ارشد","unit":"page","price_per_unit_toman":250000,"estimate_quantity":60},
+  {"order_type":"proposal","label":"پروپوزال پایان‌نامه","unit":"page","price_per_unit_toman":200000,"estimate_quantity":20},
+  {"order_type":"research_assignment","label":"تحقیق دانشگاهی","unit":"page","price_per_unit_toman":150000,"estimate_quantity":15},
+  {"order_type":"presentation","label":"ارائه و پاورپوینت","unit":"slide","price_per_unit_toman":300000,"estimate_quantity":15},
+  {"order_type":"editing","label":"ویراستاری","unit":"page","price_per_unit_toman":50000,"estimate_quantity":10}
+]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daneshyar Editing"
+  short_description: "Copyedit a registered Daneshyar Word order"
+  default_prompt: "Use $daneshyar-editing to complete this registered ویراستاری order from its original Word file."
