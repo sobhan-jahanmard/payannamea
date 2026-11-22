@@ -225,7 +225,7 @@ export default async function LandingPage() {
                 const rate = pricingByType.get(service.analyticsKey);
                 const unitLabel = rate?.unit === "slide" ? "اسلاید" : "صفحه";
                 return (
-                  <article key={service.analyticsKey} className="group grid grid-rows-[1fr_auto] overflow-hidden rounded-xl border border-white/10 bg-white/[0.035] shadow-lg shadow-black/10 transition duration-300 hover:border-teal-200/35 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20 motion-safe:hover:-translate-y-1">
+                  <article key={service.analyticsKey} className="group row-span-2 grid grid-rows-subgrid gap-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.035] shadow-lg shadow-black/10 transition duration-300 hover:border-teal-200/35 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20">
                     <div className="flex flex-col p-4 pb-5">
                       <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200/15 bg-teal-200/[0.07] text-teal-200 transition-colors group-hover:border-teal-200/30 group-hover:bg-teal-200/10">
                         <Icon className="h-5 w-5" aria-hidden="true" />
@@ -253,8 +253,8 @@ export default async function LandingPage() {
                       {rate ? (
                         <>
                           <p className="text-xs font-medium text-slate-300">تعرفه هر {unitLabel}</p>
-                          <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-[1.625rem] font-bold leading-none tracking-tight text-amber-200 tabular-nums">
-                            {rate.price_per_unit_toman.toLocaleString("fa-IR")}{" "}
+                          <p className="mt-3 flex flex-col items-start gap-2 text-[1.625rem] font-bold leading-none tracking-tight text-amber-200 tabular-nums">
+                            <span>{rate.price_per_unit_toman.toLocaleString("fa-IR")}</span>
                             <span className="text-xs font-normal tracking-normal text-slate-400">تومان</span>
                           </p>
                           <div className="mt-5 rounded-lg border border-teal-200/10 bg-teal-200/[0.045] px-3 py-3">
@@ -262,8 +262,8 @@ export default async function LandingPage() {
                               <span>هزینه تقریبی</span>
                               <span className="whitespace-nowrap text-teal-200">{rate.estimate_quantity.toLocaleString("fa-IR")} {unitLabel}</span>
                             </p>
-                            <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-lg font-semibold leading-7 text-slate-100 tabular-nums">
-                              {(rate.price_per_unit_toman * rate.estimate_quantity).toLocaleString("fa-IR")}{" "}
+                            <p className="mt-2 flex flex-col items-start gap-1 text-lg font-semibold leading-7 text-slate-100 tabular-nums">
+                              <span>{(rate.price_per_unit_toman * rate.estimate_quantity).toLocaleString("fa-IR")}</span>
                               <span className="text-[11px] font-normal text-slate-400">تومان</span>
                             </p>
                           </div>
