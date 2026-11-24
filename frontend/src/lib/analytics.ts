@@ -1,3 +1,5 @@
+import { getStoredToken, getStoredUser } from "./api";
+
 export type AnalyticsProperties = Record<string, string | number | boolean>;
 
 type QueuedAnalyticsEvent = {
@@ -20,7 +22,12 @@ let memoryUtmSource: string | null = null;
 
 function analyticsEnabled(): boolean {
   if (typeof window === "undefined") return false;
-  return !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  if (["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) return false;
+  try {
+    return !getStoredToken() || getStoredUser()?.role === "customer";
+  } catch {
+    return false;
+  }
 }
 
 /** Keeps the first campaign source for the current browser until it converts. */
@@ -120,28 +127,38 @@ export function pageViewProperties(): AnalyticsProperties {
 }
 
 export function flushAnalyticsEvents(): void {
-  if (!analyticsEnabled() || sending || queue.length === 0) return;
+  if (!analyticsEnabled()) {
+    queue.length = 0;
+    return;
+  }
+  if (sending || queue.length === 0) return;
   const event = queue.shift();
   if (!event) return;
+  const token = getStoredToken();
   sending = true;
   let retryLater = false;
 
   void fetch(`${API_BASE_URL}/api/analytics/events`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {})
+    },
     body: JSON.stringify(event),
     keepalive: true,
     credentials: "same-origin",
   })
     .then((response) => {
-      if (!response.ok && response.status >= 500) {
+      if (!response.ok && response.status >= 500 && analyticsEnabled()) {
         queue.unshift(event);
         retryLater = true;
       }
     })
     .catch(() => {
-      queue.unshift(event);
-      retryLater = true;
+      if (analyticsEnabled()) {
+        queue.unshift(event);
+        retryLater = true;
+      }
     })
     .finally(() => {
       sending = false;

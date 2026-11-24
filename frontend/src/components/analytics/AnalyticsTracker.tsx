@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useAuth } from "../auth/AuthProvider";
 
 import {
   analyticsPageKey,
@@ -25,16 +26,22 @@ function durationBucket(seconds: number): string {
 
 export function AnalyticsTracker() {
   const pathname = usePathname() ?? "/";
+  const { loading, isAdmin, isOperator } = useAuth();
+  const enabled = !loading && !isAdmin && !isOperator;
 
   useEffect(() => {
+    if (!enabled) {
+      flushAnalyticsEvents();
+      return;
+    }
     captureUtmSource();
     const flushTimer = window.setInterval(flushAnalyticsEvents, 1_000);
     flushAnalyticsEvents();
     return () => window.clearInterval(flushTimer);
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    if (pathname.startsWith("/admin")) return;
+    if (!enabled || pathname.startsWith("/admin")) return;
     const pageKey = analyticsPageKey(pathname);
     let visibleMilliseconds = 0;
     let visibleSince = document.visibilityState === "visible" ? Date.now() : null;
@@ -116,10 +123,10 @@ export function AnalyticsTracker() {
       window.removeEventListener("scroll", updateScroll);
       window.removeEventListener("pagehide", finish);
     };
-  }, [pathname]);
+  }, [enabled, pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/admin")) return;
+    if (!enabled || pathname.startsWith("/admin")) return;
     const startedForms = new WeakSet<Element>();
 
     const handleInteraction = (event: Event) => {
@@ -172,7 +179,7 @@ export function AnalyticsTracker() {
       document.removeEventListener("click", handleInteraction);
       document.removeEventListener("input", handleInteraction);
     };
-  }, [pathname]);
+  }, [enabled, pathname]);
 
   return null;
 }
